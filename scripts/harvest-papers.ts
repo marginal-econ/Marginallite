@@ -438,7 +438,7 @@ export async function runHarvester() {
 
           const { error: insErr } = await supabase.from("mcq_pdf_papers").upsert({
             title: paperTitle,
-            level: parsed.era,
+            level: "as",
             exam_year: parsed.year,
             exam_series: parsed.seasonName,
             question_count: qCount,

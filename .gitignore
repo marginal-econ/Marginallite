@@ -29,3 +29,5 @@ pnpm-debug.log*
 *.tmp
 *.swp
 push-to-github.bat
+docs/source/archive/
+docs/source/*.pdf

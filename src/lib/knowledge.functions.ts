@@ -196,11 +196,17 @@ export const listEmbeddingProviderOptions = createServerFn({ method: "GET" })
 /** Embed the next slice of a document's chunks. Call until `done` is true. */
 export const embedNextBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({ documentId: z.string().uuid(), embeddingProviderId: z.string().uuid().optional() })
-      .parse(input),
-  )
+  .inputValidator((input: unknown) => {
+    const raw = (input && typeof input === "object" && "data" in input ? (input as any).data : input) as any;
+    const documentId = raw?.documentId || raw?.id;
+    if (!documentId || typeof documentId !== "string") {
+      throw new Error("Missing or invalid document ID");
+    }
+    return {
+      documentId,
+      embeddingProviderId: typeof raw?.embeddingProviderId === "string" ? raw.embeddingProviderId : undefined,
+    };
+  })
   .handler(async ({ data, context }) => {
     await assertKnowledgeStaff(context);
     const { embed } = await import("./ai.server");
@@ -299,15 +305,19 @@ export const listDocuments = createServerFn({ method: "GET" })
 
 export const deleteDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .union([
-        z.object({ id: z.string().uuid() }),
-        z.object({ documentId: z.string().uuid() }),
-      ])
-      .transform((val) => ("id" in val ? val.id : val.documentId))
-      .parse(input),
-  )
+  .inputValidator((input: unknown) => {
+    if (typeof input === "string") return input;
+    if (input && typeof input === "object") {
+      const obj = input as any;
+      if (typeof obj.id === "string") return obj.id;
+      if (typeof obj.documentId === "string") return obj.documentId;
+      if (obj.data && typeof obj.data === "object") {
+        if (typeof obj.data.id === "string") return obj.data.id;
+        if (typeof obj.data.documentId === "string") return obj.data.documentId;
+      }
+    }
+    throw new Error("Invalid or missing document ID for deletion.");
+  })
   .handler(async ({ data: docId, context }) => {
     await assertKnowledgeStaff(context);
     const { error } = await supabaseAdmin.from("knowledge_documents").delete().eq("id", docId);
