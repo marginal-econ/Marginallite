@@ -141,16 +141,16 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2 0.018 295);
 
-  --primary: oklch(0.58 0.22 358);
-  --primary-foreground: oklch(0.995 0.006 358);
+  --primary: oklch(0.58 0.17 295);
+  --primary-foreground: oklch(0.995 0.006 295);
 
-  --secondary: oklch(0.958 0.016 300);
+  --secondary: oklch(0.965 0.012 300);
   --secondary-foreground: oklch(0.28 0.02 295);
 
-  --muted: oklch(0.963 0.012 300);
-  --muted-foreground: oklch(0.492 0.022 295);
+  --muted: oklch(0.97 0.008 300);
+  --muted-foreground: oklch(0.48 0.02 295);
 
-  --accent: oklch(0.945 0.024 298);
+  --accent: oklch(0.955 0.018 298);
   --accent-foreground: oklch(0.24 0.03 295);
 
   --destructive: oklch(0.545 0.198 27);
@@ -159,9 +159,9 @@
   --success: oklch(0.53 0.115 168);
   --warning: oklch(0.63 0.145 58);
 
-  --border: oklch(0.898 0.012 298);
-  --input: oklch(0.865 0.016 298);
-  --ring: oklch(0.62 0.22 358 / 40%);
+  --border: oklch(0.905 0.01 298);
+  --input: oklch(0.875 0.014 298);
+  --ring: oklch(0.58 0.17 295 / 40%);
 
   /* Fixed assessment-objective hues — never reuse these for decoration. */
   --ao1: oklch(0.575 0.125 228);
@@ -177,7 +177,7 @@
   --examiner-student: oklch(0.24 0.02 295);
   --examiner-student-fg: oklch(0.2 0.018 295);
   --examiner-student-bg: oklch(0.99 0.005 300);
-  --examiner-student-border: oklch(0.545 0.185 295 / 75%);
+  --examiner-student-border: oklch(0.58 0.17 295 / 75%);
 
   --examiner-positive: oklch(0.48 0.14 165);
   --examiner-positive-fg: oklch(0.98 0.01 165);
@@ -214,48 +214,48 @@
   --examiner-warning-bg: oklch(0.95 0.06 65 / 45%);
   --examiner-warning-border: oklch(0.72 0.14 65 / 70%);
 
-  --chart-1: oklch(0.62 0.22 358);
+  --chart-1: oklch(0.58 0.17 295);
   --chart-2: oklch(0.575 0.125 228);
   --chart-3: oklch(0.63 0.145 58);
   --chart-4: oklch(0.53 0.115 168);
   --chart-5: oklch(0.58 0.17 12);
 
-  --sidebar: oklch(0.974 0.014 300);
+  --sidebar: oklch(0.982 0.01 300);
   --sidebar-foreground: oklch(0.25 0.02 295);
-  --sidebar-primary: oklch(0.62 0.22 358);
-  --sidebar-primary-foreground: oklch(0.995 0.006 358);
-  --sidebar-accent: oklch(0.918 0.032 298);
+  --sidebar-primary: oklch(0.58 0.17 295);
+  --sidebar-primary-foreground: oklch(0.995 0.006 295);
+  --sidebar-accent: oklch(0.932 0.025 298);
   --sidebar-accent-foreground: oklch(0.22 0.035 295);
-  --sidebar-border: oklch(0.9 0.014 298);
-  --sidebar-ring: oklch(0.62 0.22 358 / 35%);
+  --sidebar-border: oklch(0.91 0.01 298);
+  --sidebar-ring: oklch(0.58 0.17 295 / 35%);
 
   /* The outline colour for the "sticker" cards and buttons. Near-black
      rather than pure black so it sits with the ink type instead of
      shouting over it. */
   --ink: oklch(0.19 0.045 300);
 
-  /* Deep pink plum. The house colour one octave down from --primary: used for
+  /* Deep purple. The house colour one octave down from --primary: used for
      the ribbon, the examiner chrome and the footer, so the page has
      somewhere dark to land. Never used for AO hues or for body text. */
-  --plum: oklch(0.38 0.14 358);
-  --plum-deep: oklch(0.28 0.12 358);
-  --plum-soft: oklch(0.48 0.16 358);
-  --plum-foreground: oklch(0.98 0.01 358);
+  --plum: oklch(0.35 0.135 300);
+  --plum-deep: oklch(0.25 0.105 302);
+  --plum-soft: oklch(0.45 0.165 298);
+  --plum-foreground: oklch(0.98 0.01 300);
 
   --shadow-panel:
     0 1px 2px 0 oklch(0.24 0.04 295 / 6%), 0 10px 28px -18px oklch(0.24 0.04 295 / 20%);
   --gradient-hero: radial-gradient(
     130% 90% at 50% -18%,
-    oklch(0.62 0.22 358 / 12%) 0%,
+    oklch(0.58 0.17 295 / 12%) 0%,
     transparent 64%
   );
-  --hairline: oklch(0.898 0.012 298);
+  --hairline: oklch(0.905 0.01 298);
 
   /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
-  --aurora-1: oklch(0.62 0.22 358);
+  --aurora-1: oklch(0.62 0.19 295);
   --aurora-2: oklch(0.66 0.15 228);
   --aurora-3: oklch(0.68 0.14 168);
-  --glow: oklch(0.62 0.22 358 / 22%);
+  --glow: oklch(0.58 0.17 295 / 22%);
 
   /*
    * Mascot palette.
@@ -309,8 +309,8 @@
   --popover: oklch(0.19 0.04 288);
   --popover-foreground: oklch(0.965 0.012 285);
 
-  --primary: oklch(0.76 0.17 354);
-  --primary-foreground: oklch(0.14 0.05 354);
+  --primary: oklch(0.74 0.19 300);
+  --primary-foreground: oklch(0.14 0.05 300);
 
   --secondary: oklch(0.27 0.05 290);
   --secondary-foreground: oklch(0.95 0.012 285);
@@ -382,7 +382,7 @@
   --examiner-warning-bg: oklch(0.28 0.08 65 / 45%);
   --examiner-warning-border: oklch(0.72 0.15 65 / 75%);
 
-  --chart-1: oklch(0.76 0.17 354);
+  --chart-1: oklch(0.74 0.19 300);
   --chart-2: oklch(0.76 0.16 232);
   --chart-3: oklch(0.85 0.16 82);
   --chart-4: oklch(0.81 0.17 168);
@@ -390,32 +390,31 @@
 
   --sidebar: oklch(0.17 0.036 288);
   --sidebar-foreground: oklch(0.93 0.014 285);
-  --sidebar-primary: oklch(0.76 0.17 354);
-  --sidebar-primary-foreground: oklch(0.14 0.05 354);
+  --sidebar-primary: oklch(0.74 0.19 300);
+  --sidebar-primary-foreground: oklch(0.14 0.05 300);
   --sidebar-accent: oklch(0.28 0.055 290);
   --sidebar-accent-foreground: oklch(0.965 0.012 285);
-  --sidebar-border: oklch(0.78 0.15 354 / 18%);
-  --sidebar-ring: oklch(0.76 0.17 354 / 50%);
+  --sidebar-border: oklch(0.78 0.15 300 / 18%);
+  --sidebar-ring: oklch(0.74 0.19 300 / 50%);
 
-  /* The outline colour for "sticker" cards. At night the outline is what
-     glows, so it is a light pink outline rather than near-black ink. */
-  --ink: oklch(0.86 0.11 354);
+  /* The outline colour for "sticker" cards */
+  --ink: oklch(0.86 0.11 300);
 
-  /* Deep pink plum */
-  --plum: oklch(0.32 0.12 354);
-  --plum-deep: oklch(0.22 0.09 354);
-  --plum-soft: oklch(0.42 0.14 354);
-  --plum-foreground: oklch(0.98 0.01 354);
+  /* Deep plum */
+  --plum: oklch(0.335 0.135 300);
+  --plum-deep: oklch(0.245 0.105 302);
+  --plum-soft: oklch(0.435 0.165 298);
+  --plum-foreground: oklch(0.975 0.014 300);
 
   --shadow-panel:
-    0 1px 0 0 oklch(0.9 0.1 354 / 10%) inset, 0 18px 46px -26px oklch(0.6 0.22 354 / 55%);
+    0 1px 0 0 oklch(0.9 0.1 300 / 10%) inset, 0 18px 46px -26px oklch(0.6 0.22 300 / 55%);
   --gradient-hero: radial-gradient(
     120% 85% at 50% -12%,
-    oklch(0.76 0.17 354 / 25%) 0%,
+    oklch(0.74 0.19 300 / 25%) 0%,
     oklch(0.62 0.2 220 / 14%) 42%,
     transparent 70%
   );
-  --hairline: oklch(0.78 0.15 354 / 16%);
+  --hairline: oklch(0.78 0.15 300 / 16%);
 
   /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
   --aurora-1: oklch(0.76 0.17 354);

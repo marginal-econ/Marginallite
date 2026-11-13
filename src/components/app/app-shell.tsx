@@ -1,5 +1,3 @@
-import { StudentMessagesDialog } from "@/components/app/student-messages-dialog";
-import { FloatingFeedbackPill, FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,192 +8,112 @@ import {
   LogOut,
   PenLine,
   Target,
+  Dumbbell,
+  LineChart,
+  Wand2,
   ShieldCheck,
+  ShieldPlus,
+  ListOrdered,
   BookMarked,
   Sparkles,
+  UploadCloud,
   PanelLeftClose,
   PanelLeftOpen,
   UsersRound,
   BookText,
-  ChevronDown,
-  Menu,
-  MessageSquare,
-  GraduationCap,
-  Settings,
-  LineChart,
   Trophy,
+  CircleHelp,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { usePresenceHeartbeat } from "@/hooks/use-presence";
 import { supabase } from "@/integrations/backend/client";
 import { cn } from "@/lib/utils";
 
-export type NavItem = {
+type NavItem = {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  badge?: string;
-  staffOnly?: boolean;
+  staffOnly: boolean;
   adminOnly?: boolean;
 };
 
-export type NavGroup = {
-  id: string;
-  label: string;
-  collapsible?: boolean;
-  adminOnly?: boolean;
-  staffOnly?: boolean;
-  items: NavItem[];
-};
+type AppSection = "grader" | "bank";
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "marginalite.sidebarCollapsed";
-const COLLAPSED_GROUPS_STORAGE_KEY = "marginalite.collapsedNavGroups";
+const SECTION_STORAGE_KEY = "marginal.activeSection";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "marginal.sidebarCollapsed";
 
-/**
- * Cambridge IGCSE Economics 0455 Navigation
- */
-const NAV_GROUPS: NavGroup[] = [
+// The two distinct apps that share this sidebar, same site, same database.
+// "Grader" is everything about marking and model answers; "Question bank"
+// is everything about practicing new questions (past-paper MCQ and structured questions).
+const GRADER_NAV: NavItem[] = [
+  { to: "/grade", label: "Essay marking", icon: PenLine, staffOnly: false },
+  { to: "/response-structure", label: "Response structure", icon: ListOrdered, staffOnly: false },
+  { to: "/practice", label: "AO skills coach", icon: Dumbbell, staffOnly: false },
+  { to: "/essay-generator", label: "Perfect essay generator", icon: Wand2, staffOnly: false },
+  { to: "/diagrams", label: "Diagram library", icon: LineChart, staffOnly: false },
+  { to: "/definitions", label: "Definitions hub", icon: BookText, staffOnly: false },
+  { to: "/command-words", label: "Command words test", icon: CircleHelp, staffOnly: false },
+  { to: "/showcase", label: "Showcase", icon: Trophy, staffOnly: false },
+];
+
+const BANK_NAV: NavItem[] = [
+  { to: "/question-bank", label: "Question bank", icon: BookMarked, staffOnly: false },
+  { to: "/mcq-live", label: "MCQ papers", icon: ListChecks, staffOnly: false },
+];
+
+// Not part of the toggle — visible under either section for staff, since
+// the knowledge base and calibration data feed both the grader and question systems.
+const STAFF_NAV: NavItem[] = [
+  { to: "/knowledge", label: "Knowledge base", icon: BookOpen, staffOnly: true },
+  { to: "/calibration", label: "Calibration", icon: Target, staffOnly: true },
   {
-    id: "dashboard_analytics",
-    label: "Dashboard & Analytics",
-    collapsible: true,
-    items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/review", label: "Analytics & Diagnostics", icon: ClipboardCheck },
-      { to: "/classes", label: "Classes", icon: UsersRound },
-    ],
-  },
-  {
-    id: "grading",
-    label: "Exam Practice",
-    collapsible: true,
-    items: [
-      { to: "/grade", label: "Grade Answer", icon: PenLine },
-      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks },
-    ],
-  },
-  {
-    id: "syllabus",
-    label: "Syllabus Resources",
-    collapsible: true,
-    items: [
-      { to: "/definitions", label: "Definitions Hub", icon: BookText },
-      { to: "/question-bank", label: "Question Bank", icon: BookMarked },
-      { to: "/diagrams", label: "Diagram Library", icon: LineChart },
-      { to: "/command-words", label: "Command Words", icon: Target },
-      { to: "/showcase", label: "Exemplars Showcase", icon: Trophy },
-    ],
-  },
-  {
-    id: "admin",
-    label: "Administration",
+    to: "/content-admin",
+    label: "Content admin",
+    icon: ShieldPlus,
+    staffOnly: true,
     adminOnly: true,
-    collapsible: true,
-    items: [
-      { to: "/admin", label: "Admin Console", icon: ShieldCheck, badge: "Root" },
-      { to: "/knowledge", label: "Knowledge Base", icon: BookOpen },
-      { to: "/calibration", label: "Anchor Calibration", icon: ShieldCheck },
-    ],
   },
+  {
+    to: "/mcq-papers-admin",
+    label: "MCQ paper library",
+    icon: UploadCloud,
+    staffOnly: true,
+    adminOnly: true,
+  },
+  { to: "/admin", label: "Admin console", icon: ShieldCheck, staffOnly: true, adminOnly: true },
 ];
 
-const TEACHER_NAV_GROUPS: NavGroup[] = [
-  {
-    id: "dashboard_analytics",
-    label: "Dashboard & Classrooms",
-    collapsible: true,
-    items: [
-      { to: "/dashboard", label: "Educator Dashboard", icon: LayoutDashboard },
-      { to: "/classes", label: "My Classrooms", icon: UsersRound },
-      { to: "/review", label: "Analytics & Diagnostics", icon: ClipboardCheck },
-    ],
-  },
-  {
-    id: "grading",
-    label: "Exam Practice",
-    collapsible: true,
-    items: [
-      { to: "/grade", label: "Answer Grader", icon: PenLine },
-      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks },
-    ],
-  },
-  {
-    id: "syllabus",
-    label: "Syllabus Resources",
-    collapsible: true,
-    items: [
-      { to: "/definitions", label: "Definitions Hub", icon: BookText },
-      { to: "/question-bank", label: "Question Bank", icon: BookMarked },
-      { to: "/diagrams", label: "Diagram Library", icon: LineChart },
-      { to: "/command-words", label: "Command Words", icon: Target },
-      { to: "/showcase", label: "Exemplars Showcase", icon: Trophy },
-      { to: "/knowledge", label: "Knowledge Base", icon: BookOpen },
-      { to: "/calibration", label: "Anchor Calibration", icon: ShieldCheck },
-    ],
-  },
-];
+const SECTION_NAV: Record<AppSection, NavItem[]> = {
+  grader: GRADER_NAV,
+  bank: BANK_NAV,
+};
 
-function filterGroupForRole(
-  group: NavGroup,
-  role: "student" | "teacher" | "admin",
-): NavGroup | null {
-  const isAdmin = role === "admin";
-
-  if (group.adminOnly && !isAdmin) return null;
-  if (group.staffOnly && role !== "teacher" && !isAdmin) return null;
-
-  const visibleItems = group.items.filter((item) => {
-    if (item.adminOnly && !isAdmin) return false;
-    if (item.staffOnly && role !== "teacher" && !isAdmin) return false;
-    return true;
-  });
-
-  if (visibleItems.length === 0) return null;
-  return { ...group, items: visibleItems };
+function filterForRole(items: NavItem[], role: "student" | "teacher" | "admin") {
+  return items.filter(
+    (item) =>
+      (!item.staffOnly || role === "teacher" || role === "admin") &&
+      (!item.adminOnly || role === "admin"),
+  );
 }
 
-const GROUP_META: Record<
-  string,
-  { dot: string; text: string; bg: string }
-> = {
-  dashboard_analytics: {
-    dot: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]",
-    text: "text-emerald-600 dark:text-emerald-400",
-    bg: "hover:bg-emerald-500/10",
-  },
-  grading: {
-    dot: "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]",
-    text: "text-cyan-600 dark:text-cyan-400",
-    bg: "hover:bg-cyan-500/10",
-  },
-  syllabus: {
-    dot: "bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.6)]",
-    text: "text-sky-600 dark:text-sky-400",
-    bg: "hover:bg-sky-500/10",
-  },
-  admin: {
-    dot: "bg-rose-500 shadow-[0_0_8px_rgba(225,29,72,0.6)]",
-    text: "text-rose-600 dark:text-rose-400",
-    bg: "hover:bg-rose-500/10",
-  },
-};
+function sectionForPathname(pathname: string): AppSection | null {
+  if (BANK_NAV.some((item) => pathname.startsWith(item.to))) return "bank";
+  if (GRADER_NAV.some((item) => pathname.startsWith(item.to))) return "grader";
+  return null;
+}
 
 export function AppShell({
   children,
   role,
   name,
-  school,
   userId,
 }: {
   children: ReactNode;
   role: "student" | "teacher" | "admin";
   name: string | null;
-  school?: string | null;
   userId: string;
 }) {
   const navigate = useNavigate();
@@ -203,221 +121,100 @@ export function AppShell({
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   usePresenceHeartbeat(pathname, userId);
 
+  const [section, setSection] = useState<AppSection>(
+    () => sectionForPathname(pathname) ?? "grader",
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Keep the toggle in sync with direct navigation (a link from Dashboard,
+  // browser back/forward, etc.) and remember the choice across visits to
+  // shared pages like Dashboard or the staff tools.
+  useEffect(() => {
+    const fromPath = sectionForPathname(pathname);
+    if (fromPath) {
+      setSection(fromPath);
+      window.localStorage.setItem(SECTION_STORAGE_KEY, fromPath);
+    }
+  }, [pathname]);
 
   useEffect(() => {
-    try {
-      const isCollapsed = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
-      setSidebarCollapsed(isCollapsed);
+    const stored = window.localStorage.getItem(SECTION_STORAGE_KEY);
+    if (stored === "grader" || stored === "bank") setSection(stored);
 
-      const savedCollapsedGroups = window.localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
-      if (savedCollapsedGroups) {
-        setCollapsedGroups(new Set(JSON.parse(savedCollapsedGroups)));
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
+    setSidebarCollapsed(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
   }, []);
-
-  const toggleGroup = (groupId: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      try {
-        window.localStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify(Array.from(next)));
-      } catch {
-        // Ignore localStorage write error
-      }
-      return next;
-    });
-  };
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(next));
-      } catch {
-        // Ignore localStorage error
-      }
-      return next;
-    });
-  };
-
-  const isTeacherUser = role === "teacher";
 
   const signOut = async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
-    const target = isTeacherUser ? "/teacher-auth" : "/auth";
-    navigate({ to: target, replace: true });
+    navigate({ to: "/auth", replace: true });
   };
 
-  const visibleGroups = useMemo(() => {
-    if (isTeacherUser) {
-      return TEACHER_NAV_GROUPS;
-    }
-    return NAV_GROUPS.map((g) => filterGroupForRole(g, role)).filter(
-      (g): g is NavGroup => g !== null,
-    );
-  }, [role, isTeacherUser]);
-
-  const classroomLabel = role === "student" ? "Classroom" : "Classes";
-
-  const isItemActive = (to: string) => {
-    if (to === "/dashboard") return pathname === "/dashboard";
-    if (pathname === to) return true;
-    if (to !== "/dashboard" && pathname.startsWith(to)) {
-      if (to === "/grade") return pathname === "/grade" || pathname.startsWith("/essay");
-      return true;
-    }
-    if ((to === "/admin" || to === "/knowledge") && ["/calibration", "/content-admin", "/mcq-papers-admin"].some((p) => pathname.startsWith(p))) {
-      return true;
-    }
-    return false;
+  const switchSection = (next: AppSection) => {
+    setSection(next);
+    window.localStorage.setItem(SECTION_STORAGE_KEY, next);
+    const target = SECTION_NAV[next][0];
+    if (target) navigate({ to: target.to });
   };
 
-  const renderNavGroup = (group: NavGroup, isMobile = false) => {
-    const isCollapsed = collapsedGroups.has(group.id);
-    const isOpen = !isCollapsed;
-    const meta = GROUP_META[group.id];
-
-    return (
-      <div key={group.id} className="space-y-0.5">
-        {group.label ? (
-          sidebarCollapsed && !isMobile ? (
-            <div className="my-2 border-t border-sidebar-border/60" />
-          ) : (
-            <button
-              type="button"
-              onClick={() => group.collapsible && toggleGroup(group.id)}
-              className={cn(
-                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold tracking-tight uppercase select-none transition-all duration-200 group cursor-pointer text-left",
-                meta?.bg ?? "hover:bg-sidebar-accent/50",
-                isOpen ? (meta?.text ?? "text-foreground") : "text-muted-foreground/70 hover:text-foreground",
-              )}
-              title={isOpen ? "Collapse section" : "Expand section"}
-            >
-              <span className="flex items-center gap-2 truncate">
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full transition-transform duration-200 shrink-0",
-                    meta?.dot ?? "bg-primary/70",
-                    isOpen && "scale-125",
-                  )}
-                />
-                <span className="truncate">{group.label}</span>
-              </span>
-              {group.collapsible ? (
-                <ChevronDown
-                  className={cn(
-                    "size-3 text-muted-foreground/50 transition-transform duration-300 ease-out group-hover:text-foreground shrink-0",
-                    !isOpen && "-rotate-90 text-muted-foreground/30",
-                  )}
-                />
-              ) : null}
-            </button>
-          )
-        ) : null}
-
-        <div
-          className={cn(
-            "grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden",
-            isOpen || (sidebarCollapsed && !isMobile)
-              ? "grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0 pointer-events-none",
-          )}
-        >
-          <div className="min-h-0 overflow-hidden space-y-0.5">
-            <nav className="flex flex-col gap-0.5 pt-0.5 pb-1">
-              {group.items.map((item) => {
-                const active = isItemActive(item.to);
-                const label = item.to === "/classes" ? classroomLabel : item.label;
-                const Icon = item.icon;
-
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => isMobile && setMobileDrawerOpen(false)}
-                    className={cn(
-                      "flex items-center rounded-xl text-xs font-semibold transition-all duration-150 relative group",
-                      sidebarCollapsed && !isMobile ? "justify-center p-2.5" : "gap-3 px-3 py-2",
-                      active
-                        ? "bg-primary/15 text-primary border border-primary/25 shadow-xs font-bold"
-                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    )}
-                    title={sidebarCollapsed && !isMobile ? label : undefined}
-                  >
-                    <Icon className={cn("size-4 shrink-0 transition-transform duration-150 group-hover:scale-105", active ? "text-primary font-bold" : "text-muted-foreground group-hover:text-foreground")} />
-                    <span className={cn("truncate", sidebarCollapsed && !isMobile && "sr-only")}>
-                      {label}
-                    </span>
-                    {item.badge && (!sidebarCollapsed || isMobile) ? (
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "ml-auto text-[9px] px-1.5 py-0 font-bold",
-                          active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {item.badge}
-                      </Badge>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-      </div>
-    );
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(next));
+      return next;
+    });
   };
 
-  const candidateInitials = (name || "Candidate")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const activeNav = role === "teacher" ? [] : filterForRole(SECTION_NAV[section], role);
+  const staffNav = filterForRole(STAFF_NAV, role);
+  const classroomLabel = role === "student" ? "Join class" : "Classes";
+  const mobileNav = [...activeNav, ...staffNav];
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      {/* ── Desktop Sidebar ── */}
+    <div className="flex min-h-screen bg-background">
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r border-sidebar-border bg-sidebar/95 backdrop-blur-md transition-all duration-300 ease-in-out shrink-0 select-none z-30 sticky top-0 h-screen",
-          sidebarCollapsed ? "w-16 p-2" : "w-64 p-3",
+          "hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar py-5 transition-[width,padding] duration-300 ease-out md:flex",
+          sidebarCollapsed ? "w-[4.5rem] px-2" : "w-60 px-3",
         )}
       >
-        {/* Brand Header */}
-        <div className={cn("flex items-center mb-3 px-1", sidebarCollapsed ? "justify-center" : "justify-between")}>
-          <Link to="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-            <div className="size-8 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-sm shadow-sm shrink-0">
-              M
-            </div>
-            {!sidebarCollapsed ? (
-              <div className="flex flex-col min-w-0">
-                <span className="font-extrabold text-sm tracking-tight text-foreground truncate">Marginalite</span>
-                <span className="text-[10px] text-muted-foreground font-semibold tracking-wider uppercase">IGCSE 0455</span>
-              </div>
-            ) : null}
+        <div
+          className={cn(
+            "mb-5 flex items-center",
+            sidebarCollapsed ? "justify-center" : "gap-2 px-2",
+          )}
+        >
+          <Link
+            to="/dashboard"
+            className="flex min-w-0 items-center gap-2"
+            title="Marginal dashboard"
+          >
+            <img
+              src="/marginal-m-icon-clean.png"
+              alt=""
+              aria-hidden="true"
+              className="size-9 shrink-0 object-contain"
+            />
+            <span
+              className={cn("text-sm leading-tight font-semibold", sidebarCollapsed && "hidden")}
+            >
+              Marginal
+              <span className="block text-[11px] font-normal text-muted-foreground">
+                Economics 0455
+              </span>
+            </span>
           </Link>
-
           {!sidebarCollapsed ? (
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 text-muted-foreground hover:text-foreground"
+              className="ml-auto size-8 shrink-0 text-muted-foreground hover:text-foreground"
               onClick={toggleSidebar}
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
-              <PanelLeftClose className="size-3.5" />
+              <PanelLeftClose className="size-4" />
             </Button>
           ) : null}
         </div>
@@ -426,161 +223,272 @@ export function AppShell({
           <Button
             variant="ghost"
             size="icon"
-            className="mb-2 size-8 self-center text-muted-foreground hover:text-foreground shrink-0"
+            className="mb-3 size-10 self-center text-muted-foreground hover:text-foreground"
             onClick={toggleSidebar}
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
-            <PanelLeftOpen className="size-3.5" />
+            <PanelLeftOpen className="size-4" />
           </Button>
         ) : null}
 
-        {/* User Status Widget */}
-        {!sidebarCollapsed ? (
-          <div className="mb-3 rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/[0.04] p-3 shrink-0 shadow-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between gap-2 relative z-10">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="relative size-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0 border border-primary/20 shadow-xs">
-                  {candidateInitials}
-                  <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold truncate text-foreground leading-tight">
-                    {name?.toLowerCase().includes("admin") ? "Marginalite Admin" : (name ?? (role === "admin" ? "Marginalite Admin" : role === "teacher" ? "Educator" : "Candidate"))}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground capitalize leading-tight mt-0.5 font-medium truncate">
-                    {role === "teacher" && school ? school : role}
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant="outline"
-                className="border-primary/30 bg-primary/10 text-primary text-[9.5px] px-2 py-0.5 font-bold shrink-0 shadow-2xs capitalize"
-              >
-                {role}
-              </Badge>
-            </div>
+        <Link
+          to="/dashboard"
+          className={cn(
+            "mb-3 flex items-center rounded-md py-2 text-sm text-sidebar-foreground/75 transition-colors",
+            sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            pathname === "/dashboard" &&
+              "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+          )}
+        >
+          <LayoutDashboard className="size-4" />
+          <span className={cn(sidebarCollapsed && "sr-only")}>Dashboard</span>
+        </Link>
+
+        {role !== "teacher" ? (
+          <Link
+            to="/review"
+            className={cn(
+              "mb-3 flex items-center rounded-md py-2 text-sm text-sidebar-foreground/75 transition-colors",
+              sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              pathname === "/review" &&
+                "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+            )}
+          >
+            <ClipboardCheck className="size-4" />
+            <span className={cn(sidebarCollapsed && "sr-only")}>Review panel</span>
+          </Link>
+        ) : null}
+
+        <Link
+          to="/classes"
+          className={cn(
+            "mb-3 flex items-center rounded-md py-2 text-sm text-sidebar-foreground/75 transition-colors",
+            sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            pathname.startsWith("/classes") &&
+              "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+          )}
+          title={classroomLabel}
+        >
+          <UsersRound className="size-4" />
+          <span className={cn(sidebarCollapsed && "sr-only")}>{classroomLabel}</span>
+        </Link>
+
+        {role !== "teacher" ? (
+          <div
+            className={cn(
+              "mb-3 grid gap-1 rounded-lg bg-muted p-1",
+              sidebarCollapsed ? "grid-cols-1" : "grid-cols-2",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => switchSection("grader")}
+              className={cn(
+                "rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                section === "grader"
+                  ? "bg-background text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <span className={cn(sidebarCollapsed && "sr-only")}>Grader</span>
+              {sidebarCollapsed ? <PenLine className="mx-auto size-4" /> : null}
+            </button>
+            <button
+              type="button"
+              onClick={() => switchSection("bank")}
+              className={cn(
+                "rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                section === "bank"
+                  ? "bg-background text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <span className={cn(sidebarCollapsed && "sr-only")}>Question bank</span>
+              {sidebarCollapsed ? <BookMarked className="mx-auto size-4" /> : null}
+            </button>
           </div>
         ) : null}
 
-        {/* Scrollable Navigation Groups */}
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2.5 px-0.5 pt-1.5 pb-3">
-          {visibleGroups.map((group) => renderNavGroup(group))}
-        </div>
-
-        {/* User Footer */}
-        <div className="shrink-0 pt-2 border-t border-sidebar-border/70 mt-auto space-y-0.5">
-          <StudentMessagesDialog
-            trigger={
-              <div
+        <nav className="flex flex-col gap-0.5">
+          {activeNav.map((item) => {
+            const active = pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
                 className={cn(
-                  "flex items-center rounded-lg py-1.5 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer select-none",
-                  sidebarCollapsed ? "justify-center px-1" : "gap-2.5 px-2.5",
+                  "flex items-center rounded-md py-2 text-sm text-sidebar-foreground/75 transition-colors",
+                  sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
                 )}
-                title="Direct messages with Marginalite Team"
               >
-                <MessageSquare className="size-4 shrink-0 text-muted-foreground/80" />
-                <span className={cn("truncate", sidebarCollapsed && "sr-only")}>
-                  Messages
-                </span>
-              </div>
-            }
-          />
+                <item.icon className="size-4" />
+                <span className={cn(sidebarCollapsed && "sr-only")}>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {staffNav.length > 0 ? (
+          <>
+            <p
+              className={cn(
+                "mt-5 mb-1 px-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase",
+                sidebarCollapsed && "sr-only",
+              )}
+            >
+              Staff
+            </p>
+            <nav className="flex flex-1 flex-col gap-0.5">
+              {staffNav.map((item) => {
+                const active = pathname.startsWith(item.to);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={cn(
+                      "flex items-center rounded-md py-2 text-sm text-sidebar-foreground/75 transition-colors",
+                      sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <item.icon className="size-4" />
+                    <span className={cn(sidebarCollapsed && "sr-only")}>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        <div className="mt-4 border-t border-sidebar-border pt-3">
           <Link
             to="/settings"
             className={cn(
-              "flex items-center rounded-lg py-1.5 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              sidebarCollapsed ? "justify-center px-1" : "gap-2.5 px-2.5",
-              pathname.startsWith("/settings") && "bg-sidebar-accent text-sidebar-accent-foreground font-semibold",
+              "block rounded-md py-1.5 transition-colors hover:bg-sidebar-accent",
+              sidebarCollapsed ? "px-2 text-center" : "px-2.5",
+              pathname.startsWith("/settings") && "bg-sidebar-accent",
             )}
-            title="Account settings"
           >
-            <Settings className="size-4 shrink-0 text-muted-foreground/80" />
-            <span className={cn("truncate", sidebarCollapsed && "sr-only")}>
-              Settings
-            </span>
+            <p className={cn("text-sm font-medium", sidebarCollapsed && "sr-only")}>
+              {name ?? "Your account"}
+            </p>
+            <p
+              className={cn(
+                "text-xs text-muted-foreground capitalize",
+                sidebarCollapsed && "sr-only",
+              )}
+            >
+              {role} · Edit profile
+            </p>
+            {sidebarCollapsed ? (
+              <span className="text-xs font-medium">{role.slice(0, 1).toUpperCase()}</span>
+            ) : null}
           </Link>
-
           <Button
             variant="ghost"
             size="sm"
-            className={cn(
-              "h-8 w-full text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors",
-              sidebarCollapsed ? "justify-center p-0" : "justify-start px-2.5 gap-2.5"
-            )}
+            className={cn("mt-1 w-full", sidebarCollapsed ? "justify-center" : "justify-start")}
             onClick={signOut}
-            title="Sign out of account"
+            title="Sign out"
           >
-            <LogOut className="size-4 shrink-0" />
+            <LogOut className="size-4" />{" "}
             <span className={cn(sidebarCollapsed && "sr-only")}>Sign out</span>
           </Button>
         </div>
       </aside>
 
-      {/* ── Main Content & Mobile Header ── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <header className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2.5 backdrop-blur-sm md:hidden sticky top-0 z-40 w-full max-w-full">
-          <div className="flex items-center gap-2.5">
-            <Sheet open={mobileDrawerOpen} onOpenChange={setMobileDrawerOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8">
-                  <Menu className="size-4" />
-                  <span className="sr-only">Open navigation menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-4 flex flex-col h-full">
-                <SheetHeader className="mb-3 text-left shrink-0">
-                  <SheetTitle className="flex items-center gap-2">
-                    <div className="size-6 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xs font-black">
-                      M
-                    </div>
-                    <span className="font-bold">Marginalite 0455</span>
-                  </SheetTitle>
-                </SheetHeader>
-
-                <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-1">
-                  {visibleGroups.map((group) => renderNavGroup(group, true))}
-                </div>
-
-                <div className="mt-auto shrink-0 pt-3 border-t border-border space-y-1">
-                  <Link
-                    to="/settings"
-                    onClick={() => setMobileDrawerOpen(false)}
-                    className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-foreground hover:bg-muted"
-                  >
-                    <Settings className="size-4 text-muted-foreground" /> Settings
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2.5 gap-2.5"
-                    onClick={signOut}
-                  >
-                    <LogOut className="size-4" /> Sign out
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="size-6 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-xs font-black">
-                M
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex flex-col gap-2 border-b border-border px-3 py-2 md:hidden">
+          <div className="flex items-center gap-1">
+            {role !== "teacher" ? (
+              <div className="grid flex-1 grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                <button
+                  type="button"
+                  onClick={() => switchSection("grader")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    section === "grader"
+                      ? "bg-background text-foreground shadow-sm font-semibold"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  Grader
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchSection("bank")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    section === "bank"
+                      ? "bg-background text-foreground shadow-sm font-semibold"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  Question bank
+                </button>
               </div>
-              <span className="text-sm font-bold">Marginalite</span>
-            </Link>
+            ) : (
+              <div className="flex-1 px-2 text-sm font-semibold">Marginal teacher</div>
+            )}
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              <LogOut className="size-4" />
+            </Button>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className="text-[10px] font-bold border-primary/30 text-primary capitalize"
+          <div className="flex items-center gap-1 overflow-x-auto">
+            <Link
+              to="/dashboard"
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground",
+                pathname === "/dashboard" && "bg-accent text-accent-foreground font-medium",
+              )}
             >
-              {role}
-            </Badge>
+              Dashboard
+            </Link>
+            {role !== "teacher" ? (
+              <Link
+                to="/review"
+                className={cn(
+                  "rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground",
+                  pathname === "/review" && "bg-accent text-accent-foreground font-medium",
+                )}
+              >
+                Review panel
+              </Link>
+            ) : null}
+            <Link
+              to="/classes"
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground",
+                pathname.startsWith("/classes") && "bg-accent text-accent-foreground font-medium",
+              )}
+            >
+              {classroomLabel}
+            </Link>
+            {mobileNav.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap text-muted-foreground",
+                  pathname.startsWith(item.to) && "bg-accent text-accent-foreground font-medium",
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
         </header>
 
-        <main className="flex-1 min-w-0 overflow-x-hidden">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );
@@ -596,12 +504,14 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6 pb-4 border-b border-border">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-5 md:px-8">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h1>
-        {description ? <p className="text-xs text-muted-foreground mt-0.5 sm:text-sm">{description}</p> : null}
+        <h1 className="text-lg font-semibold md:text-xl text-foreground">{title}</h1>
+        {description ? (
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-      {action ? <div className="mt-2 sm:mt-0 flex items-center gap-2">{action}</div> : null}
+      {action ? <div className="flex items-center gap-2">{action}</div> : null}
     </div>
   );
 }
