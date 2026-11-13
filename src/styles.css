@@ -1,0 +1,2195 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * :root holds the light theme (the product's default look). .dark keeps the
+ * original ink theme intact, so any `dark:` variant in the codebase still
+ * resolves correctly and the theme can be toggled later without a rewrite.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Outfit", "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-ao1: var(--ao1);
+  --color-ao2: var(--ao2);
+  --color-ao3: var(--ao3);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-ink: var(--ink);
+  --color-plum: var(--plum);
+  --color-plum-deep: var(--plum-deep);
+  --color-plum-soft: var(--plum-soft);
+  --color-plum-foreground: var(--plum-foreground);
+
+  /* Examiner semantic colour-coding tokens */
+  --color-examiner-question: var(--examiner-question);
+  --color-examiner-question-fg: var(--examiner-question-fg);
+  --color-examiner-question-bg: var(--examiner-question-bg);
+  --color-examiner-question-border: var(--examiner-question-border);
+  --color-examiner-student: var(--examiner-student);
+  --color-examiner-student-fg: var(--examiner-student-fg);
+  --color-examiner-student-bg: var(--examiner-student-bg);
+  --color-examiner-student-border: var(--examiner-student-border);
+  --color-examiner-positive: var(--examiner-positive);
+  --color-examiner-positive-fg: var(--examiner-positive-fg);
+  --color-examiner-positive-bg: var(--examiner-positive-bg);
+  --color-examiner-positive-border: var(--examiner-positive-border);
+  --color-examiner-correction: var(--examiner-correction);
+  --color-examiner-correction-fg: var(--examiner-correction-fg);
+  --color-examiner-correction-bg: var(--examiner-correction-bg);
+  --color-examiner-correction-border: var(--examiner-correction-border);
+  --color-examiner-misconception: var(--examiner-misconception);
+  --color-examiner-misconception-fg: var(--examiner-misconception-fg);
+  --color-examiner-misconception-bg: var(--examiner-misconception-bg);
+  --color-examiner-misconception-border: var(--examiner-misconception-border);
+  --color-examiner-concept: var(--examiner-concept);
+  --color-examiner-concept-fg: var(--examiner-concept-fg);
+  --color-examiner-concept-bg: var(--examiner-concept-bg);
+  --color-examiner-concept-border: var(--examiner-concept-border);
+  --color-examiner-hint: var(--examiner-hint);
+  --color-examiner-hint-fg: var(--examiner-hint-fg);
+  --color-examiner-hint-bg: var(--examiner-hint-bg);
+  --color-examiner-hint-border: var(--examiner-hint-border);
+  --color-examiner-explanation: var(--examiner-explanation);
+  --color-examiner-explanation-fg: var(--examiner-explanation-fg);
+  --color-examiner-explanation-bg: var(--examiner-explanation-bg);
+  --color-examiner-explanation-border: var(--examiner-explanation-border);
+  --color-examiner-warning: var(--examiner-warning);
+  --color-examiner-warning-fg: var(--examiner-warning-fg);
+  --color-examiner-warning-bg: var(--examiner-warning-bg);
+  --color-examiner-warning-border: var(--examiner-warning-border);
+}
+
+/*
+ * Light theme — paper, not screen.
+ *
+ * A near-white ground with hairline rules, ink-black type and a single
+ * confident jade accent. Rows and cards are separated by 1px borders rather
+ * than heavy shadows, so long lists (question banks, mark breakdowns,
+ * document lists) stay calm at any length. Three fixed hues are reserved for
+ * the AO1 / AO2 / AO3 assessment objectives so a mark breakdown always reads
+ * the same way across the product — never reuse them for decoration.
+ */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.993 0.004 300);
+  --foreground: oklch(0.2 0.018 295);
+
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(0.972 0.016 300);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.018 295);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.018 295);
+
+  --primary: oklch(0.58 0.22 358);
+  --primary-foreground: oklch(0.995 0.006 358);
+
+  --secondary: oklch(0.958 0.016 300);
+  --secondary-foreground: oklch(0.28 0.02 295);
+
+  --muted: oklch(0.963 0.012 300);
+  --muted-foreground: oklch(0.492 0.022 295);
+
+  --accent: oklch(0.945 0.024 298);
+  --accent-foreground: oklch(0.24 0.03 295);
+
+  --destructive: oklch(0.545 0.198 27);
+  --destructive-foreground: oklch(0.99 0.005 20);
+
+  --success: oklch(0.53 0.115 168);
+  --warning: oklch(0.63 0.145 58);
+
+  --border: oklch(0.898 0.012 298);
+  --input: oklch(0.865 0.016 298);
+  --ring: oklch(0.62 0.22 358 / 40%);
+
+  /* Fixed assessment-objective hues — never reuse these for decoration. */
+  --ao1: oklch(0.575 0.125 228);
+  --ao2: oklch(0.53 0.115 168);
+  --ao3: oklch(0.63 0.145 58);
+
+  /* Examiner semantic colour-coding tokens (Light Theme) */
+  --examiner-question: oklch(0.38 0.14 290);
+  --examiner-question-fg: oklch(0.98 0.01 290);
+  --examiner-question-bg: oklch(0.96 0.03 290 / 45%);
+  --examiner-question-border: oklch(0.72 0.08 290 / 60%);
+
+  --examiner-student: oklch(0.24 0.02 295);
+  --examiner-student-fg: oklch(0.2 0.018 295);
+  --examiner-student-bg: oklch(0.99 0.005 300);
+  --examiner-student-border: oklch(0.545 0.185 295 / 75%);
+
+  --examiner-positive: oklch(0.48 0.14 165);
+  --examiner-positive-fg: oklch(0.98 0.01 165);
+  --examiner-positive-bg: oklch(0.94 0.05 165 / 45%);
+  --examiner-positive-border: oklch(0.65 0.12 165 / 70%);
+
+  --examiner-correction: oklch(0.55 0.18 25);
+  --examiner-correction-fg: oklch(0.99 0.01 25);
+  --examiner-correction-bg: oklch(0.95 0.06 25 / 45%);
+  --examiner-correction-border: oklch(0.72 0.14 25 / 70%);
+
+  --examiner-misconception: oklch(0.52 0.22 27);
+  --examiner-misconception-fg: oklch(0.99 0.01 27);
+  --examiner-misconception-bg: oklch(0.94 0.08 27 / 50%);
+  --examiner-misconception-border: oklch(0.62 0.2 27 / 80%);
+
+  --examiner-concept: oklch(0.48 0.15 250);
+  --examiner-concept-fg: oklch(0.98 0.01 250);
+  --examiner-concept-bg: oklch(0.94 0.05 250 / 45%);
+  --examiner-concept-border: oklch(0.68 0.12 250 / 70%);
+
+  --examiner-hint: oklch(0.48 0.14 210);
+  --examiner-hint-fg: oklch(0.98 0.01 210);
+  --examiner-hint-bg: oklch(0.95 0.05 210 / 45%);
+  --examiner-hint-border: oklch(0.7 0.11 210 / 70%);
+
+  --examiner-explanation: oklch(0.4 0.05 280);
+  --examiner-explanation-fg: oklch(0.98 0.01 280);
+  --examiner-explanation-bg: oklch(0.95 0.02 280 / 50%);
+  --examiner-explanation-border: oklch(0.78 0.04 280 / 65%);
+
+  --examiner-warning: oklch(0.55 0.16 65);
+  --examiner-warning-fg: oklch(0.98 0.01 65);
+  --examiner-warning-bg: oklch(0.95 0.06 65 / 45%);
+  --examiner-warning-border: oklch(0.72 0.14 65 / 70%);
+
+  --chart-1: oklch(0.62 0.22 358);
+  --chart-2: oklch(0.575 0.125 228);
+  --chart-3: oklch(0.63 0.145 58);
+  --chart-4: oklch(0.53 0.115 168);
+  --chart-5: oklch(0.58 0.17 12);
+
+  --sidebar: oklch(0.974 0.014 300);
+  --sidebar-foreground: oklch(0.25 0.02 295);
+  --sidebar-primary: oklch(0.62 0.22 358);
+  --sidebar-primary-foreground: oklch(0.995 0.006 358);
+  --sidebar-accent: oklch(0.918 0.032 298);
+  --sidebar-accent-foreground: oklch(0.22 0.035 295);
+  --sidebar-border: oklch(0.9 0.014 298);
+  --sidebar-ring: oklch(0.62 0.22 358 / 35%);
+
+  /* The outline colour for the "sticker" cards and buttons. Near-black
+     rather than pure black so it sits with the ink type instead of
+     shouting over it. */
+  --ink: oklch(0.19 0.045 300);
+
+  /* Deep pink plum. The house colour one octave down from --primary: used for
+     the ribbon, the examiner chrome and the footer, so the page has
+     somewhere dark to land. Never used for AO hues or for body text. */
+  --plum: oklch(0.38 0.14 358);
+  --plum-deep: oklch(0.28 0.12 358);
+  --plum-soft: oklch(0.48 0.16 358);
+  --plum-foreground: oklch(0.98 0.01 358);
+
+  --shadow-panel:
+    0 1px 2px 0 oklch(0.24 0.04 295 / 6%), 0 10px 28px -18px oklch(0.24 0.04 295 / 20%);
+  --gradient-hero: radial-gradient(
+    130% 90% at 50% -18%,
+    oklch(0.62 0.22 358 / 12%) 0%,
+    transparent 64%
+  );
+  --hairline: oklch(0.898 0.012 298);
+
+  /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
+  --aurora-1: oklch(0.62 0.22 358);
+  --aurora-2: oklch(0.66 0.15 228);
+  --aurora-3: oklch(0.68 0.14 168);
+  --glow: oklch(0.62 0.22 358 / 22%);
+
+  /*
+   * Mascot palette.
+   *
+   * The character is drawn once and re-tinted per theme, so the cap, lenses
+   * and jumper shift with the rest of the product instead of sitting in the
+   * page like an imported sticker.
+   */
+  --mascot-line: oklch(0.22 0.05 315);
+  --mascot-panel: oklch(0.66 0.16 355);
+  --mascot-panel-2: oklch(0.6 0.18 340);
+  --mascot-skin: oklch(0.82 0.075 48);
+  --mascot-skin-shade: oklch(0.74 0.085 42);
+  --mascot-hair: oklch(0.31 0.075 330);
+  --mascot-cap: oklch(0.52 0.21 268);
+  --mascot-cap-shade: oklch(0.46 0.18 300);
+  --mascot-frame: oklch(0.52 0.12 325);
+  --mascot-lens: oklch(0.94 0.11 105);
+  --mascot-mint: oklch(0.83 0.1 178);
+  --mascot-sweater: oklch(0.65 0.11 182);
+  --mascot-sweater-2: oklch(0.58 0.12 190);
+  --mascot-collar: oklch(0.5 0.16 305);
+  --mascot-band: oklch(0.87 0.14 92);
+  --mascot-pencil: oklch(0.63 0.18 32);
+  --mascot-tongue: oklch(0.58 0.2 27);
+  --mascot-blush: oklch(0.7 0.16 15);
+}
+
+/*
+ * Night theme — "neon aurora".
+ *
+ * Not a desaturated inversion of the light theme. The ground is a deep
+ * blue-black, every surface is a translucent pane lifted off it, and the
+ * accents are the two aurora hues (electric rose-pink and cyan) that also drive
+ * the WebGL hero. Borders carry a faint inner light rather than a flat grey,
+ * which is what stops a dark UI reading as "the light one with the lamp off".
+ *
+ * The three assessment-objective hues stay recognisably themselves — the same
+ * blue / green / amber a student learned in daylight — just pushed brighter so
+ * they hold their identity against the dark ground.
+ */
+.dark {
+  --background: oklch(0.145 0.032 288);
+  --foreground: oklch(0.965 0.012 285);
+
+  --surface: oklch(0.196 0.038 288 / 82%);
+  --surface-raised: oklch(0.235 0.048 290 / 88%);
+
+  --card: oklch(0.196 0.038 288 / 82%);
+  --card-foreground: oklch(0.965 0.012 285);
+  --popover: oklch(0.19 0.04 288);
+  --popover-foreground: oklch(0.965 0.012 285);
+
+  --primary: oklch(0.76 0.17 354);
+  --primary-foreground: oklch(0.14 0.05 354);
+
+  --secondary: oklch(0.27 0.05 290);
+  --secondary-foreground: oklch(0.95 0.012 285);
+
+  --muted: oklch(0.255 0.045 290);
+  --muted-foreground: oklch(0.735 0.035 288);
+
+  --accent: oklch(0.3 0.07 292);
+  --accent-foreground: oklch(0.97 0.012 285);
+
+  --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(0.99 0.005 20);
+
+  --success: oklch(0.8 0.16 168);
+  --warning: oklch(0.85 0.15 82);
+
+  --border: oklch(0.38 0.05 285 / 35%);
+  --input: oklch(0.38 0.05 285 / 45%);
+  --ring: oklch(0.68 0.12 285 / 50%);
+
+  /* Fixed assessment-objective hues — never reuse these for decoration. */
+  --ao1: oklch(0.76 0.16 232);
+  --ao2: oklch(0.81 0.17 168);
+  --ao3: oklch(0.85 0.16 82);
+
+  /* Examiner semantic colour-coding tokens (Dark Theme) */
+  --examiner-question: oklch(0.82 0.14 290);
+  --examiner-question-fg: oklch(0.12 0.04 290);
+  --examiner-question-bg: oklch(0.28 0.08 290 / 45%);
+  --examiner-question-border: oklch(0.65 0.16 290 / 60%);
+
+  --examiner-student: oklch(0.95 0.01 285);
+  --examiner-student-fg: oklch(0.98 0.01 285);
+  --examiner-student-bg: oklch(0.2 0.03 288 / 75%);
+  --examiner-student-border: oklch(0.74 0.19 300 / 80%);
+
+  --examiner-positive: oklch(0.8 0.17 165);
+  --examiner-positive-fg: oklch(0.12 0.04 165);
+  --examiner-positive-bg: oklch(0.26 0.08 165 / 45%);
+  --examiner-positive-border: oklch(0.7 0.15 165 / 75%);
+
+  --examiner-correction: oklch(0.78 0.18 25);
+  --examiner-correction-fg: oklch(0.12 0.04 25);
+  --examiner-correction-bg: oklch(0.27 0.09 25 / 45%);
+  --examiner-correction-border: oklch(0.68 0.16 25 / 75%);
+
+  --examiner-misconception: oklch(0.75 0.22 27);
+  --examiner-misconception-fg: oklch(0.1 0.03 27);
+  --examiner-misconception-bg: oklch(0.28 0.1 27 / 50%);
+  --examiner-misconception-border: oklch(0.68 0.2 27 / 85%);
+
+  --examiner-concept: oklch(0.78 0.16 250);
+  --examiner-concept-fg: oklch(0.12 0.04 250);
+  --examiner-concept-bg: oklch(0.26 0.08 250 / 45%);
+  --examiner-concept-border: oklch(0.68 0.14 250 / 75%);
+
+  --examiner-hint: oklch(0.79 0.15 210);
+  --examiner-hint-fg: oklch(0.12 0.04 210);
+  --examiner-hint-bg: oklch(0.26 0.07 210 / 45%);
+  --examiner-hint-border: oklch(0.68 0.13 210 / 75%);
+
+  --examiner-explanation: oklch(0.8 0.04 280);
+  --examiner-explanation-fg: oklch(0.15 0.02 280);
+  --examiner-explanation-bg: oklch(0.24 0.03 280 / 50%);
+  --examiner-explanation-border: oklch(0.6 0.06 280 / 65%);
+
+  --examiner-warning: oklch(0.84 0.17 65);
+  --examiner-warning-fg: oklch(0.14 0.04 65);
+  --examiner-warning-bg: oklch(0.28 0.08 65 / 45%);
+  --examiner-warning-border: oklch(0.72 0.15 65 / 75%);
+
+  --chart-1: oklch(0.76 0.17 354);
+  --chart-2: oklch(0.76 0.16 232);
+  --chart-3: oklch(0.85 0.16 82);
+  --chart-4: oklch(0.81 0.17 168);
+  --chart-5: oklch(0.75 0.19 12);
+
+  --sidebar: oklch(0.17 0.036 288);
+  --sidebar-foreground: oklch(0.93 0.014 285);
+  --sidebar-primary: oklch(0.76 0.17 354);
+  --sidebar-primary-foreground: oklch(0.14 0.05 354);
+  --sidebar-accent: oklch(0.28 0.055 290);
+  --sidebar-accent-foreground: oklch(0.965 0.012 285);
+  --sidebar-border: oklch(0.78 0.15 354 / 18%);
+  --sidebar-ring: oklch(0.76 0.17 354 / 50%);
+
+  /* The outline colour for "sticker" cards. At night the outline is what
+     glows, so it is a light pink outline rather than near-black ink. */
+  --ink: oklch(0.86 0.11 354);
+
+  /* Deep pink plum */
+  --plum: oklch(0.32 0.12 354);
+  --plum-deep: oklch(0.22 0.09 354);
+  --plum-soft: oklch(0.42 0.14 354);
+  --plum-foreground: oklch(0.98 0.01 354);
+
+  --shadow-panel:
+    0 1px 0 0 oklch(0.9 0.1 354 / 10%) inset, 0 18px 46px -26px oklch(0.6 0.22 354 / 55%);
+  --gradient-hero: radial-gradient(
+    120% 85% at 50% -12%,
+    oklch(0.76 0.17 354 / 25%) 0%,
+    oklch(0.62 0.2 220 / 14%) 42%,
+    transparent 70%
+  );
+  --hairline: oklch(0.78 0.15 354 / 16%);
+
+  /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
+  --aurora-1: oklch(0.76 0.17 354);
+  --aurora-2: oklch(0.72 0.2 218);
+  --aurora-3: oklch(0.74 0.19 168);
+  --glow: oklch(0.76 0.17 354 / 35%);
+
+  /* Mascot, after dark: the cap and jumper pick up the aurora, the lenses
+     go from lemon to a cool glowing cyan, and the outline stops being ink. */
+  --mascot-line: oklch(0.16 0.045 295);
+  --mascot-panel: oklch(0.42 0.19 305);
+  --mascot-panel-2: oklch(0.34 0.17 275);
+  --mascot-skin: oklch(0.78 0.08 46);
+  --mascot-skin-shade: oklch(0.68 0.09 38);
+  --mascot-hair: oklch(0.26 0.08 320);
+  --mascot-cap: oklch(0.58 0.23 272);
+  --mascot-cap-shade: oklch(0.52 0.22 312);
+  --mascot-frame: oklch(0.7 0.16 320);
+  --mascot-lens: oklch(0.88 0.15 190);
+  --mascot-mint: oklch(0.86 0.15 172);
+  --mascot-sweater: oklch(0.6 0.14 192);
+  --mascot-sweater-2: oklch(0.5 0.15 218);
+  --mascot-collar: oklch(0.55 0.2 305);
+  --mascot-band: oklch(0.88 0.16 96);
+  --mascot-pencil: oklch(0.7 0.19 34);
+  --mascot-tongue: oklch(0.62 0.21 25);
+  --mascot-blush: oklch(0.72 0.18 12);
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  img,
+  svg,
+  video,
+  canvas,
+  audio,
+  iframe,
+  embed,
+  object {
+    max-width: 100%;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.021em;
+  }
+
+  /* Big display type wants to be tighter still — matches the reference's
+     confident, closely-set headlines. */
+  h1 {
+    letter-spacing: -0.032em;
+  }
+
+  ::selection {
+    background-color: oklch(0.545 0.185 295 / 20%);
+  }
+}
+
+@utility panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility hero-glow {
+  background-image: var(--gradient-hero);
+}
+
+@utility grid-fade {
+  background-image:
+    linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(80% 55% at 50% 0%, black 0%, transparent 75%);
+}
+
+/* Subtle lift on hover for interactive panels/cards — same shadow language
+   as --shadow-panel, just a touch stronger, so it reads as "responding to
+   you" without turning into a bouncy toy. */
+@utility panel-interactive {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: oklch(0.545 0.185 295 / 40%);
+    box-shadow:
+      0 1px 2px 0 oklch(0.24 0.04 295 / 7%),
+      0 18px 36px -20px oklch(0.24 0.04 295 / 28%);
+  }
+}
+
+/* ── Reference-style list rhythm ──────────────────────────────────────────
+   Long lists read best as full-bleed rows separated by a single hairline,
+   with generous vertical air and the action parked hard right. No card
+   chrome, no alternating fills. */
+@utility rule-list {
+  border-top: 1px solid var(--hairline);
+
+  & > * {
+    border-bottom: 1px solid var(--hairline);
+  }
+}
+
+@utility rule-row {
+  /* No align-items here on purpose: callers set `items-start` /
+     `items-center` themselves, and two competing utilities of equal
+     specificity would resolve by stylesheet order rather than intent. */
+  display: flex;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding-block: 1.15rem;
+  transition: background-color 140ms ease;
+
+  &:hover {
+    background-color: var(--muted);
+  }
+}
+
+/* Small, tracked, uppercase caption — the "PROMOTED" / "PREMIUM" label in
+   the reference. Quiet by default; pair with .eyebrow-accent to shout. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+@utility eyebrow-accent {
+  color: var(--primary);
+}
+
+/* The solid teal chip. Used sparingly — one per screen at most. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+@utility chip-soft {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: oklch(0.545 0.185 295 / 12%);
+  color: var(--primary);
+}
+
+/* Pull-quote type: serif, roomy, deliberately unlike the UI font so it
+   reads as someone's voice rather than product copy. */
+@utility quote {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+/* ── The "sticker" language ───────────────────────────────────────────────
+   Outlined, rounded blocks sitting on a hard offset shadow — no blur, no
+   gradient. It's what makes a study tool feel like something you'd want to
+   pick up rather than a form you have to fill in. Used on marketing
+   surfaces and the auth card; the working app stays quieter on purpose. */
+@utility pop {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-xl);
+  background-color: var(--surface);
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+@utility pop-sm {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-md);
+  box-shadow: 3px 3px 0 0 var(--ink);
+}
+
+/* Press-down interaction: the block slides into its own shadow. */
+@utility pop-press {
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+
+  &:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 0 var(--ink);
+  }
+
+  &:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 0 var(--ink);
+  }
+}
+
+/* A rotated tag, like something stuck on by hand. */
+@utility sticker {
+  display: inline-block;
+  transform: rotate(-6deg);
+  border: 1.5px solid var(--ink);
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 3px 3px 0 0 var(--ink);
+}
+
+/* A solid block behind a few words of a headline — a highlighter pen. The
+   inline-block + slight negative margin keeps the text baseline intact. */
+@utility highlight {
+  position: relative;
+  display: inline-block;
+  padding-inline: 0.25em;
+  margin-inline: -0.05em;
+  border: 1.5px solid var(--ink);
+  border-radius: 0.35rem;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Faint engineering grid behind the hero — the reference's graph-paper
+   feel, fading out before it reaches any text. */
+@utility paper-grid {
+  background-image:
+    linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(75% 60% at 50% 15%, black 0%, transparent 78%);
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--doodle-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-7px) rotate(var(--doodle-rotate, 0deg));
+  }
+}
+
+/* Decorative sparkles/squiggles drift very slightly so the page feels
+   alive without anything actually moving under the reader's eye. */
+@utility doodle {
+  animation: float-slow 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* A soft light sweep across any in-progress bar — reads as "actively
+   working", not just a static filled rectangle. */
+@utility progress-shimmer {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, oklch(1 0 0 / 45%) 50%, transparent 100%);
+    animation: progress-shimmer 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes urgent-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.545 0.198 27 / 40%);
+  }
+  50% {
+    box-shadow: 0 0 0 6px oklch(0.545 0.198 27 / 0%);
+  }
+}
+
+/* Timer running low: a slow outward pulse instead of a jarring blink —
+   noticeable without being alarming. */
+@utility urgent-pulse {
+  animation: urgent-pulse 1.8s ease-out infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Motion
+   ──────────────────────────────────────────────────────────────────────────
+   Everything below is decorative. The reduced-motion block at the very end
+   of this file switches all of it off, so nothing here is load-bearing for
+   reading, navigating or understanding the page.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Scroll reveal.
+   ──────────────────────────────────────────────────────────────────────────
+   The hidden state is scoped under `html.motion-ready`, a class an inline
+   script in the document head adds before first paint. That inversion is the
+   whole safety story: if JavaScript is disabled, blocked, still loading, or
+   throws during hydration, the class is never added and every section simply
+   renders visible. Hiding by default and revealing with JS — the usual way
+   this is written — means one failed script leaves the reader staring at an
+   empty page.
+
+   Elements reveal once and stay revealed; re-animating on every scroll-past
+   is exhausting to read. */
+
+.reveal,
+.reveal-pop {
+  transition:
+    opacity 640ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal-pop {
+  transition-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition-duration: 560ms;
+}
+
+/* No `will-change` here on purpose. It would promote every unrevealed
+   section to its own compositor layer for the whole life of the page —
+   dozens of layers held permanently, for a transition that runs once and is
+   cheap anyway. */
+html.motion-ready .reveal:not([data-revealed="true"]) {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+html.motion-ready .reveal-pop:not([data-revealed="true"]) {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+}
+
+@keyframes marquee-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* The diagonal ribbon across the hero. The track holds the text twice, so
+   translating exactly -50% loops seamlessly. */
+@utility marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-slide var(--marquee-duration, 26s) linear infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--bob-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(var(--bob-rotate, 0deg));
+  }
+}
+
+/* The character breathing. Slow and small on purpose — a mascot that
+   bounces hard turns a study tool into a toy. */
+@utility bob {
+  animation: bob 5.5s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@utility wiggle {
+  animation: wiggle 3.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility spin-slow {
+  animation: spin-slow 18s linear infinite;
+}
+
+@keyframes lock-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-5px) rotate(-1.5deg);
+  }
+  40%, 80% {
+    transform: translateX(5px) rotate(1.5deg);
+  }
+}
+
+@utility lock-shake {
+  animation: lock-shake 0.45s ease-in-out;
+}
+
+@keyframes grow-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* AO bars fill left-to-right when the specimen card first appears. */
+@utility grow-bar {
+  transform-origin: left center;
+  animation: grow-bar 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--bar-delay, 0ms);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Cursor
+   ──────────────────────────────────────────────────────────────────────────
+   Two layers. The CSS cursor below is a real cursor image, so it works with
+   JavaScript disabled and never leaves someone without a pointer — the
+   usual failure of "custom cursor" implementations that set `cursor: none`
+   and draw their own. The soft ring that trails it is the JS layer on top,
+   and is purely additive.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (pointer: fine) {
+  /* A proper pointer, drawn rather than borrowed: a crisp arrow with the
+     same ink outline as everything else on the page. It stays a real CSS
+     cursor so precision, text selection and the no-JavaScript case all keep
+     working — the layers below are decoration on top of it, never a
+     replacement for it. */
+  .cursor-marker {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M3.2 2.1 20.6 11a.9.9 0 0 1-.1 1.6l-6.1 2.3a.9.9 0 0 0-.5.5l-2.3 6.1a.9.9 0 0 1-1.6.1L1.9 3.4a.9.9 0 0 1 1.3-1.3Z' fill='%237c4dde' stroke='%23231837' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+        3 2,
+      auto;
+  }
+
+  .cursor-marker input,
+  .cursor-marker textarea {
+    cursor: text;
+  }
+}
+
+/* The dot rides just behind the real pointer; the ring lags further and,
+   over anything clickable, stretches to wrap that element instead of
+   staying a circle. Both are driven by one rAF loop. */
+.cursor-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 999px;
+  background-color: var(--primary);
+  box-shadow: 0 0 0 1.5px var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    width 160ms ease,
+    height 160ms ease,
+    margin 160ms ease;
+}
+
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9998;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 1.5px solid var(--primary);
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 220ms ease;
+}
+
+.cursor-dot[data-visible="true"] {
+  opacity: 1;
+}
+
+.cursor-ring[data-visible="true"] {
+  opacity: 0.6;
+}
+
+/* Wrapped around a button or link. */
+.cursor-ring[data-magnetic="true"] {
+  opacity: 1;
+  background-color: oklch(0.545 0.185 295 / 10%);
+}
+
+/* Pressed. */
+.cursor-dot[data-pressed="true"] {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+}
+
+/* Scroll progress along the very top of the page. */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  height: 3px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background-color: var(--primary);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Reduced motion
+   ──────────────────────────────────────────────────────────────────────────
+   One switch. Revealed content is forced visible rather than left hidden,
+   which is the bug that makes "accessible" reveal animations blank the page
+   for the people who most need it to just work.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal,
+  .reveal-pop {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .cursor-ring,
+  .cursor-dot {
+    display: none;
+  }
+
+  .scroll-progress {
+    display: none;
+  }
+}
+
+@keyframes draw-in {
+  from {
+    stroke-dashoffset: var(--draw-length, 300);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Scribbles draw themselves on, like someone sketching in the margin. */
+@utility draw-in {
+  stroke-dasharray: var(--draw-length, 300);
+  animation: draw-in 1.5s cubic-bezier(0.65, 0, 0.35, 1) both;
+  animation-delay: var(--draw-delay, 0ms);
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-25deg);
+  }
+  70% {
+    transform: scale(1.12) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@utility pop-in {
+  animation: pop-in 640ms cubic-bezier(0.34, 1.5, 0.64, 1) both;
+  animation-delay: var(--pop-delay, 0ms);
+}
+
+@keyframes underline-sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* A marker underline that sweeps in under a section heading once it's
+   revealed. */
+@utility sweep-underline {
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1) 180ms;
+
+  [data-revealed="true"] & {
+    transform: scaleX(1);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Mascot
+   ──────────────────────────────────────────────────────────────────────────
+   The character is one SVG with a handful of named groups. Each group gets
+   its own slow, out-of-phase loop so the whole thing never lands on a single
+   synchronised beat — that synchronisation is what makes animated mascots
+   read as a GIF rather than as something alive.
+
+   The stage adds a pointer-driven lean on top: --mx/--my are written by
+   MascotStage's rAF loop, and every layer multiplies them by a different
+   factor, so the head, cap and panel separate in depth as you move.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.mascot-stage {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.mascot-stage .mascot {
+  transform: rotateY(calc(var(--mx, 0) * 9deg * var(--lean, 1)))
+    rotateX(calc(var(--my, 0) * -7deg * var(--lean, 1)));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+.mascot {
+  animation: mascot-float 6s ease-in-out infinite;
+}
+
+/* The head leads the lean and the body follows, which is what sells it as a
+   body turning rather than a flat image skewing. */
+.mascot-head {
+  transform: translate(calc(var(--mx, 0) * 9px), calc(var(--my, 0) * 7px));
+  transform-origin: 200px 300px;
+  transition: transform 120ms linear;
+}
+
+.mascot-body {
+  transform: translate(calc(var(--mx, 0) * 3px), 0);
+  transition: transform 200ms linear;
+}
+
+.mascot-cap {
+  transform: translate(calc(var(--mx, 0) * 5px), calc(var(--my, 0) * 3px));
+  transition: transform 160ms linear;
+}
+
+@keyframes mascot-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.25);
+  }
+}
+
+/* The eyes are already creased shut, so a "blink" is a quick extra squeeze
+   rather than a lid drop — the same thing a face does mid-laugh. */
+.mascot-eyes {
+  animation: mascot-blink 6.5s ease-in-out infinite;
+  transform-origin: 205px 208px;
+}
+
+@keyframes mascot-pencil-wiggle {
+  0%,
+  100% {
+    rotate: -2.5deg;
+  }
+  50% {
+    rotate: 3.5deg;
+  }
+}
+
+.mascot-pencil {
+  animation: mascot-pencil-wiggle 3.6s ease-in-out infinite;
+  transform-origin: 150px 130px;
+  transform-box: view-box;
+}
+
+@keyframes mascot-brow-raise {
+  0%,
+  88%,
+  100% {
+    translate: 0 0;
+  }
+  93% {
+    translate: 0 -4px;
+  }
+}
+
+/* The brows lift a beat before the eyes squeeze — the order a real face
+   does it in, and the thing that stops the blink reading as a glitch. */
+.mascot-brows {
+  animation: mascot-brow-raise 6.5s ease-in-out infinite;
+}
+
+@keyframes mascot-mouth {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.mascot-mouth {
+  animation: mascot-mouth 5.2s ease-in-out infinite;
+  transform-origin: 205px 275px;
+  transform-box: view-box;
+}
+
+@keyframes mascot-halo {
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(1.05);
+  }
+}
+
+.mascot-halo {
+  animation: mascot-halo 7s ease-in-out infinite;
+  transform-origin: 204px 196px;
+  transform-box: view-box;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.7) rotate(0deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15) rotate(45deg);
+  }
+}
+
+/* ── Mystical Celestial Comets & Stardust Engine ────────────────────────── */
+@keyframes mystic-comet-travel {
+  0% {
+    transform: translate3d(-360px, 0, 0) scale(0.65);
+    opacity: 0;
+  }
+  2.5% {
+    opacity: 0.2;
+  }
+  8% {
+    transform: translate3d(60px, 0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate3d(780px, 0, 0) scale(1.02);
+    opacity: 0.95;
+  }
+  72% {
+    transform: translate3d(1200px, 0, 0) scale(0.88);
+    opacity: 0.35;
+  }
+  85%,
+  100% {
+    transform: translate3d(1450px, 0, 0) scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes mystic-core-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+@keyframes mystic-spark-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(0.85);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-3px, 1.5px) scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes micro-meteor-dash {
+  0% {
+    transform: translate3d(-120px, 0, 0) scaleX(0.2);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.85;
+  }
+  35% {
+    transform: translate3d(550px, 0, 0) scaleX(1.3);
+    opacity: 0.75;
+  }
+  55% {
+    transform: translate3d(900px, 0, 0) scaleX(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(1050px, 0, 0) scaleX(0.2);
+    opacity: 0;
+  }
+}
+
+.mystic-comet-track {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.mystic-comet-body {
+  position: relative;
+  width: 380px;
+  height: 60px;
+  animation: mystic-comet-travel var(--comet-duration, 7.5s) cubic-bezier(0.22, 0.1, 0.25, 1) infinite;
+  animation-delay: var(--comet-delay, 0s);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.mystic-comet-core-glow {
+  transform-origin: center;
+  animation: mystic-core-pulse 2s ease-in-out infinite;
+}
+
+.mystic-stardust-spark {
+  transform-origin: center;
+  animation: mystic-spark-float 2.4s ease-in-out infinite;
+}
+
+.micro-meteor-track {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.micro-meteor-streak {
+  width: 150px;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 55%, #ffffff 90%, #a5f3fc 100%);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 14px rgba(56, 189, 248, 0.7));
+  animation: micro-meteor-dash var(--meteor-duration, 5.5s) cubic-bezier(0.15, 0.85, 0.2, 1) infinite;
+  animation-delay: var(--meteor-delay, 1s);
+  opacity: 0;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* Fallback for legacy class if referenced anywhere */
+.shooting-comet {
+  display: none;
+}
+
+.mascot-sparkles > * {
+  animation: twinkle 3s ease-in-out infinite;
+  animation-delay: var(--twinkle-delay, 0ms);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes mascot-gear {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: -3px -5px;
+  }
+}
+
+.mascot-gear {
+  animation: mascot-gear 5.8s ease-in-out infinite;
+}
+
+@keyframes tick-draw {
+  from {
+    stroke-dashoffset: 120;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.tick-draw {
+  stroke-dasharray: 120;
+  animation: tick-draw 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3D
+   ──────────────────────────────────────────────────────────────────────────
+   All of it is CSS transforms on a perspective container. No WebGL, no
+   library, no layout thrash: the only thing JavaScript does is write two
+   numbers (--rx, --ry) onto an element, and the compositor does the rest.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@utility scene {
+  perspective: 1100px;
+  perspective-origin: center;
+}
+
+/* A card that leans toward the pointer and lifts on the Z axis. The inner
+   layers can be pushed forward with .layer-* to separate in depth. */
+.tilt {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(var(--tz, 0px));
+  transform-style: preserve-3d;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tilt[data-active="true"] {
+  transition: transform 90ms linear;
+}
+
+/* Depth planes for children of a .tilt or .mascot-stage.
+
+   Inside a 3D rendering context the browser sorts by real Z depth, not by
+   z-index — so a label pinned to the edge of a panel has to sit further
+   forward than the panel's own corner travels when the panel rotates. At a
+   9deg lean a 460px-wide panel throws its edge ~36px toward the viewer, so
+   layer-3 is set well clear of that. */
+/* These use the standalone `translate` property rather than `transform` on
+   purpose: .sticker already sets a `transform: rotate(...)`, and two classes
+   both writing `transform` means the later one in the stylesheet silently
+   wins. `translate` composes with `transform` instead of replacing it, so a
+   sticker keeps its hand-stuck-on tilt AND gets its depth. */
+.layer-1 {
+  translate: 0 0 26px;
+}
+
+.layer-2 {
+  translate: 0 0 56px;
+}
+
+.layer-3 {
+  translate: 0 0 104px;
+}
+
+/* A moving specular sheen that follows the pointer across a tilted card. */
+.tilt-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms ease;
+  background: radial-gradient(
+    46% 46% at var(--px, 50%) var(--py, 50%),
+    oklch(1 0 0 / 34%) 0%,
+    transparent 68%
+  );
+}
+
+.tilt[data-active="true"] .tilt-sheen {
+  opacity: 1;
+}
+
+/* Two-sided card that flips on hover / focus. */
+.flip {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 620ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+.flip-shell:hover .flip,
+.flip-shell:focus-within .flip {
+  transform: rotateY(180deg);
+}
+
+.flip-face {
+  backface-visibility: hidden;
+}
+
+.flip-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Aurora
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.aurora-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.aurora-canvas[data-ready="true"] {
+  opacity: 1;
+}
+
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(-6%, 0, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(6%, -3%, 0) scale(1.22);
+  }
+  100% {
+    transform: translate3d(-6%, 0, 0) scale(1.1);
+  }
+}
+
+/* The CSS fallback that shows if WebGL is unavailable, and the ambient wash
+   that sits under the canvas either way. */
+@utility aurora-wash {
+  background:
+    radial-gradient(48% 40% at 18% 12%, var(--aurora-1) 0%, transparent 62%),
+    radial-gradient(42% 38% at 78% 8%, var(--aurora-2) 0%, transparent 60%),
+    radial-gradient(50% 42% at 52% 40%, var(--aurora-3) 0%, transparent 64%);
+  opacity: 0.16;
+  filter: blur(38px);
+  animation: aurora-drift 24s ease-in-out infinite;
+}
+
+.dark .aurora-wash {
+  opacity: 0.32;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Theme orb
+   ──────────────────────────────────────────────────────────────────────────
+   The floating switch, bottom right. It is a real <button> with a live
+   accessible label; the 3D coin-flip and the ripple are decoration layered
+   on top of an ordinary toggle.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.theme-orb {
+  position: fixed;
+  right: clamp(1rem, 2.5vw, 1.5rem);
+  bottom: clamp(1rem, 2.5vw, 1.5rem);
+  z-index: 60;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  perspective: 500px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow:
+    0 4px 14px -2px rgba(0, 0, 0, 0.12),
+    0 2px 6px -1px rgba(0, 0, 0, 0.08);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+@media (max-width: 767px) {
+  .theme-orb {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.theme-orb:hover {
+  transform: scale(1.06);
+  border-color: var(--primary);
+  box-shadow: 0 6px 20px -3px rgba(0, 0, 0, 0.16);
+}
+
+.theme-orb:active {
+  transform: scale(0.95);
+}
+
+.theme-orb:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.orb-coin {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  transform-style: preserve-3d;
+  transition: transform 450ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.theme-orb[data-theme="dark"] .orb-coin {
+  transform: rotateY(180deg);
+}
+
+.orb-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  backface-visibility: hidden;
+}
+
+.orb-face-back {
+  transform: rotateY(180deg);
+}
+
+/* The whole page cross-fades rather than hard-cutting when the theme flips.
+   Scoped to a class the toggle adds for the length of one transition, so it
+   never taxes ordinary hover states.
+
+   Deliberately NOT transitioning `color`: an element that already carries
+   `transition: all` (every shadcn button does) and takes its colour by
+   inheritance can be left stranded on the old value when this blanket rule is
+   removed mid-flight — the header's "Sign in" link ended up near-black on a
+   near-black ground. Surfaces fade; text flips, which nobody notices. */
+html.theme-shifting,
+html.theme-shifting * {
+  transition:
+    background-color 420ms ease,
+    border-color 420ms ease,
+    box-shadow 420ms ease !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Night-theme surface treatment
+   ──────────────────────────────────────────────────────────────────────────
+   At night the sticker cards stop being paper with an ink shadow and become
+   lit panes: translucent, blurred behind, with the outline itself carrying
+   the glow. Same components, different physics.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.dark body {
+  background-image:
+    radial-gradient(58% 42% at 12% 0%, oklch(0.5 0.22 300 / 26%) 0%, transparent 62%),
+    radial-gradient(52% 38% at 88% 6%, oklch(0.52 0.19 220 / 22%) 0%, transparent 60%),
+    radial-gradient(60% 50% at 50% 100%, oklch(0.5 0.18 168 / 16%) 0%, transparent 66%);
+  background-attachment: fixed;
+}
+
+.dark .pop {
+  backdrop-filter: blur(14px);
+  box-shadow:
+    4px 4px 0 0 var(--ink),
+    0 0 28px -6px var(--glow),
+    inset 0 1px 0 0 oklch(1 0 0 / 8%);
+}
+
+.dark .pop-sm {
+  box-shadow:
+    3px 3px 0 0 var(--ink),
+    0 0 20px -6px var(--glow);
+}
+
+.dark .panel {
+  backdrop-filter: blur(14px);
+}
+
+.dark .highlight {
+  box-shadow: 0 0 26px -4px var(--glow);
+}
+
+.dark .chip-soft {
+  background-color: oklch(0.74 0.19 300 / 18%);
+  box-shadow: inset 0 0 0 1px oklch(0.74 0.19 300 / 30%);
+}
+
+.dark .sticker {
+  box-shadow:
+    3px 3px 0 0 var(--ink),
+    0 0 18px -4px var(--glow);
+}
+
+/* Star-field: multi-layered twinkling cosmic points in both light and dark modes */
+.starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  transition: opacity 800ms ease;
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 18%, oklch(0.55 0.15 280 / 60%) 50%, transparent),
+    radial-gradient(1.8px 1.8px at 42% 8%, oklch(0.65 0.18 80 / 60%) 50%, transparent),
+    radial-gradient(1.6px 1.6px at 68% 24%, oklch(0.55 0.2 260 / 70%) 50%, transparent),
+    radial-gradient(1.2px 1.2px at 84% 12%, oklch(0.6 0.15 160 / 60%) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 27% 42%, oklch(0.65 0.18 80 / 70%) 50%, transparent),
+    radial-gradient(1.8px 1.8px at 56% 56%, oklch(0.55 0.15 280 / 60%) 50%, transparent),
+    radial-gradient(1.4px 1.4px at 92% 48%, oklch(0.6 0.15 160 / 65%) 50%, transparent),
+    radial-gradient(1.6px 1.6px at 8% 68%, oklch(0.55 0.2 260 / 65%) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 35% 75%, oklch(0.65 0.18 80 / 60%) 50%, transparent),
+    radial-gradient(1.7px 1.7px at 75% 82%, oklch(0.55 0.15 280 / 65%) 50%, transparent),
+    radial-gradient(1.3px 1.3px at 48% 90%, oklch(0.6 0.15 160 / 60%) 50%, transparent),
+    radial-gradient(1.6px 1.6px at 88% 88%, oklch(0.65 0.18 80 / 70%) 50%, transparent);
+  background-size: 100% 100%;
+  animation: twinkle-field 6s ease-in-out infinite alternate;
+}
+
+.dark .starfield {
+  opacity: 0.95;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, oklch(1 0 0 / 90%) 50%, transparent),
+    radial-gradient(1.8px 1.8px at 42% 8%, oklch(0.9 0.12 85 / 85%) 50%, transparent),
+    radial-gradient(1.6px 1.6px at 68% 24%, oklch(1 0 0 / 85%) 50%, transparent),
+    radial-gradient(1.3px 1.3px at 84% 12%, oklch(0.85 0.15 180 / 80%) 50%, transparent),
+    radial-gradient(1.7px 1.7px at 27% 42%, oklch(0.9 0.14 85 / 90%) 50%, transparent),
+    radial-gradient(1.8px 1.8px at 56% 56%, oklch(1 0 0 / 80%) 50%, transparent),
+    radial-gradient(1.4px 1.4px at 92% 48%, oklch(0.9 0.15 280 / 85%) 50%, transparent),
+    radial-gradient(1.6px 1.6px at 8% 68%, oklch(1 0 0 / 75%) 50%, transparent),
+    radial-gradient(1.7px 1.7px at 35% 75%, oklch(0.95 0.12 85 / 80%) 50%, transparent),
+    radial-gradient(1.9px 1.9px at 75% 82%, oklch(1 0 0 / 90%) 50%, transparent),
+    radial-gradient(1.4px 1.4px at 48% 90%, oklch(0.9 0.14 180 / 75%) 50%, transparent),
+    radial-gradient(1.8px 1.8px at 88% 88%, oklch(0.95 0.12 85 / 85%) 50%, transparent);
+  animation: twinkle-field 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle-field {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Additional motion
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Live gradient type for one phrase per page — any more and the page starts
+   competing with its own content. */
+@utility aurora-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--aurora-1) 0%,
+    var(--aurora-2) 34%,
+    var(--aurora-3) 62%,
+    var(--aurora-1) 100%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-pan 9s ease-in-out infinite;
+}
+
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  60%,
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+/* A light sweeping across a button, on a long cycle so it reads as a
+   material property rather than an attention-grab. */
+@utility shine {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 32%), transparent);
+    animation: shine-sweep 4.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  translate: 0 0.16em;
+  background-color: var(--primary);
+  animation: caret-blink 1s step-end infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow);
+  }
+  70% {
+    box-shadow: 0 0 0 16px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@utility pulse-ring {
+  animation: pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+/* Scroll-driven where the browser supports it: the element's own progress
+   through the viewport drives the animation, with no scroll listener and no
+   rAF loop. Falls back to simply being visible. */
+@supports (animation-timeline: view()) {
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(46px) rotateX(12deg);
+      filter: blur(3px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+
+  .scroll-rise {
+    animation: rise-in linear both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 26%;
+    transform-origin: center bottom;
+  }
+
+  @keyframes parallax-up {
+    from {
+      translate: 0 var(--parallax-from, 40px);
+    }
+    to {
+      translate: 0 var(--parallax-to, -40px);
+    }
+  }
+
+  .scroll-parallax {
+    animation: parallax-up linear both;
+    animation-timeline: view();
+    animation-range: cover;
+  }
+}
+
+/* Magnetic buttons: JS writes the offset, CSS eases it. */
+.magnetic {
+  transform: translate(var(--magnet-x, 0px), var(--magnet-y, 0px));
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.magnetic[data-active="true"] {
+  transition: transform 90ms linear;
+}
+
+/* ── Reduced motion, again ────────────────────────────────────────────────
+   The global block earlier in this file zeroes durations, which is enough
+   for transitions but leaves transform-based idles sitting on their first
+   keyframe. These are the ones that need their transform cleared outright. */
+@media (prefers-reduced-motion: reduce) {
+  .mascot,
+  .mascot-head,
+  .mascot-body,
+  .mascot-cap,
+  .mascot-eyes,
+  .mascot-pencil,
+  .mascot-brows,
+  .mascot-mouth,
+  .mascot-halo,
+  .mascot-gear,
+  .mascot-sparkles > *,
+  .theme-orb,
+  .orb-orbit,
+  .aurora-wash,
+  .starfield,
+  .mystic-comet-track,
+  .mystic-comet-body,
+  .micro-meteor-track,
+  .micro-meteor-streak,
+  .shooting-comet {
+    animation: none !important;
+    display: none !important;
+    transform: none !important;
+    translate: none !important;
+    rotate: none !important;
+  }
+
+  .tilt,
+  .flip,
+  .magnetic {
+    transform: none !important;
+  }
+
+  .aurora-canvas {
+    display: none;
+  }
+
+  .caret {
+    animation: none !important;
+    opacity: 1;
+  }
+}
+
+/* Nav links grow an underline from the left rather than switching one on —
+   the same marker language as the section headings. */
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* The flip cards are focusable containers, so they need a visible focus
+   ring of their own — the faces inside are not interactive. */
+.flip-shell:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 6px;
+  border-radius: var(--radius-xl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-link::after {
+    transition: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The ribbon
+   ══════════════════════════════════════════════════════════════════════════
+   A real ribbon rather than a band running off both edges of the screen: it
+   is inset from the viewport, the printed centre panel sits on top, and two
+   folded tails fall behind it with a swallowtail cut in the outer end.
+
+   The tails are SVG (see ribbon.tsx) so the ink outline follows the notch —
+   a CSS clip-path would cut the border off along exactly the edge that most
+   needs one. The ink drop-shadow is applied once to the whole group so the
+   band and both tails cast one consistent shadow.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.ribbon {
+  --ribbon-height: 2.75rem;
+  --ribbon-tail: 3.5rem;
+  filter: drop-shadow(3px 4px 0 var(--ink));
+}
+
+.ribbon-band {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: var(--ribbon-height);
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  border-radius: 0.35rem;
+  background-image: linear-gradient(
+    180deg,
+    var(--plum-soft) 0%,
+    var(--plum) 62%,
+    var(--plum-deep) 100%
+  );
+  color: var(--plum-foreground);
+}
+
+/* A hairline of light along the top edge — the fold catching the light, and
+   the thing that stops the band reading as a flat rectangle of deep pink. */
+.ribbon-band::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background-color: oklch(1 0 0 / 22%);
+  pointer-events: none;
+}
+
+.ribbon-tail {
+  position: absolute;
+  top: 56%;
+  z-index: 1;
+  height: calc(var(--ribbon-height) * 0.94);
+  width: var(--ribbon-tail);
+  translate: 0 -50%;
+}
+
+.ribbon-tail-left {
+  left: calc(var(--ribbon-tail) * -0.72);
+}
+
+.ribbon-tail-right {
+  right: calc(var(--ribbon-tail) * -0.72);
+  scale: -1 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Interactive Examiner Preview
+   ══════════════════════════════════════════════════════════════════════════
+   The hero's animated proof: a script typing itself while the examiner marks
+   underneath it. Everything here is either a slow loop or a one-shot pop, so
+   it can run forever in the corner of the page without demanding attention.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.examiner-stage {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.examiner-card {
+  transform: rotateY(calc(var(--mx, 0) * 5deg)) rotateX(calc(var(--my, 0) * -4deg));
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+@keyframes examiner-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -9px;
+  }
+}
+
+.examiner-float {
+  animation: examiner-float 7s ease-in-out infinite;
+}
+
+/* Each clause is un-marked until the examiner reaches it; the wash and the
+   underline are two background layers on the text itself, both wiping in
+   from the left, so the marking reads as a pen moving across the line. Doing
+   it with backgrounds rather than an extra element keeps the clause inline —
+   a block child inside running text would break every line it sits on. */
+.clause {
+  padding-bottom: 3px;
+  border-radius: 0.25rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background-image:
+    linear-gradient(var(--clause-ink, transparent), var(--clause-ink, transparent)),
+    linear-gradient(var(--clause-tint, transparent), var(--clause-tint, transparent));
+  background-repeat: no-repeat;
+  background-position:
+    0 100%,
+    0 0;
+  background-size:
+    0% 2.5px,
+    0% 100%;
+  transition: background-size 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.clause[data-marked="true"] {
+  background-size:
+    100% 2.5px,
+    100% 100%;
+}
+
+@keyframes note-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+    scale: 0.97;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+.note-in {
+  animation: note-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The scanning line that sweeps the script while the examiner is reading. */
+@keyframes examiner-scan {
+  0% {
+    opacity: 0;
+    translate: 0 -110%;
+  }
+  14%,
+  86% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 260%;
+  }
+}
+
+.examiner-scan {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 38%;
+  background-image: linear-gradient(180deg, transparent, var(--glow), transparent);
+  animation: examiner-scan 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .examiner-float,
+  .examiner-scan,
+  .note-in {
+    animation: none !important;
+    translate: none !important;
+  }
+
+  .examiner-card {
+    transform: none !important;
+  }
+
+  .clause {
+    transition: none !important;
+  }
+}
+
+/* Legal pages: the only place in the product with long-form prose, so the
+   list and emphasis rules live here rather than in a global reset. */
+.legal-prose ul {
+  margin-block: 0.25rem;
+  padding-left: 1.15rem;
+  list-style: none;
+}
+
+.legal-prose li {
+  position: relative;
+  padding-left: 0.1rem;
+  margin-block: 0.45rem;
+}
+
+.legal-prose li::before {
+  content: "";
+  position: absolute;
+  left: -0.95rem;
+  top: 0.62em;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background-color: var(--primary);
+}
+
+.legal-prose strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* The headline highlighter, in the deep pink plum rather than the accent — one
+   per page, and it is what the eye lands on first. */
+@utility highlight-deep {
+  background-color: var(--plum);
+  color: var(--plum-foreground);
+}
+
+@utility scrollbar-none {
+  &::-webkit-scrollbar {
+    display: none !important;
+  }
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none !important;
+  }
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+

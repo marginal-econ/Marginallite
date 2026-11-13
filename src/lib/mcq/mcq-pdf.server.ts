@@ -1,0 +1,249 @@
+/**
+ * Marginalite MCQ Live — practice straight off an uploaded past paper.
+ *
+ * Real Cambridge IGCSE Economics (0455) Paper 1 multiple-choice practice.
+ *
+ * AI is used for two assistive (not generative) things only:
+ *   classifyPdfMcqTopics — tags each question against the real 0455
+ *   syllabus sections so it can feed the same "where you're losing marks"
+ *   feedback as the rest of the app. Text-only, cheap, one call per paper.
+ *
+ *   explainPdfMcqAnswer — after marking, a short written explanation of
+ *   why the correct option is right for one question the student got
+ *   wrong (or wants to review) — text-only, generated on demand per
+ *   question, never used to grade.
+ */
+import { chat } from "../ai.server";
+import { MODEL_EXAMINER } from "../examiner/config";
+import { extractFirstJsonObject } from "../examiner/json";
+import { IGCSE_0455_SECTIONS } from "./mcq.server";
+
+export type PdfMcqEra = "legacy" | "2027";
+
+/** One row as read straight off `mcq_pdf_attempts` — the minimum needed to group attempts by paper. */
+export type PdfAttemptRow = {
+  id: string;
+  title: string;
+  level: string;
+  paper_id: string | null;
+  score: number | null;
+  total: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+/**
+ * One row per *paper* a student has practiced, not one row per attempt —
+ * retaking the same library paper collapses into a single history entry
+ * instead of flooding the sidebar with duplicates.
+ */
+export type PaperHistoryEntry = {
+  paperId: string | null;
+  title: string;
+  level: string;
+  attemptsCount: number;
+  aggregateAttemptId: string;
+  aggregateScore: number | null;
+  aggregateTotal: number;
+  aggregateAt: string;
+  latestAttemptId: string;
+  latestScore: number | null;
+  latestTotal: number;
+  latestAt: string;
+};
+
+/** Groups completed attempt rows into one history entry per paper, first-attempt-counts. */
+export function groupPdfAttemptsByPaper(rows: PdfAttemptRow[]): PaperHistoryEntry[] {
+  const completed = rows
+    .filter((r) => r.completed_at)
+    .slice()
+    .sort((a, b) => (a.completed_at! < b.completed_at! ? -1 : 1));
+
+  const byKey = new Map<string, PdfAttemptRow[]>();
+  for (const row of completed) {
+    const key = row.paper_id ?? `solo:${row.id}`;
+    const list = byKey.get(key);
+    if (list) list.push(row);
+    else byKey.set(key, [row]);
+  }
+
+  const entries: PaperHistoryEntry[] = [];
+  for (const [key, attempts] of byKey) {
+    const first = attempts[0];
+    const latest = attempts[attempts.length - 1];
+    entries.push({
+      paperId: key.startsWith("solo:") ? null : key,
+      title: latest.title,
+      level: latest.level,
+      attemptsCount: attempts.length,
+      aggregateAttemptId: first.id,
+      aggregateScore: first.score,
+      aggregateTotal: first.total,
+      aggregateAt: first.completed_at!,
+      latestAttemptId: latest.id,
+      latestScore: latest.score,
+      latestTotal: latest.total,
+      latestAt: latest.completed_at!,
+    });
+  }
+
+  return entries.sort((a, b) => (a.latestAt < b.latestAt ? 1 : -1));
+}
+
+export type TopicTag = {
+  number: number;
+  topic: string;
+  skill: "knowledge" | "application" | "analysis";
+};
+
+/** Tags each question against the real syllabus sections — classification, not generation. */
+export async function classifyPdfMcqTopics(options: {
+  level?: string;
+  items: { number: number; text: string }[];
+}): Promise<TopicTag[]> {
+  if (options.items.length === 0) return [];
+  const sections = IGCSE_0455_SECTIONS;
+
+  const systemPrompt = [
+    "You are tagging real Cambridge IGCSE Economics (0455) Paper 1 Multiple Choice exam",
+    "questions against the official syllabus, for a student's topic-level feedback report.",
+    "Do not answer, rewrite, or invent any question content — only classify what is given.",
+    "",
+    "Syllabus units to choose from (use the closest match; do not invent new ones):",
+    sections.map((s, i) => `${i + 1}. ${s}`).join("\n"),
+  ].join("\n");
+
+  const userMessage = [
+    "Question text was extracted from a real PDF, so it may include the option list run",
+    "together with the stem, stray line breaks, or minor OCR noise — classify from what's legible.",
+    "",
+    "Questions:",
+    options.items.map((it) => `#${it.number}: ${it.text.slice(0, 600)}`).join("\n\n"),
+    "",
+    'Return ONLY one JSON object: { "tags": [ { "number": number, "topic": string, "skill": "knowledge" | "application" | "analysis" } ] }',
+    "topic must be a short syllabus topic name drawn from the units above (not the full sentence).",
+  ].join("\n");
+
+  const result = await chat({
+    model: MODEL_EXAMINER,
+    temperature: 0,
+    json: true,
+    reasoningEffort: "low",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const parsed = extractFirstJsonObject(result.text);
+  const tags = Array.isArray(parsed.tags) ? (parsed.tags as unknown[]) : [];
+
+  return tags
+    .map((t) => {
+      if (!t || typeof t !== "object") return null;
+      const row = t as Record<string, unknown>;
+      const number = Number(row.number);
+      if (!Number.isFinite(number)) return null;
+      const skill =
+        row.skill === "application" || row.skill === "analysis" ? row.skill : "knowledge";
+      return {
+        number,
+        topic: typeof row.topic === "string" && row.topic.trim() ? row.topic.trim() : "Untagged",
+        skill,
+      } satisfies TopicTag;
+    })
+    .filter((t): t is TopicTag => t !== null);
+}
+
+export type McqDiagnostic = {
+  concept: string;
+  keyRule: string;
+  correctReasoning: string;
+  distractorTrap: string;
+  speedTip: string;
+};
+
+export type McqExplanationResult = {
+  text: string;
+  diagnostic?: McqDiagnostic;
+};
+
+/**
+ * Advanced examiner explanation of why one question's mark-scheme answer is
+ * correct, generated on demand when a student opens a question in the
+ * post-attempt review. Produces structured Cambridge 0455 diagnostic data
+ * (concept, key rule, worked derivation, distractor trap analysis, speed tip).
+ */
+export async function explainPdfMcqAnswer(options: {
+  level?: string;
+  number: number;
+  stemText: string;
+  correctAnswer: "A" | "B" | "C" | "D";
+  userAnswer: "A" | "B" | "C" | "D" | null;
+}): Promise<McqExplanationResult> {
+  const { number, stemText, correctAnswer, userAnswer } = options;
+
+  const systemPrompt = [
+    "You are a Principal Examiner for Cambridge IGCSE Economics (0455) Paper 1 (Multiple Choice)",
+    "explaining a past multiple-choice question to a student reviewing their finished paper attempt.",
+    "The question stem was extracted from a real past paper.",
+    "Deliver an advanced, authoritative diagnostic breakdown.",
+    "",
+    "Return ONLY a single valid JSON object with these exact keys:",
+    '- "concept": short syllabus unit & topic reference (e.g. "Unit 2: Price Elasticity of Demand (PED)")',
+    '- "keyRule": the core economic principle, equation, or golden rule governing this question',
+    '- "correctReasoning": clear step-by-step worked derivation of why the correct option is uniquely true',
+    '- "distractorTrap": detailed diagnosis of why the student\'s choice was wrong or the common distractor trap Cambridge sets for this item',
+    '- "speedTip": rapid elimination shortcut to solve or reject options in < 45 seconds on Paper 1',
+    '- "summary": a cohesive 3-5 sentence explanation paragraph walking through the question',
+  ].join("\n");
+
+  const userMessage = [
+    `Question ${number}:`,
+    stemText.slice(0, 1400) ||
+      "(question text unavailable — explain generally from the answer key)",
+    "",
+    `Correct mark scheme answer: Option ${correctAnswer}`,
+    userAnswer
+      ? `Student selected: Option ${userAnswer} (${userAnswer === correctAnswer ? "CORRECT" : "INCORRECT"})`
+      : "Student left this question unattempted.",
+  ].join("\n");
+
+  const result = await chat({
+    model: MODEL_EXAMINER,
+    temperature: 0.2,
+    json: true,
+    reasoningEffort: "none",
+    maxCompletionTokens: 1000,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const parsed = extractFirstJsonObject(result.text);
+  if (parsed && typeof parsed === "object") {
+    const p = parsed as Record<string, unknown>;
+    const summary = typeof p.summary === "string" && p.summary.trim() ? p.summary.trim() : "";
+    const correctReasoning =
+      typeof p.correctReasoning === "string" ? p.correctReasoning.trim() : "";
+    const text = summary || correctReasoning || result.text.trim();
+
+    const diagnostic: McqDiagnostic = {
+      concept:
+        typeof p.concept === "string" && p.concept.trim()
+          ? p.concept.trim()
+          : `Cambridge 0455 Question ${number}`,
+      keyRule: typeof p.keyRule === "string" ? p.keyRule.trim() : "",
+      correctReasoning: correctReasoning || text,
+      distractorTrap: typeof p.distractorTrap === "string" ? p.distractorTrap.trim() : "",
+      speedTip: typeof p.speedTip === "string" ? p.speedTip.trim() : "",
+    };
+
+    return { text, diagnostic };
+  }
+
+  return {
+    text: result.text.trim(),
+  };
+}

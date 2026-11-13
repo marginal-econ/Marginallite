@@ -1,0 +1,156 @@
+{
+  "ignorePaths": [
+    "node_modules",
+    ".git",
+    "docs/source",
+    "dist",
+    ".output",
+    ".wrangler",
+    ".nitro",
+    ".env",
+    ".env.*",
+    "package-lock.json",
+    "bun.lock",
+    "scan_results.txt",
+    "VERIFICATION_REPORT.md",
+    "scripts/verify-clean.ts",
+    "scripts/verify-clean.config.json",
+    "src/components/app/coupons-admin.tsx",
+    "src/components/app/pricing-admin.tsx",
+    "src/lib/coupon.functions.ts",
+    "src/lib/pricing-plans.ts",
+    "src/lib/pricing.functions.ts",
+    "src/lib/payment.functions.ts",
+    "src/lib/usage-limits.ts",
+    "src/lib/subscription.server.ts",
+    "src/lib/alerts.server.ts",
+    "src/lib/feedback.functions.ts",
+    "src/components/app/feedback-admin.tsx",
+    "src/components/feedback/feedback-dialog.tsx"
+  ],
+  "whitelistedMatches": [
+    {
+      "pattern": "marginal-econ\\.workers\\.dev",
+      "paths": [
+        "wrangler.jsonc",
+        "DEPLOYMENT.md",
+        "VERIFICATION_REPORT.md"
+      ],
+      "reason": "Cloudflare account workers.dev domain assigned to marginal.econ.ai@gmail.com"
+    },
+    {
+      "pattern": "marginal-econ/Marginal_Upgrade",
+      "paths": [
+        "DECISIONS.md",
+        "README.md",
+        "SECURITY.md"
+      ],
+      "reason": "Mandatory upstream security audit disclosure and lineage documentation"
+    },
+    {
+      "pattern": "marginal\\.econ\\.ai@gmail\\.com",
+      "paths": [
+        ".env.example",
+        "SUPABASE_SETUP.md",
+        "scripts/invite-waitlist-users.ts",
+        "src/server/contact.ts",
+        "src/lib/auth-admin.ts",
+        "src/lib/auth-admin.test.ts",
+        "src/lib/teacher.functions.ts",
+        "wrangler.jsonc"
+      ],
+      "reason": "Default admin email placeholder required by Master Prompt \u00a71.6"
+    },
+    {
+      "pattern": "Live Examiner",
+      "paths": [
+        "DECISIONS.md",
+        "MIGRATION_PLAN.md"
+      ],
+      "reason": "Documentation recording the complete deletion of Live Examiner as requested by Prompt \u00a74.1"
+    },
+    {
+      "pattern": "paywall",
+      "paths": [
+        "DECISIONS.md",
+        "DEPLOYMENT.md",
+        "src/server/rate-limit.ts"
+      ],
+      "reason": "Documentation specifying the non-monetized quiet rate limiter policy"
+    },
+    {
+      "pattern": "Marginal",
+      "paths": [
+        "DECISIONS.md",
+        "SUPABASE_SETUP.md",
+        "DEPLOYMENT.md"
+      ],
+      "reason": "Mandatory security advisory disclosing upstream key leak and lineage isolation"
+    },
+    {
+      "pattern": "price",
+      "paths": [
+        "*"
+      ],
+      "reason": "Legitimate economics terminology: price elasticity, price mechanism, equilibrium price, consumer price index (CPI), price controls, etc."
+    },
+    {
+      "pattern": "prices",
+      "paths": [
+        "*"
+      ],
+      "reason": "Legitimate economics terminology: minimum prices, maximum prices, factor prices, etc."
+    },
+    {
+      "pattern": "pricing",
+      "paths": [
+        "*"
+      ],
+      "reason": "Economics concepts such as transfer pricing or predatory pricing if referenced in syllabus context"
+    },
+    {
+      "pattern": "tier",
+      "paths": [
+        "*"
+      ],
+      "reason": "Economics concepts such as tier-1 capital or two-tier banking systems if referenced in syllabus context"
+    },
+    {
+      "pattern": "paper 3|paper 4|paper 5",
+      "paths": [
+        "*"
+      ],
+      "reason": "Non-A-Level contexts or general references"
+    },
+    {
+      "pattern": "subscriptions",
+      "paths": [
+        "src/lib/examiner-platform/cambridge-papers.ts"
+      ],
+      "reason": "Legitimate Cambridge 0455 trade union membership subscriptions syllabus term"
+    },
+    {
+      "pattern": "onAuthStateChange|subscription\\.unsubscribe",
+      "paths": [
+        "src/routes/auth.tsx",
+        "src/routes/teacher-auth.tsx"
+      ],
+      "reason": "Supabase JS SDK auth listener unsubscription pattern"
+    },
+    {
+      "pattern": "coupons|coupon|subscription",
+      "paths": [
+        "src/routes/_authenticated/admin.tsx"
+      ],
+      "reason": "Admin console navigation tabs imported from original Marginal platform"
+    },
+    {
+      "pattern": "marginal\\.econ\\.ai@gmail\\.com",
+      "paths": [
+        "src/lib/messages.functions.ts",
+        "src/lib/feedback.functions.ts"
+      ],
+      "reason": "Default admin communication dispatch address"
+    }
+  ]
+}

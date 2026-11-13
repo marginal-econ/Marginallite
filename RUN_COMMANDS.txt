@@ -1,0 +1,22 @@
+# 0. Run the newest database migration once (Supabase SQL Editor, or `supabase db push`):
+#    supabase/migrations/20260919090000_user_cap_waitlist_limits_presence.sql
+
+# 1. Install dependencies (--legacy-peer-deps needed because of a
+#    beta-version peer-check quirk in @lovable.dev/vite-tanstack-config,
+#    not a real conflict)
+npm install --legacy-peer-deps
+
+# 2. Run locally (also regenerates src/routeTree.gen.ts for real)
+npm run dev
+
+# 3. Once you've clicked through and it looks right, build for production
+npm run build
+
+# 4a. If Cloudflare is connected to your git repo for auto-deploy:
+git add .
+git commit -m "Split app into Grader / Question bank, add Content admin"
+git push
+
+# 4b. If you deploy manually instead of via git push:
+npx wrangler login
+npx nitro deploy --prebuilt

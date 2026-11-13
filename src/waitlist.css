@@ -1,0 +1,99 @@
+/*
+ * Waitlist form styling.
+ *
+ * Kept in its own plain stylesheet, loaded after `styles.css`, for one
+ * reason: it reads the design tokens (--ink, --surface, --ring, --radius-xl)
+ * that styles.css defines, but it adds no Tailwind utilities of its own, so
+ * there is nothing here for the Tailwind entry to compile. Separating it also
+ * means the design system file the rest of the site shares is untouched.
+ *
+ * The material is the page's own: 1.5px ink border, hard offset shadow. On
+ * focus the field presses into the page — the shadow shrinks and the element
+ * moves down and right by exactly the amount the shadow lost, so the whole
+ * control appears to be pushed in. The focus ring is kept *as well*, never
+ * instead: the press is invisible to anyone who can't see it.
+ */
+
+.waitlist-field {
+  width: 100%;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-xl, 1rem);
+  background-color: var(--surface);
+  box-shadow: 4px 4px 0 0 var(--ink);
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--foreground);
+  transition:
+    box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    translate 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 140ms ease;
+}
+
+.waitlist-field::placeholder {
+  color: var(--muted-foreground);
+}
+
+.waitlist-field:hover:not(:disabled) {
+  box-shadow: 5px 5px 0 0 var(--ink);
+  translate: -1px -1px;
+}
+
+.waitlist-field:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: 2px 2px 0 0 var(--ink);
+  translate: 2px 2px;
+}
+
+.waitlist-field:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.waitlist-field-error {
+  border-color: var(--destructive);
+  box-shadow: 4px 4px 0 0 var(--destructive);
+  animation: waitlist-shake 320ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* iOS zooms the entire page when a focused input is smaller than 16px.
+   Keep phone fields at the platform-safe size so the layout does not jump. */
+@media (max-width: 639px) {
+  .waitlist-field {
+    font-size: 1rem;
+  }
+}
+
+/*
+ * A short, small-amplitude shake. Longer or wider reads as the error message
+ * shouting; this reads as the field saying "not that" and then stopping.
+ */
+@keyframes waitlist-shake {
+  10%,
+  90% {
+    translate: -2px 0;
+  }
+  20%,
+  80% {
+    translate: 3px 0;
+  }
+  30%,
+  50%,
+  70% {
+    translate: -5px 0;
+  }
+  40%,
+  60% {
+    translate: 5px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waitlist-field-error {
+    animation: none;
+  }
+  .waitlist-field {
+    transition: none;
+  }
+}

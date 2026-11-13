@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "marginalite",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "PUBLIC_SITE_URL": "https://marginalite.marginal-econ.workers.dev",
+    "VITE_BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
+    "VITE_BACKEND_PUBLISHABLE_KEY": "sb_publishable_OjodijuvlKGW8FBiuSZU7g_EUggDP77",
+    "BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
+    "BACKEND_PUBLISHABLE_KEY": "sb_publishable_OjodijuvlKGW8FBiuSZU7g_EUggDP77",
+    "SUPABASE_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
+    "MAILJET_SENDER_EMAIL": "marginal.econ.ai@gmail.com",
+    "ADMIN_EMAILS": "marginal.econ.ai@gmail.com",
+    "VITE_ADMIN_EMAILS": "marginal.econ.ai@gmail.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

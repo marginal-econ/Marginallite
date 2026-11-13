@@ -1,0 +1,21 @@
+{
+  "name": "Marginalite — Cambridge IGCSE Economics (0455)",
+  "short_name": "Marginalite",
+  "description": "Examiner-standard marking and practice for Cambridge IGCSE Economics 0455.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ec4899",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/marginalite-mark.svg",
+      "sizes": "256x256",
+      "type": "image/svg+xml"
+    }
+  ]
+}
