@@ -523,10 +523,10 @@ Question 2(a): Productive efficiency requires operation at minimum average cost 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="22">Paper 22 (AS Data Response &amp; Essays · 60 marks)</SelectItem>
-                <SelectItem value="42">Paper 42 (A Level Data Response &amp; Essays · 60 marks)</SelectItem>
-                <SelectItem value="21">Paper 21 (AS Data Response &amp; Essays · 60 marks)</SelectItem>
-                <SelectItem value="12">Paper 12 (AS Multiple Choice · 30 marks)</SelectItem>
+                <SelectItem value="22">Paper 22 (IGCSE Structured Questions · 90 marks)</SelectItem>
+                <SelectItem value="21">Paper 21 (IGCSE Structured Questions · 90 marks)</SelectItem>
+                <SelectItem value="12">Paper 12 (IGCSE Multiple Choice · 30 marks)</SelectItem>
+                <SelectItem value="11">Paper 11 (IGCSE Multiple Choice · 30 marks)</SelectItem>
               </SelectContent>
             </Select>
           </div>

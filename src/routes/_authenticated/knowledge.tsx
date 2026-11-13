@@ -570,7 +570,7 @@ export function KnowledgePage() {
                         onClick={async () => {
                           if (confirm(`Remove "${doc.title}" from Knowledge Base?`)) {
                             try {
-                              await removeDoc({ data: { documentId: doc.id } });
+                              await removeDoc({ data: { id: doc.id } });
                               toast.success("Document removed.");
                               queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] });
                             } catch (err: any) {

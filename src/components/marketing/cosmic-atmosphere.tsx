@@ -359,7 +359,7 @@ export function CosmicAtmosphere({
   density = "medium",
   comets,
 }: CosmicAtmosphereProps) {
-  const showComets = comets ?? (variant === "hero");
+  const showComets = false;
 
   const gradientStyles = {
     hero: (

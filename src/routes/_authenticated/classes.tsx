@@ -1643,7 +1643,7 @@ function ClassworkTab({
               filter === "essay" ? "bg-pink-600 text-white" : "text-slate-400",
             )}
           >
-            Cambridge Essays (8, 12, 20m)
+            Cambridge Questions (2, 4, 6, 8m)
           </Button>
           <Button
             size="sm"
@@ -2035,9 +2035,10 @@ function ClassworkTab({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                          <SelectItem value="8">8 Marks (AS Part a)</SelectItem>
-                          <SelectItem value="12">12 Marks (AS Part b / Evaluate)</SelectItem>
-                          <SelectItem value="20">20 Marks (Full Section B/C Essay)</SelectItem>
+                          <SelectItem value="2">2 Marks (Part a: Identify / Define)</SelectItem>
+                          <SelectItem value="4">4 Marks (Part b: Explain / Calculate)</SelectItem>
+                          <SelectItem value="6">6 Marks (Part c: Analyse)</SelectItem>
+                          <SelectItem value="8">8 Marks (Part d: Discuss / Evaluate)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

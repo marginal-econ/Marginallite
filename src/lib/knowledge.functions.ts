@@ -299,10 +299,18 @@ export const listDocuments = createServerFn({ method: "GET" })
 
 export const deleteDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data, context }) => {
+  .inputValidator((input: unknown) =>
+    z
+      .union([
+        z.object({ id: z.string().uuid() }),
+        z.object({ documentId: z.string().uuid() }),
+      ])
+      .transform((val) => ("id" in val ? val.id : val.documentId))
+      .parse(input),
+  )
+  .handler(async ({ data: docId, context }) => {
     await assertKnowledgeStaff(context);
-    const { error } = await supabaseAdmin.from("knowledge_documents").delete().eq("id", data.id);
+    const { error } = await supabaseAdmin.from("knowledge_documents").delete().eq("id", docId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

@@ -78,7 +78,7 @@ describe("Review Panel & Holistic Diagnostics", () => {
 describe("Advanced MCQ Review and Response Engine", () => {
   it("validates structured Cambridge MCQ diagnostic schema", () => {
     const mockDiagnostic: McqDiagnostic = {
-      concept: "AS Unit 2: Cross Elasticity of Demand (XED)",
+      concept: "IGCSE Topic 2: Cross Elasticity of Demand (XED)",
       keyRule: "Positive XED indicates substitutes; negative XED indicates complements.",
       correctReasoning:
         "A price increase in good X shifts the demand for good Y rightward, meaning X and Y are substitute goods.",
@@ -94,7 +94,7 @@ describe("Advanced MCQ Review and Response Engine", () => {
     };
 
     expect(result.diagnostic).toBeDefined();
-    expect(result.diagnostic?.concept).toContain("AS Unit 2");
+    expect(result.diagnostic?.concept).toContain("IGCSE Topic 2");
     expect(result.diagnostic?.keyRule).toBeTruthy();
     expect(result.diagnostic?.correctReasoning).toBeTruthy();
     expect(result.diagnostic?.distractorTrap).toBeTruthy();
