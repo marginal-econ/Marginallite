@@ -93,12 +93,13 @@ export const AI_PROVIDERS = [
     baseUrl: "https://api.mistral.ai/v1",
     keyHint: "mstrl_... (single key or pool for auto-rotation)",
     models: [
-      "ministral-8b-latest",
+      "ministral-14b-2512",
+      "ministral-14b-latest",
       "open-mistral-nemo",
+      "ministral-8b-latest",
       "ministral-3b-latest",
       "mistral-small-latest",
       "mistral-large-latest",
-      "ministral-14b-latest",
       "mistral-medium-latest",
     ],
     // mistral-embed outputs 1024 dims and is automatically zero-padded to 2048 dims

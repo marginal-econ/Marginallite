@@ -470,11 +470,12 @@ async function chatViaProvider(
       ? Array.from(
           new Set(
             [
-              config.model || "ministral-8b-latest",
-              "ministral-8b-latest",
-              "open-mistral-nemo",
-              "ministral-3b-latest",
+              config.model || "ministral-14b-2512",
+              "ministral-14b-2512",
               "ministral-14b-latest",
+              "open-mistral-nemo",
+              "ministral-8b-latest",
+              "ministral-3b-latest",
               "mistral-small-latest",
               "mistral-large-latest",
               "mistral-medium-latest",

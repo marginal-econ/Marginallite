@@ -957,12 +957,12 @@ export const testSpecificKey = createServerFn({ method: "POST" })
       (data.provider === "google"
         ? "gemini-2.5-flash"
         : data.provider === "mistral"
-          ? "ministral-8b-latest"
+          ? "ministral-14b-2512"
           : "gpt-4o-mini");
     if (data.provider === "google" && !data.model?.trim()) {
       testModel = "gemini-2.5-flash";
     } else if (data.provider === "mistral" && !data.model?.trim()) {
-      testModel = "ministral-8b-latest";
+      testModel = "ministral-14b-2512";
     }
 
     const config = normaliseConfig({
