@@ -519,16 +519,24 @@ export function renderContext(sources: GroundingSource[]): string {
   if (sources.length === 0) return "";
 
   const blocks = sources.map((source, index) => {
+    const isReference =
+      source.documentTitle.toLowerCase().includes("reference") ||
+      source.documentTitle.toLowerCase().includes("as level") ||
+      (source.heading && source.heading.toLowerCase().includes("as ref"));
     const label = source.heading
       ? `${source.documentTitle} — ${source.heading}`
       : source.documentTitle;
-    return `[S${index + 1}] (${source.docType.replace("_", " ")}) ${label}\n${source.snippet}`;
+    const refTag = isReference
+      ? " [REFERENCE ONLY: Theoretical enrichment & reasoning depth; marking criteria remain Cambridge 0455]"
+      : "";
+    return `[S${index + 1}] (${source.docType.replace("_", " ")})${refTag} ${label}\n${source.snippet}`;
   });
 
   return [
-    "RETRIEVED CAMBRIDGE SOURCE MATERIAL — this is the only material you may treat as authoritative.",
-    "Cite the sources you use with their [S#] markers. If the material below does not cover something,",
-    "say so plainly rather than inventing syllabus content, mark scheme wording, or examiner report claims.",
+    "RETRIEVED CAMBRIDGE SOURCE MATERIAL — this is the authoritative material for this assessment.",
+    "Cite the sources you use with their [S#] markers.",
+    "NOTE ON REFERENCE SOURCES: Any source tagged [REFERENCE ONLY] (such as AS Level foundational chapters) provides theoretical depth and economic reasoning structure. Do NOT penalise an IGCSE candidate if higher-level AS concepts or advanced formalisms are not mentioned; evaluate the candidate strictly by Cambridge IGCSE 0455 standards.",
+    "If the material below does not cover something, say so plainly rather than inventing syllabus content, mark scheme wording, or examiner report claims.",
     "",
     blocks.join("\n\n"),
   ].join("\n");
