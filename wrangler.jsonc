@@ -4,8 +4,15 @@
   "main": "@tanstack/react-start/server-entry",
   "compatibility_date": "2026-08-25",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "lite.marginal-econ.com",
+      "custom_domain": true
+    }
+  ],
   "vars": {
-    "PUBLIC_SITE_URL": "https://marginalite.marginal-econ.workers.dev",
+    "PUBLIC_SITE_URL": "https://lite.marginal-econ.com",
     "VITE_BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
     "VITE_BACKEND_PUBLISHABLE_KEY": "sb_publishable_OjodijuvlKGW8FBiuSZU7g_EUggDP77",
     "BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
