@@ -470,13 +470,13 @@ async function chatViaProvider(
       ? Array.from(
           new Set(
             [
-              config.model,
-              "codestral-latest",
+              config.model || "ministral-8b-latest",
               "ministral-8b-latest",
-              "mistral-small-latest",
-              "mistral-large-latest",
+              "open-mistral-nemo",
               "ministral-3b-latest",
               "ministral-14b-latest",
+              "mistral-small-latest",
+              "mistral-large-latest",
               "mistral-medium-latest",
             ].filter(Boolean),
           ),
@@ -516,7 +516,7 @@ async function chatViaProvider(
               Authorization: `Bearer ${currentKey}`,
             },
             body: JSON.stringify(modelBody),
-            signal: AbortSignal.timeout(45_000), // 45-second timeout for full essay generation/marking
+            signal: AbortSignal.timeout(90_000), // 90-second timeout for full essay generation/marking
           });
 
           if (response.ok) {
@@ -595,12 +595,12 @@ async function chatViaProvider(
 
           if (isTimeout) {
             lastErrStatus = 504;
-            lastErrDetail = JSON.stringify({ message: `Model ${m} timed out after 45s.` });
+            lastErrDetail = JSON.stringify({ message: `Model ${m} timed out after 90s.` });
             const cooldownTime = activeKeysToTry.length > 1 ? 60_000 : 2_000;
             markKeyRateLimited(currentKey, cooldownTime);
             const isPaidKey = paidKeys.includes(currentKey);
             console.warn(
-              `[chatViaProvider] Model ${m} (key ...${currentKey.slice(-4)}, ${isPaidKey ? "emergency paid fallback" : "free pool key"}) timed out (>45s). Auto-hopping to next key...`,
+              `[chatViaProvider] Model ${m} (key ...${currentKey.slice(-4)}, ${isPaidKey ? "emergency paid fallback" : "free pool key"}) timed out (>90s). Auto-hopping to next key...`,
             );
             try {
               const { supabaseAdmin } = await import("@/integrations/backend/client.server");
@@ -608,9 +608,9 @@ async function chatViaProvider(
                 user_id: options.userId ?? null,
                 feature: (options.feature ?? "chat") + "_key_hop",
                 model: m,
-                latency_ms: 45_000,
+                latency_ms: 90_000,
                 ok: false,
-                error_message: `Key ...${currentKey.slice(-4)} (${isPaidKey ? "emergency paid fallback" : "free pool key"}) exceeded 45s timeout. Auto-hopped to next key.`,
+                error_message: `Key ...${currentKey.slice(-4)} (${isPaidKey ? "emergency paid fallback" : "free pool key"}) exceeded 90s timeout. Auto-hopped to next key.`,
               });
             } catch {}
 

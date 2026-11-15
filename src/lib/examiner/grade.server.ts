@@ -262,11 +262,8 @@ export async function gradeEssay(
   let latencyMs = first.latencyMs;
 
   // --- audit pass ----------------------------------------------------------
-  // To protect students from Cloudflare 524 gateway timeouts (100s ceiling),
-  // we only run the audit pass if the primary examiner completed within 18s.
-  // The audit pass itself is protected with a 10s timeout, guaranteeing total
-  // response time stays under 25-30s.
-  if (options.auditPass !== false && first.latencyMs < 18_000) {
+  // Accommodates up to a minute for deep essay marking and independent moderation.
+  if (options.auditPass !== false && first.latencyMs < 50_000) {
     const auditSystemPrompt = `${loadPrompt(AUDIT_PROMPT, promptValues)}\n\n${RESPONSE_CONTRACT}`;
     const auditUserMessage =
       `Exam question (${maxMark} marks):\n\n${question}\n\n` +
@@ -300,7 +297,7 @@ export async function gradeEssay(
       const second = await Promise.race([
         secondPromise,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Audit pass exceeded 10s timeout")), 10_000),
+          setTimeout(() => reject(new Error("Audit pass exceeded 30s timeout")), 30_000),
         ),
       ]);
 
@@ -314,7 +311,7 @@ export async function gradeEssay(
       // Triggered only when a material discrepancy or grade band contradiction
       // exists between the Primary Examiner and Independent Moderator.
       const disputeCheck = shouldTriggerArbitration(grading, secondGrading, maxMark);
-      if (disputeCheck.shouldArbitrate && latencyMs < 25_000) {
+      if (disputeCheck.shouldArbitrate && latencyMs < 75_000) {
         try {
           const arbitrated = await Promise.race([
             arbitrateGrading({
@@ -327,7 +324,7 @@ export async function gradeEssay(
               disputeReason: disputeCheck.reason,
             }),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Arbitration exceeded 8s timeout")), 8_000),
+              setTimeout(() => reject(new Error("Arbitration exceeded 25s timeout")), 25_000),
             ),
           ]);
           grading = arbitrated;

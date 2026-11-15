@@ -94,10 +94,10 @@ export const AI_PROVIDERS = [
     keyHint: "mstrl_... (single key or pool for auto-rotation)",
     models: [
       "ministral-8b-latest",
-      "mistral-small-latest",
-      "codestral-latest",
-      "mistral-large-latest",
+      "open-mistral-nemo",
       "ministral-3b-latest",
+      "mistral-small-latest",
+      "mistral-large-latest",
       "ministral-14b-latest",
       "mistral-medium-latest",
     ],
