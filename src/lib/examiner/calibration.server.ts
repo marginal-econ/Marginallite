@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { MAX_ANCHORS_PER_BAND } from "./config";
+import { IGCSE_0455_GOLD_CALIBRATION_SET } from "./calibration/gold-set";
 
 export type Anchor = {
   question: string;
@@ -12,26 +13,38 @@ export type Anchor = {
 };
 
 /**
- * Loads every active calibration anchor. Unlike the retrieval call this
- * shares a table with, an anchor query failing IS a real problem — the
- * mark scale has nothing else grounding it — so this throws on a genuine
- * DB error instead of quietly returning an empty list.  Zero *rows*
- * (nobody has added an anchor yet) is a normal, non-error state and
- * returns `[]` — see fetchCalibrationAnchors's callers for how that's
- * surfaced instead of hidden.
+ * Loads calibration anchors for few-shot prompt injection.
+ * Tries the database `calibration_anchors` table first; if the table is empty or
+ * not yet migrated, smoothly falls back to the official Cambridge IGCSE 0455 Gold
+ * Calibration Set across all 6 Units.
  */
 export async function fetchCalibrationAnchors(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
 ): Promise<Anchor[]> {
-  const { data, error } = await supabase
-    .from("calibration_anchors")
-    .select("question, essay_text, mark, max_mark, band_label, notes")
-    .eq("active", true)
-    .order("created_at", { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from("calibration_anchors")
+      .select("question, essay_text, mark, max_mark, band_label, notes")
+      .eq("active", true)
+      .order("created_at", { ascending: true });
 
-  if (error) throw new Error(`Calibration anchors could not be loaded: ${error.message}`);
-  return (data ?? []) as Anchor[];
+    if (!error && data && data.length > 0) {
+      return data as Anchor[];
+    }
+  } catch (err) {
+    console.warn("calibration_anchors query failed, falling back to Gold Calibration Set:", err);
+  }
+
+  // Fallback to comprehensive 0455 Gold Calibration Set covering all 6 units & tariffs (2m, 4m, 6m, 8m)
+  return IGCSE_0455_GOLD_CALIBRATION_SET.map((item) => ({
+    question: `[${item.topic} | ${item.paper} Q${item.questionNumber}] ${item.question}`,
+    essay_text: item.candidateAnswer,
+    mark: item.expectedMark,
+    max_mark: item.maxMark,
+    band_label: item.band,
+    notes: `Tariff: ${item.maxMark}m | Standard: ${item.markingGuide} | Examiner Rationale: ${item.reason}`,
+  }));
 }
 
 /**

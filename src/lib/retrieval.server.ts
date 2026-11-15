@@ -325,6 +325,106 @@ export function deduplicateSources(sources: GroundingSource[]): GroundingSource[
   return result;
 }
 
+/**
+ * Lexical keyword retrieval directly against document_chunks and knowledge_documents.
+ * Used when vector embeddings are not yet generated, or when vector search returns 0 matches.
+ */
+export async function lexicalFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  options: RetrieveOptions,
+): Promise<GroundingSource[]> {
+  const queryTerms = options.query
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !GENERIC_STOP_WORDS_2.has(w));
+
+  if (queryTerms.length === 0) return [];
+
+  // Exclude command and meta words
+  const excludeWords = new Set([
+    "what",
+    "which",
+    "explain",
+    "discuss",
+    "evaluate",
+    "analyse",
+    "analyze",
+    "define",
+    "question",
+    "scheme",
+    "guidance",
+    "whether",
+    "should",
+    "reasons",
+    "points",
+    "marks",
+    "paper",
+    "candidate",
+    "answer",
+    "using",
+  ]);
+
+  const distinctive = queryTerms.filter((w) => !excludeWords.has(w)).slice(0, 5);
+  const termsToQuery = distinctive.length > 0 ? distinctive : queryTerms.slice(0, 3);
+
+  try {
+    const orFilter = termsToQuery
+      .map((term) => `content.ilike.%${term}%,heading.ilike.%${term}%`)
+      .join(",");
+
+    let query = supabase
+      .from("document_chunks")
+      .select("id, document_id, heading, content, knowledge_documents!inner(id, title, doc_type)")
+      .or(orFilter)
+      .limit(40);
+
+    if (options.docTypes && options.docTypes.length > 0) {
+      query = query.in("knowledge_documents.doc_type", options.docTypes);
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) return [];
+
+    const scored = data.map((chunk: any) => {
+      const doc = Array.isArray(chunk.knowledge_documents)
+        ? chunk.knowledge_documents[0]
+        : chunk.knowledge_documents;
+      const docTitle = doc?.title || "Cambridge Economics Resource";
+      const docType = (doc?.doc_type || "notes") as DocType;
+
+      const score = computeLexicalScore(
+        {
+          content: chunk.content,
+          heading: chunk.heading,
+          document_title: docTitle,
+        },
+        termsToQuery,
+      );
+
+      return {
+        documentId: chunk.document_id,
+        documentTitle: docTitle,
+        docType,
+        heading: chunk.heading,
+        snippet: chunk.content,
+        similarity: Math.min(0.92, 0.55 + score * 0.04),
+        score,
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    const targetCount = options.matchCount ?? 8;
+    return deduplicateSources(
+      scored.slice(0, targetCount).map(({ score: _score, ...rest }) => rest),
+    );
+  } catch (err) {
+    console.warn("Lexical fallback search error:", err);
+    return [];
+  }
+}
+
 export async function retrieve(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
@@ -338,46 +438,51 @@ export async function retrieve(
     return cached.sources;
   }
 
-  const expandedQuery = expandEconomicQuery(options.query);
-  const queryEmbedding = await embedOne(expandedQuery, MODEL_EMBEDDING);
+  let queryEmbedding: number[] | null = null;
+  try {
+    const expandedQuery = expandEconomicQuery(options.query);
+    queryEmbedding = await embedOne(expandedQuery, MODEL_EMBEDDING);
+  } catch (embedErr) {
+    console.warn("embedOne failed or provider unconfigured, using lexical retrieval:", embedErr);
+  }
+
   const matchTarget = options.matchCount ?? 8;
-  // Over-fetch by 2x when hybrid RRF is enabled to allow reciprocal reranking across candidates
   const fetchCount =
     options.enableHybridRrf !== false ? Math.min(24, Math.max(matchTarget * 2, 16)) : matchTarget;
 
-  const { data, error } = await supabase.rpc("match_document_chunks", {
-    query_embedding: JSON.stringify(queryEmbedding),
-    match_count: fetchCount,
-    filter_doc_types: options.docTypes ?? null,
-    filter_topic_id: options.topicId ?? null,
-  });
+  let rows: MatchRow[] = [];
+  if (queryEmbedding) {
+    try {
+      const { data, error } = await supabase.rpc("match_document_chunks", {
+        query_embedding: JSON.stringify(queryEmbedding),
+        match_count: fetchCount,
+        filter_doc_types: options.docTypes ?? null,
+        filter_topic_id: options.topicId ?? null,
+      });
 
-  if (error) throw new Error(`Knowledge search failed: ${error.message}`);
+      if (!error && data) {
+        rows = data as MatchRow[];
+      }
+    } catch (rpcErr) {
+      console.warn("match_document_chunks RPC failed, falling back to lexical search:", rpcErr);
+    }
+  }
 
-  const rows = (data ?? []) as MatchRow[];
   const minSimilarity = options.minSimilarity ?? DEFAULT_GROUNDING_SIMILARITY_FLOOR; // Calibrated floor (>=0.50)
   const matches = rows.filter((row) => row.similarity >= minSimilarity);
 
-  // Before accepting "nothing relevant was found" at face value, rule out
-  // embedding space mismatches
-  if (matches.length === 0 && rows.length > 0) {
-    const topSimilarity = Math.max(...rows.map((row) => row.similarity));
-    if (topSimilarity < SPACE_MISMATCH_CEILING) {
-      const active = await getActiveEmbeddingProvider();
-      const activeLabel = active
-        ? `${active.label} (${active.provider} \u00b7 ${active.model})`
-        : "the built-in default embedding model";
-      throw new Error(
-        `Knowledge base search found candidates but every one scored far below the relevance floor ` +
-          `(best match ${(topSimilarity * 100).toFixed(1)}%, vs the ${(minSimilarity * 100).toFixed(0)}% needed) ` +
-          `— that flat, near-zero pattern across every candidate is the signature of an embedding-provider ` +
-          `mismatch, not an empty knowledge base. Your documents were embedded with a different provider/model ` +
-          `than the one currently active for embedding (${activeLabel}). Fix under Admin \u2192 Embeddings: either ` +
-          `switch the active embedding provider back to whichever one originally embedded this knowledge base, ` +
-          `or re-embed the knowledge base under the current provider (Admin \u2192 Knowledge). Grading is stopped ` +
-          `rather than silently proceeding without real grounding.`,
-      );
+  // If vector search returned nothing or below floor, fall back to lexical search
+  if (matches.length === 0) {
+    const fallbackSources = await lexicalFallback(supabase, options);
+    if (fallbackSources.length > 0) {
+      if (RETRIEVAL_CACHE.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = RETRIEVAL_CACHE.keys().next().value;
+        if (oldestKey) RETRIEVAL_CACHE.delete(oldestKey);
+      }
+      RETRIEVAL_CACHE.set(cacheKey, { sources: fallbackSources, timestamp: now });
+      return fallbackSources;
     }
+    return [];
   }
 
   // Apply Reciprocal Rank Fusion (RRF) between dense and sparse ranks

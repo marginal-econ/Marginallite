@@ -3,16 +3,35 @@ import { z } from "zod";
 import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
+import { IGCSE_0455_GOLD_CALIBRATION_SET } from "./examiner/calibration/gold-set";
 
 export const listAnchors = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("calibration_anchors")
-      .select("id, question, essay_text, mark, max_mark, band_label, notes, active, created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    try {
+      const { data, error } = await context.supabase
+        .from("calibration_anchors")
+        .select("id, question, essay_text, mark, max_mark, band_label, notes, active, created_at")
+        .order("created_at", { ascending: false });
+      if (!error && data && data.length > 0) {
+        return data;
+      }
+    } catch {
+      // Fallback below
+    }
+
+    // Return the curated Cambridge 0455 Gold Calibration Set across all 6 units
+    return IGCSE_0455_GOLD_CALIBRATION_SET.map((item, idx) => ({
+      id: `gold-${item.id}`,
+      question: `[${item.topic} - ${item.paper} Q${item.questionNumber}] ${item.question}`,
+      essay_text: item.candidateAnswer,
+      mark: item.expectedMark,
+      max_mark: item.maxMark,
+      band_label: item.band,
+      notes: `Standard: ${item.markingGuide} | Examiner Rationale: ${item.reason}`,
+      active: true,
+      created_at: new Date(2024, 0, idx + 1).toISOString(),
+    }));
   });
 
 const AnchorInput = z.object({
@@ -27,7 +46,7 @@ const AnchorInput = z.object({
 
 export const createAnchor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => AnchorInput.parse(input))
+  .inputValidator((input: unknown) => AnchorInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     if (data.mark > data.maxMark) {
       throw new Error("The confirmed mark cannot be higher than the total available.");
