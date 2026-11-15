@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 
@@ -106,7 +107,11 @@ export const listDefinitions = createServerFn({ method: "GET" })
  *  accepted (verbatim-verified) definitions found in it. */
 export const extractDefinitions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ documentId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const documentId = typeof raw === "string" ? raw : (raw as any)?.documentId || (raw as any)?.id;
+    return z.object({ documentId: z.string().uuid() }).parse({ documentId });
+  })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertStaff(supabase, userId);
@@ -131,7 +136,11 @@ export const extractDefinitions = createServerFn({ method: "POST" })
 
 export const deleteDefinition = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const id = typeof raw === "string" ? raw : (raw as any)?.id;
+    return z.object({ id: z.string().uuid() }).parse({ id });
+  })
   .handler(async ({ data, context }) => {
     await assertStaff(context.supabase, context.userId);
     const { error } = await context.supabase.from("definitions").delete().eq("id", data.id);

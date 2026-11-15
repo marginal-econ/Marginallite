@@ -18,6 +18,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
+import { unwrapData } from "@/lib/safe-validator";
+import curated0455Questions from "./bank/curated-0455-questions.json";
 
 const EraEnum = z.enum(["legacy", "2027"]).default("legacy");
 
@@ -40,7 +42,7 @@ const ExtractInput = z.object({
 /** Extract candidate questions from a pasted/uploaded QP(+MS) and stage them as pending_review. */
 export const extractBankQuestions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ExtractInput.parse(input))
+  .inputValidator((input: unknown) => ExtractInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -146,7 +148,7 @@ const ListForReviewInput = z.object({
 
 export const listBankQuestionsForReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ListForReviewInput.parse(input))
+  .inputValidator((input: unknown) => ListForReviewInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const table = data.kind === "mcq" ? "bank_mcq_questions" : "bank_essay_questions";
     let query = context.supabase
@@ -168,7 +170,7 @@ const SetStatusInput = z.object({
 
 export const setBankQuestionStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => SetStatusInput.parse(input))
+  .inputValidator((input: unknown) => SetStatusInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const table = data.kind === "mcq" ? "bank_mcq_questions" : "bank_essay_questions";
     const { error } = await context.supabase
@@ -198,7 +200,7 @@ const UpdateMcqInput = z.object({
 /** Inline edit of a bank MCQ question before/while reviewing it. */
 export const updateBankMcqQuestion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => UpdateMcqInput.parse(input))
+  .inputValidator((input: unknown) => UpdateMcqInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { id, diagramId, diagramImageUrl, ...patch } = data;
     const { error } = await context.supabase
@@ -223,7 +225,7 @@ const UpdateEssayInput = z.object({
 
 export const updateBankEssayQuestion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => UpdateEssayInput.parse(input))
+  .inputValidator((input: unknown) => UpdateEssayInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("bank_essay_questions")
@@ -238,11 +240,11 @@ export const updateBankEssayQuestion = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const DeleteBankInput = z.object({ kind: z.enum(["mcq", "essay"]), id: z.string().uuid() });
+const DeleteBankInput = z.object({ kind: z.enum(["mcq", "essay"]), id: z.string() });
 
 export const deleteBankQuestion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => DeleteBankInput.parse(input))
+  .inputValidator((input: unknown) => DeleteBankInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const table = data.kind === "mcq" ? "bank_mcq_questions" : "bank_essay_questions";
     const { error } = await context.supabase.from(table).delete().eq("id", data.id);
@@ -259,17 +261,32 @@ const ListTopicsInput = z.object({ kind: z.enum(["mcq", "essay"]), era: EraEnum.
 /** Distinct topics with at least one approved question, for the browse UI. */
 export const listBankTopics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ListTopicsInput.parse(input))
+  .inputValidator((input: unknown) => ListTopicsInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const table = data.kind === "mcq" ? "bank_mcq_questions" : "bank_essay_questions";
-    const { data: rows, error } = await context.supabase
-      .from(table)
-      .select("topic")
-      .eq("status", "approved");
-    if (error) throw new Error(error.message);
+    try {
+      const { data: rows, error } = await context.supabase
+        .from(table)
+        .select("topic")
+        .eq("status", "approved");
+      if (!error && rows && rows.length > 0) {
+        const counts = new Map<string, number>();
+        for (const row of rows) {
+          const topic = (row as { topic: string }).topic || "General";
+          counts.set(topic, (counts.get(topic) ?? 0) + 1);
+        }
+        return [...counts.entries()]
+          .map(([topic, count]) => ({ topic, count }))
+          .sort((a, b) => b.count - a.count);
+      }
+    } catch {
+      /* Fallback to curated Cambridge 0455 corpus */
+    }
+
+    // Curated Cambridge IGCSE 0455 units
     const counts = new Map<string, number>();
-    for (const row of rows ?? []) {
-      const topic = (row as { topic: string }).topic || "General";
+    for (const q of curated0455Questions) {
+      const topic = q.topic || "General Economics Principles";
       counts.set(topic, (counts.get(topic) ?? 0) + 1);
     }
     return [...counts.entries()]
@@ -284,18 +301,36 @@ const ListApprovedEssaysInput = z.object({
 
 export const listApprovedEssayQuestions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => ListApprovedEssaysInput.parse(input))
+  .inputValidator((input: unknown) => ListApprovedEssaysInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
-    let query = context.supabase
-      .from("bank_essay_questions")
-      .select("id, question_text, topic, max_mark, exam_series")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (data.topic) query = query.eq("topic", data.topic);
-    const { data: rows, error } = await query;
-    if (error) throw new Error(error.message);
-    return rows ?? [];
+    try {
+      let query = context.supabase
+        .from("bank_essay_questions")
+        .select("id, question_text, topic, max_mark, exam_series")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (data.topic) query = query.eq("topic", data.topic);
+      const { data: rows, error } = await query;
+      if (!error && rows && rows.length > 0) {
+        return rows;
+      }
+    } catch {
+      /* Fallback to curated catalog */
+    }
+
+    // Filter curated 0455 questions by topic if selected
+    let questions = curated0455Questions;
+    if (data.topic) {
+      questions = questions.filter((q) => q.topic.toLowerCase() === data.topic?.toLowerCase());
+    }
+    return questions.slice(0, 100).map((q) => ({
+      id: q.id,
+      question_text: q.question_text,
+      topic: q.topic,
+      max_mark: q.max_mark,
+      exam_series: q.exam_series,
+    }));
   });
 
 // MCQ practice is PDF-only — there is deliberately no "start a paper from

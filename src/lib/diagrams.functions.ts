@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import type { Database } from "@/integrations/backend/types";
@@ -289,7 +290,11 @@ export const autofillDiagramFromImage = createServerFn({ method: "POST" })
 
 export const deleteCustomDiagram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const id = typeof raw === "string" ? raw : (raw as any)?.id;
+    return z.object({ id: z.string().uuid() }).parse({ id });
+  })
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("custom_diagrams").delete().eq("id", data.id);
     if (error) throw new Error(error.message);

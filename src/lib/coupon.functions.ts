@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import { supabaseAdmin } from "@/integrations/backend/client.server";
@@ -385,7 +386,11 @@ export const updateCouponCode = createServerFn({ method: "POST" })
  */
 export const deleteCouponCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const id = typeof raw === "string" ? raw : (raw as any)?.id;
+    return z.object({ id: z.string() }).parse({ id });
+  })
   .handler(async ({ data, context }) => {
     await assertAdminAccess(context as any);
 

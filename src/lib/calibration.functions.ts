@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 
@@ -55,7 +56,7 @@ export const createAnchor = createServerFn({ method: "POST" })
 export const setAnchorActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid(), active: z.boolean() }).parse(input),
+    z.object({ id: z.string().uuid(), active: z.boolean() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -68,7 +69,11 @@ export const setAnchorActive = createServerFn({ method: "POST" })
 
 export const deleteAnchor = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const id = typeof raw === "string" ? raw : (raw as any)?.id;
+    return z.object({ id: z.string().uuid() }).parse({ id });
+  })
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("calibration_anchors").delete().eq("id", data.id);
     if (error) throw new Error(error.message);

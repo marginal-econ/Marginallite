@@ -7,6 +7,8 @@ import type { Database } from "@/integrations/backend/types";
 import { isAdmin as checkAdmin } from "@/lib/auth-admin";
 import { supabaseAdmin } from "@/integrations/backend/client.server";
 
+import { unwrapData } from "@/lib/safe-validator";
+
 type KnowledgeAuthContext = {
   supabase: SupabaseClient<Database>;
   userId: string;
@@ -80,7 +82,7 @@ const IngestInput = z.object({
  */
 export const ingestDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IngestInput.parse(input))
+  .inputValidator((input: unknown) => IngestInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     await assertKnowledgeStaff(context);
     const { userId } = context;
@@ -354,7 +356,7 @@ export const reembedAllDocuments = createServerFn({ method: "POST" })
 export const searchKnowledge = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ query: z.string().trim().min(2).max(500) }).parse(input),
+    z.object({ query: z.string().trim().min(2).max(500) }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const { retrieve } = await import("./retrieval.server");

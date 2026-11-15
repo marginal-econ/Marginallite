@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { formatErrorMessage } from "@/lib/safe-validator";
 
 import { PageHeader } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -158,7 +159,7 @@ export function KnowledgePage() {
       setUploadProgress({ step: "File loaded successfully", percent: 100 });
       toast.success(`Extracted ${extracted.length.toLocaleString()} characters.`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to parse document");
+      toast.error(formatErrorMessage(err, "Failed to parse document"));
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadProgress(null), 1500);
@@ -221,7 +222,7 @@ export function KnowledgePage() {
       setNewText("");
       setExamSeries("");
     } catch (err: any) {
-      toast.error(err.message || "Failed to ingest document");
+      toast.error(formatErrorMessage(err, "Failed to ingest document"));
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -574,7 +575,7 @@ export function KnowledgePage() {
                               toast.success("Document removed.");
                               queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] });
                             } catch (err: any) {
-                              toast.error(err.message || "Failed to delete");
+                              toast.error(formatErrorMessage(err, "Failed to delete"));
                             }
                           }
                         }}

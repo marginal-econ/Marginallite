@@ -24,20 +24,9 @@ async function check() {
     console.log("Total papers listed:", mcqs.length);
   }
 
-  const { data: docs, count: docCount } = await supabase
-    .from("knowledge_documents")
-    .select("id, title, doc_type, exam_series, chunk_count", { count: "exact" });
-
-  console.log("\n=== KNOWLEDGE BASE DOCUMENTS IN PRODUCTION ===");
-  console.log("Total Knowledge Documents:", docCount);
-  if (docs && docs.length > 0) {
-    const series = Array.from(new Set(docs.map((d) => d.exam_series).filter(Boolean))).sort();
-    console.log("Exam Series represented:", series.length, "series:", series);
-    const docTypes = docs.reduce((acc: any, d: any) => {
-      acc[d.doc_type] = (acc[d.doc_type] || 0) + 1;
-      return acc;
-    }, {});
-    console.log("By type:", docTypes);
+  for (const table of ["profiles", "definitions", "calibration_anchors", "classrooms", "essays", "essay_versions"]) {
+    const { error } = await supabase.from(table).select("id").limit(1);
+    console.log(`table ${table}:`, error ? error.message : "EXISTS");
   }
 
   const { count: chunkCount } = await supabase

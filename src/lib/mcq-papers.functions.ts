@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import type { Database } from "@/integrations/backend/types";
@@ -38,7 +39,11 @@ export const getServerTime = createServerFn({ method: "GET" })
  */
 export const startMcqAttempt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ paperId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const paperId = typeof raw === "string" ? raw : (raw as any)?.paperId || (raw as any)?.id;
+    return z.object({ paperId: z.string().uuid() }).parse({ paperId });
+  })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: paper, error } = await supabase
@@ -173,7 +178,11 @@ export const addMcqPapers = createServerFn({ method: "POST" })
 
 export const deleteMcqPaper = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => {
+    const raw = unwrapData(input);
+    const id = typeof raw === "string" ? raw : (raw as any)?.id;
+    return z.object({ id: z.string().uuid() }).parse({ id });
+  })
   .handler(async ({ data, context }) => {
     await assertLibraryStaff(context);
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
