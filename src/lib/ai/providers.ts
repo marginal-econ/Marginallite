@@ -91,16 +91,22 @@ export const AI_PROVIDERS = [
     id: "mistral",
     label: "Mistral",
     baseUrl: "https://api.mistral.ai/v1",
-    keyHint: "...",
-    models: ["mistral-large-latest"],
-    // mistral-embed is fixed at 1024 dims with no way to request a
-    // different size, so it can never match document_chunks.embedding
-    // (vector(2048)) — left out of the Embeddings console rather than
-    // offering an option that's guaranteed to fail on first use.
-    embeddingModels: [],
-    embeddingCapable: false,
+    keyHint: "mstrl_... (single key or pool for auto-rotation)",
+    models: [
+      "ministral-8b-latest",
+      "mistral-small-latest",
+      "codestral-latest",
+      "mistral-large-latest",
+      "ministral-3b-latest",
+      "ministral-14b-latest",
+      "mistral-medium-latest",
+    ],
+    // mistral-embed outputs 1024 dims and is automatically zero-padded to 2048 dims
+    // (preserving cosine distance) to match pgvector document_chunks.embedding.
+    embeddingModels: ["mistral-embed", "mistral-embed-2312"],
+    embeddingCapable: true,
     visionCapable: true,
-    visionModels: ["pixtral-large-latest"],
+    visionModels: ["pixtral-large-latest", "pixtral-12b-2409"],
   },
   {
     id: "deepseek",

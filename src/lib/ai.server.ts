@@ -74,13 +74,40 @@ function apiKey(): string {
 
 /** Maps gateway failures onto messages that are safe and useful in the UI. */
 function explain(status: number, body: string): string {
-  if (status === 429) return "The AI is rate limited right now. Please try again in a moment.";
+  let providerMsg = "";
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed.message) {
+      providerMsg = String(parsed.message);
+    } else if (parsed.error?.message) {
+      providerMsg = String(parsed.error.message);
+    } else if (typeof parsed.error === "string") {
+      providerMsg = parsed.error;
+    }
+  } catch {}
+
+  if (status === 429) return providerMsg || "The AI is rate limited right now. Please try again in a moment.";
   if (status === 402)
-    return "AI credits have run out. An admin can add credits, or plug in their own provider key (Claude, Gemini, Grok, OpenAI…) under Admin → AI providers.";
+    return (
+      providerMsg ||
+      "AI credits have run out. An admin can add credits, or plug in their own provider key (Mistral, Claude, Gemini, Grok, OpenAI…) under Admin → AI providers."
+    );
   if (status === 401)
-    return "The configured AI provider rejected the API key. An admin can update it under Admin → AI providers.";
-  if (status === 403) return "AI access is disabled for this workspace.";
-  return `The AI request failed (${status}). ${body.slice(0, 300)}`;
+    return providerMsg || "The configured AI provider rejected the API key. An admin can update it under Admin → AI providers.";
+  if (status === 403) {
+    if (providerMsg) return `AI provider forbidden (403): ${providerMsg}`;
+    if (body.toLowerCase().includes("workspace")) return "AI access is disabled for this workspace.";
+    return `AI provider access forbidden (403). ${body.slice(0, 200)}`;
+  }
+  if (status === 504) return providerMsg || "The AI request timed out. Please try again in a moment.";
+  if (status === 500 || status === 502 || status === 503) {
+    return providerMsg || `The AI provider returned a server error (${status}). Please try again in a moment.`;
+  }
+  return providerMsg
+    ? `AI provider error (${status}): ${providerMsg}`
+    : body && body.trim()
+      ? `The AI request failed (${status}). ${body.slice(0, 300)}`
+      : `The AI request failed (${status}). Please try again.`;
 }
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -130,7 +157,7 @@ export type ChatResult = {
  * (which run in large offline batches and can afford to wait): this path
  * is interactive, so it backs off quickly and gives up sooner.
  */
-const CHAT_RETRY_OPTS = { maxRetries: 3, baseMs: 400 };
+const CHAT_RETRY_OPTS = { maxRetries: 3, baseMs: 1200 };
 
 /**
  * Every path that reaches the AI (built-in gateway or a bring-your-own-key
@@ -166,6 +193,13 @@ export async function chat(rawOptions: ChatOptions): Promise<ChatResult> {
       const provResult = await chatViaProvider(override, options);
       result = { ...provResult, latencyMs: Date.now() - started };
       return result;
+    }
+
+    if (!readEnv("LOVABLE_API_KEY")) {
+      throw new AiGatewayError(
+        "No active AI provider is configured. Please configure and activate an AI provider key (e.g. Mistral or Google) under Admin → AI providers.",
+        500,
+      );
     }
 
     const body: Record<string, unknown> = {
@@ -427,14 +461,39 @@ async function chatViaProvider(
   if (options.json) body.response_format = { type: "json_object" };
   if (options.maxCompletionTokens) body.max_completion_tokens = options.maxCompletionTokens;
 
-  function resolveGoogleModel(_rawModel: string): string {
-    return "gemini-3.8-flash";
+  function resolveGoogleModel(rawModel: string): string {
+    return rawModel.replace(/^(google\/|models\/)/, "");
   }
 
   const candidateModels =
-    config.provider === "google"
-      ? ["gemini-3.8-flash"]
-      : [config.model];
+    config.provider === "mistral"
+      ? Array.from(
+          new Set(
+            [
+              config.model,
+              "codestral-latest",
+              "ministral-8b-latest",
+              "mistral-small-latest",
+              "mistral-large-latest",
+              "ministral-3b-latest",
+              "ministral-14b-latest",
+              "mistral-medium-latest",
+            ].filter(Boolean),
+          ),
+        )
+      : config.provider === "google"
+        ? Array.from(
+            new Set(
+              [
+                resolveGoogleModel(config.model),
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-3.8-flash",
+              ].filter(Boolean),
+            ),
+          )
+        : [config.model];
 
   let usedModel = candidateModels[0];
   let successfulKeyIdx = 0;
@@ -457,7 +516,7 @@ async function chatViaProvider(
               Authorization: `Bearer ${currentKey}`,
             },
             body: JSON.stringify(modelBody),
-            signal: AbortSignal.timeout(15_000), // 15-second abort timeout per key attempt to prevent 524
+            signal: AbortSignal.timeout(45_000), // 45-second timeout for full essay generation/marking
           });
 
           if (response.ok) {
@@ -475,7 +534,8 @@ async function chatViaProvider(
 
           // Rate limit, server error, or 404 deprecated model on Google: rotate key or try next candidate model
           if (response.status === 429 || response.status === 503 || response.status === 500) {
-            markKeyRateLimited(currentKey, 60_000);
+            const cooldownTime = activeKeysToTry.length > 1 ? 60_000 : 2_000;
+            markKeyRateLimited(currentKey, cooldownTime);
             const isPaidKey = paidKeys.includes(currentKey);
             console.warn(
               `[chatViaProvider] Model ${m} (key ...${currentKey.slice(-4)}, ${isPaidKey ? "emergency paid fallback" : "free pool key"}) returned ${response.status}. Attempting key rotation / fallback...`,
@@ -495,20 +555,31 @@ async function chatViaProvider(
             if (kIdx + 1 < activeKeysToTry.length) {
               continue; // Try next key on this same model
             }
+            if (activeKeysToTry.length <= 1 && response.status === 429) {
+              // Wait briefly before trying next model on single free key to avoid immediate rate limit cascade
+              await new Promise((r) => setTimeout(r, 1500));
+            }
             break; // All keys exhausted on this model, step to next candidate model
           }
 
           const isModelUnavailable =
-            (response.status === 404 ||
-              (response.status === 400 &&
-                (text.toLowerCase().includes("model") ||
-                  text.toLowerCase().includes("not found") ||
-                  text.toLowerCase().includes("unsupported")))) &&
-            config.provider === "google";
+            response.status === 404 ||
+            (response.status === 403 &&
+              (text.toLowerCase().includes("tier") ||
+                text.toLowerCase().includes("subscription") ||
+                text.toLowerCase().includes("model") ||
+                text.toLowerCase().includes("not allowed"))) ||
+            (response.status === 400 &&
+              (text.toLowerCase().includes("model") ||
+                text.toLowerCase().includes("not found") ||
+                text.toLowerCase().includes("unsupported") ||
+                text.toLowerCase().includes("invalid")));
 
           if (isModelUnavailable) {
+            lastErrStatus = response.status;
+            lastErrDetail = text;
             console.warn(
-              `[chatViaProvider] Google Model ${m} returned ${response.status} (deprecated/unavailable). Falling back to next candidate model...`,
+              `[chatViaProvider] Provider ${config.provider} model ${m} returned ${response.status} (unavailable / tier restricted). Stepping to next candidate model...`,
             );
             break; // Step to next candidate model immediately
           }
@@ -523,10 +594,13 @@ async function chatViaProvider(
             fetchErr?.message?.includes("aborted");
 
           if (isTimeout) {
-            markKeyRateLimited(currentKey, 60_000);
+            lastErrStatus = 504;
+            lastErrDetail = JSON.stringify({ message: `Model ${m} timed out after 45s.` });
+            const cooldownTime = activeKeysToTry.length > 1 ? 60_000 : 2_000;
+            markKeyRateLimited(currentKey, cooldownTime);
             const isPaidKey = paidKeys.includes(currentKey);
             console.warn(
-              `[chatViaProvider] Model ${m} (key ...${currentKey.slice(-4)}, ${isPaidKey ? "emergency paid fallback" : "free pool key"}) timed out (>15s). Auto-hopping to next key...`,
+              `[chatViaProvider] Model ${m} (key ...${currentKey.slice(-4)}, ${isPaidKey ? "emergency paid fallback" : "free pool key"}) timed out (>45s). Auto-hopping to next key...`,
             );
             try {
               const { supabaseAdmin } = await import("@/integrations/backend/client.server");
@@ -534,9 +608,9 @@ async function chatViaProvider(
                 user_id: options.userId ?? null,
                 feature: (options.feature ?? "chat") + "_key_hop",
                 model: m,
-                latency_ms: 15_000,
+                latency_ms: 45_000,
                 ok: false,
-                error_message: `Key ...${currentKey.slice(-4)} (${isPaidKey ? "emergency paid fallback" : "free pool key"}) exceeded 15s timeout. Auto-hopped to next key.`,
+                error_message: `Key ...${currentKey.slice(-4)} (${isPaidKey ? "emergency paid fallback" : "free pool key"}) exceeded 45s timeout. Auto-hopped to next key.`,
               });
             } catch {}
 
@@ -552,7 +626,7 @@ async function chatViaProvider(
 
     // If all models and keys failed with 429/503/500, throw so withRetry429 can backoff
     throw new AiGatewayError(explain(lastErrStatus, lastErrDetail), lastErrStatus);
-  }, { maxRetries: 1, baseMs: 150 });
+  }, CHAT_RETRY_OPTS);
 
   const usedKey = activeKeysToTry[successfulKeyIdx] || "";
   const isUsedPaid = paidKeys.includes(usedKey);
@@ -762,6 +836,17 @@ async function embedViaGoogle(
   return vectors;
 }
 
+function fitVectorDimensions(vec: number[], targetDims: number = EMBEDDING_DIMS): number[] {
+  if (!vec) return new Array(targetDims).fill(0);
+  if (vec.length === targetDims) return vec;
+  if (vec.length < targetDims) {
+    const padded = new Array(targetDims).fill(0);
+    for (let i = 0; i < vec.length; i++) padded[i] = vec[i];
+    return padded;
+  }
+  return vec.slice(0, targetDims);
+}
+
 /**
  * Direct call to any OpenAI-compatible /embeddings endpoint — covers
  * OpenAI, OpenRouter, Mistral, DeepSeek, and custom self-hosted endpoints
@@ -774,6 +859,13 @@ async function embedViaOpenAiCompatible(
   const vectors: number[][] = new Array(inputs.length);
   const candidateKeys =
     config.apiKeys && config.apiKeys.length > 0 ? config.apiKeys : [config.apiKey];
+
+  const modelToUse =
+    config.provider === "mistral"
+      ? config.model?.includes("embed")
+        ? config.model
+        : "mistral-embed"
+      : config.model;
 
   for (let offset = 0; offset < inputs.length; offset += EMBED_BATCH_LIMIT) {
     const batch = inputs.slice(offset, offset + EMBED_BATCH_LIMIT);
@@ -798,10 +890,11 @@ async function embedViaOpenAiCompatible(
             Authorization: `Bearer ${currentKey}`,
           },
           body: JSON.stringify({
-            model: config.model,
+            model: modelToUse,
             input: batch,
             ...(supportsDimensionsParam ? { dimensions: EMBEDDING_DIMS } : {}),
           }),
+          signal: AbortSignal.timeout(30_000),
         });
 
         if (response.ok) {
@@ -814,7 +907,8 @@ async function embedViaOpenAiCompatible(
         lastErrDetail = detail;
 
         if (response.status === 429 || response.status === 503) {
-          markKeyRateLimited(currentKey, 60_000);
+          const cooldownTime = candidateKeys.length > 1 ? 60_000 : 2_000;
+          markKeyRateLimited(currentKey, cooldownTime);
           console.warn(
             `[embedViaOpenAiCompatible] Key ...${currentKey.slice(-4)} returned ${response.status}. Hopping to next key...`,
           );
@@ -834,7 +928,7 @@ async function embedViaOpenAiCompatible(
     });
 
     for (const item of data.data ?? []) {
-      vectors[offset + item.index] = item.embedding;
+      vectors[offset + item.index] = fitVectorDimensions(item.embedding, EMBEDDING_DIMS);
     }
   }
 
@@ -879,11 +973,28 @@ export async function embed(
 
     if (!config) {
       const activeChat = await getActiveProvider();
-      if (activeChat && activeChat.provider === "google") {
-        config = {
-          ...activeChat,
-          model: GOOGLE_EMBED_MODEL,
-        };
+      if (activeChat) {
+        if (activeChat.provider === "google") {
+          config = {
+            ...activeChat,
+            model: GOOGLE_EMBED_MODEL,
+          };
+        } else if (activeChat.provider === "mistral") {
+          config = {
+            ...activeChat,
+            model: "mistral-embed",
+          };
+        } else if (activeChat.provider === "openai") {
+          config = {
+            ...activeChat,
+            model: "text-embedding-3-small",
+          };
+        } else if (activeChat.provider === "openrouter") {
+          config = {
+            ...activeChat,
+            model: "openai/text-embedding-3-large",
+          };
+        }
       }
     }
 
@@ -894,7 +1005,7 @@ export async function embed(
 
     if (!readEnv("LOVABLE_API_KEY")) {
       throw new AiGatewayError(
-        "No embedding provider is configured. Add one under Admin → Embeddings and mark it active.",
+        "No active AI embedding provider configured. Add and activate a provider under Admin → Embeddings or Admin → AI Providers.",
         500,
       );
     }
@@ -1055,86 +1166,134 @@ async function visionChatViaOpenAiCompatible(
 ): Promise<Omit<ChatResult, "latencyMs">> {
   const keysToTry = getPrioritizedKeyOrder(config, keyCooldowns);
 
-  const body: Record<string, unknown> = {
-    model: config.provider === "google" ? "gemini-3.8-flash" : config.model,
-    messages: [
-      { role: "system", content: options.systemPrompt },
-      {
-        role: "user",
-        content: [
-          { type: "text", text: options.prompt },
-          ...options.imageDataUrls.map((url) => ({
-            type: "image_url" as const,
-            image_url: { url, detail: "high" as const },
-          })),
-        ],
-      },
-    ],
-  };
-  if (options.maxCompletionTokens) body.max_completion_tokens = options.maxCompletionTokens;
+  const candidateVisionModels =
+    config.provider === "google"
+      ? Array.from(
+          new Set(
+            [
+              config.model?.replace(/^(google\/|models\/)/, ""),
+              "gemini-2.5-flash",
+              "gemini-2.0-flash",
+              "gemini-1.5-flash",
+              "gemini-3.8-flash",
+            ].filter(Boolean),
+          ),
+        )
+      : config.provider === "mistral"
+        ? Array.from(
+            new Set(
+              (
+                [
+                  config.model?.startsWith("pixtral") ? config.model : "",
+                  "pixtral-12b-2409",
+                  "pixtral-large-latest",
+                ] as string[]
+              ).filter((m): m is string => Boolean(m)),
+            ),
+          )
+        : [config.model];
 
-  let lastStatus = 500;
-  let lastText = "";
+  let usedVisionModel = candidateVisionModels[0] || config.model;
 
-  for (let kIdx = 0; kIdx < keysToTry.length; kIdx++) {
-    const currentKey = keysToTry[kIdx]!;
-    try {
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${currentKey}`,
+  for (const vm of candidateVisionModels) {
+    usedVisionModel = vm;
+    const body: Record<string, unknown> = {
+      model: vm,
+      messages: [
+        { role: "system", content: options.systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: options.prompt },
+            ...options.imageDataUrls.map((url) => ({
+              type: "image_url" as const,
+              image_url: { url, detail: "high" as const },
+            })),
+          ],
         },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15_000),
-      });
+      ],
+    };
+    if (options.maxCompletionTokens) body.max_completion_tokens = options.maxCompletionTokens;
 
-      if (response.ok) {
-        markKeyHealthy(currentKey);
-        const data = (await response.json()) as {
-          choices?: { message?: { content?: string } }[];
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        };
-        return {
-          text: data.choices?.[0]?.message?.content ?? "",
-          model: config.model,
-          promptTokens: data.usage?.prompt_tokens ?? null,
-          completionTokens: data.usage?.completion_tokens ?? null,
-        };
+    let lastStatus = 500;
+    let lastText = "";
+
+    for (let kIdx = 0; kIdx < keysToTry.length; kIdx++) {
+      const currentKey = keysToTry[kIdx]!;
+      try {
+        const response = await fetch(`${config.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(15_000),
+        });
+
+        if (response.ok) {
+          markKeyHealthy(currentKey);
+          const data = (await response.json()) as {
+            choices?: { message?: { content?: string } }[];
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+          };
+          return {
+            text: data.choices?.[0]?.message?.content ?? "",
+            model: usedVisionModel,
+            promptTokens: data.usage?.prompt_tokens ?? null,
+            completionTokens: data.usage?.completion_tokens ?? null,
+          };
+        }
+
+        const text = await response.text();
+        lastStatus = response.status;
+        lastText = text;
+
+        if (response.status === 429 || response.status === 503 || response.status === 500) {
+          markKeyRateLimited(currentKey, 60_000);
+          console.warn(
+            `[visionChatViaOpenAiCompatible] Key ...${currentKey.slice(-4)} returned ${response.status}. Hopping to next key...`,
+          );
+          if (kIdx + 1 < keysToTry.length) continue;
+          break;
+        }
+
+        const isModelUnavailable =
+          response.status === 404 ||
+          (response.status === 400 &&
+            (text.toLowerCase().includes("model") ||
+              text.toLowerCase().includes("not found") ||
+              text.toLowerCase().includes("unsupported")));
+
+        if (isModelUnavailable) {
+          console.warn(
+            `[visionChatViaOpenAiCompatible] Provider ${config.provider} model ${vm} returned ${response.status}. Trying next candidate vision model...`,
+          );
+          break; // Step to next candidate model
+        }
+
+        throw new AiGatewayError(explain(response.status, text), response.status);
+      } catch (fetchErr: any) {
+        const isTimeout =
+          fetchErr?.name === "AbortError" ||
+          fetchErr?.name === "TimeoutError" ||
+          fetchErr?.message?.includes("timed out") ||
+          fetchErr?.message?.includes("aborted");
+
+        if (isTimeout) {
+          markKeyRateLimited(currentKey, 60_000);
+          console.warn(
+            `[visionChatViaOpenAiCompatible] Key ...${currentKey.slice(-4)} timed out (>15s). Hopping to next key...`,
+          );
+          if (kIdx + 1 < keysToTry.length) continue;
+          break;
+        }
+        throw fetchErr;
       }
-
-      const text = await response.text();
-      lastStatus = response.status;
-      lastText = text;
-
-      if (response.status === 429 || response.status === 503 || response.status === 500) {
-        markKeyRateLimited(currentKey, 60_000);
-        console.warn(
-          `[visionChatViaOpenAiCompatible] Key ...${currentKey.slice(-4)} returned ${response.status}. Hopping to next key...`,
-        );
-        if (kIdx + 1 < keysToTry.length) continue;
-      }
-
-      throw new AiGatewayError(explain(response.status, text), response.status);
-    } catch (fetchErr: any) {
-      const isTimeout =
-        fetchErr?.name === "AbortError" ||
-        fetchErr?.name === "TimeoutError" ||
-        fetchErr?.message?.includes("timed out") ||
-        fetchErr?.message?.includes("aborted");
-
-      if (isTimeout) {
-        markKeyRateLimited(currentKey, 60_000);
-        console.warn(
-          `[visionChatViaOpenAiCompatible] Key ...${currentKey.slice(-4)} timed out (>30s). Hopping to next key...`,
-        );
-        if (kIdx + 1 < keysToTry.length) continue;
-      }
-      throw fetchErr;
     }
   }
 
-  throw new AiGatewayError(explain(lastStatus, lastText), lastStatus);
+  throw new AiGatewayError("All vision models/keys failed.", 500);
 }
 
 /**

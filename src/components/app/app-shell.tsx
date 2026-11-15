@@ -109,11 +109,13 @@ export function AppShell({
   children,
   role,
   name,
+  school: _school,
   userId,
 }: {
   children: ReactNode;
   role: "student" | "teacher" | "admin";
   name: string | null;
+  school?: string | null;
   userId: string;
 }) {
   const navigate = useNavigate();

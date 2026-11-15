@@ -115,13 +115,13 @@ async function getVisionConfig(): Promise<ProviderConfig | null> {
     const vision = await getActiveVisionProvider();
     if (vision) {
       const { allOrderedKeys } = buildOrderedKeyPool(vision);
-      if (allOrderedKeys.length > 1) return vision;
+      if (allOrderedKeys.length > 0) return vision;
     }
     const chat = await getActiveProvider();
     if (chat && chat.provider === "google") {
       return {
         ...chat,
-        model: vision?.model || "gemini-3.8-flash",
+        model: vision?.model || "models/gemini-2.5-flash",
       };
     }
     return vision ?? chat;
@@ -163,7 +163,13 @@ async function transcribeViaGoogle(
   const { mimeType, data } = await prepareDataUrl(dataUrl);
   const primary = model.startsWith("models/") ? model : `models/${model}`;
   const candidateModels = Array.from(
-    new Set([primary, "models/gemini-3.8-flash"]),
+    new Set([
+      primary,
+      "models/gemini-2.5-flash",
+      "models/gemini-2.0-flash",
+      "models/gemini-1.5-flash",
+      "models/gemini-3.8-flash",
+    ]),
   );
 
   const rawKeys = Array.isArray(apiKeyInput) ? apiKeyInput : [apiKeyInput];

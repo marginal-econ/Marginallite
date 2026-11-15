@@ -953,9 +953,16 @@ export const testSpecificKey = createServerFn({ method: "POST" })
     const { chat } = await import("./ai.server");
     const { normaliseConfig } = await import("./ai/active.server");
     let testModel =
-      data.model?.trim() || (data.provider === "google" ? "gemini-3.8-flash" : "gpt-4o-mini");
-    if (data.provider === "google") {
-      testModel = "gemini-3.8-flash";
+      data.model?.trim() ||
+      (data.provider === "google"
+        ? "gemini-2.5-flash"
+        : data.provider === "mistral"
+          ? "ministral-8b-latest"
+          : "gpt-4o-mini");
+    if (data.provider === "google" && !data.model?.trim()) {
+      testModel = "gemini-2.5-flash";
+    } else if (data.provider === "mistral" && !data.model?.trim()) {
+      testModel = "ministral-8b-latest";
     }
 
     const config = normaliseConfig({

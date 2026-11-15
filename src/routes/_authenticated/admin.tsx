@@ -955,7 +955,7 @@ function ProvidersPanel() {
                 <div>
                   <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                    Free Gemini API Keys Pool (Auto-Hopping)
+                    Free {meta.label} API Keys Pool (Auto-Hopping)
                   </Label>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     Tried 1st in rotation. Hops automatically every 15s or on rate limits (429/503).
@@ -988,7 +988,7 @@ function ProvidersPanel() {
                     rows={3}
                     value={bulkInput}
                     onChange={(e) => setBulkInput(e.target.value)}
-                    placeholder="AIzaSyA...&#10;AIzaSyB...&#10;AIzaSyC..."
+                    placeholder={meta.id === "mistral" ? "mstrl_A...&#10;mstrl_B...&#10;mstrl_C..." : "AIzaSyA...&#10;AIzaSyB...&#10;AIzaSyC..."}
                     className="font-mono text-xs bg-background"
                   />
                   <div className="flex justify-end gap-1.5">
@@ -1125,7 +1125,7 @@ function ProvidersPanel() {
                             onChange={(e) =>
                               handleUpdatePoolKey(item.id, { key: e.target.value })
                             }
-                            placeholder="AIzaSy... (Free API Key)"
+                            placeholder={`${meta.id === "mistral" ? "mstrl_..." : meta.keyHint.split(" ")[0]} (Free API Key)`}
                             className="h-8 text-xs font-mono"
                           />
                         </div>
@@ -1174,7 +1174,7 @@ function ProvidersPanel() {
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-                    Emergency Paid Gemini Key (Last Resort Fallback)
+                    Emergency Paid {meta.label} Key (Last Resort Fallback)
                   </Label>
                   <div className="flex items-center gap-1.5">
                     <Button
@@ -1215,7 +1215,7 @@ function ProvidersPanel() {
                   type="password"
                   value={paidPrimaryKey}
                   onChange={(event) => setPaidPrimaryKey(event.target.value)}
-                  placeholder="AIza... (Untouched unless all free keys fail)"
+                  placeholder={`${meta.id === "mistral" ? "mstrl_..." : "AIza..."} (Untouched unless all free keys fail)`}
                 />
                 {keyTestState["paid-primary"] && (
                   <div
@@ -1284,7 +1284,7 @@ function ProvidersPanel() {
                   type="password"
                   value={paidSecondaryKey}
                   onChange={(event) => setPaidSecondaryKey(event.target.value)}
-                  placeholder="AIza... (Optional backup if primary emergency key fails)"
+                  placeholder={`${meta.id === "mistral" ? "mstrl_..." : "AIza..."} (Optional backup if primary emergency key fails)`}
                 />
               </div>
             </div>
