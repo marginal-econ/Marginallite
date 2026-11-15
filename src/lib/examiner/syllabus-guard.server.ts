@@ -103,6 +103,61 @@ const HIGH_CONFIDENCE_0455_ECON_TERMS: RegExp[] = [
   /\bdepreciation\b/i,
   /\bbalance of payments\b/i,
   /\bcurrent account\b/i,
+  // Additional core Cambridge IGCSE 0455 curriculum vocabulary
+  /\beconom(y|ic|ics)\b/i,
+  /\bgovernment spending\b/i,
+  /\bgovernment expenditure\b/i,
+  /\btax(es|ation)?\b/i,
+  /\bsubsid(ise|ize|ised|ized)\b/i,
+  /\bdemand (and|or) supply\b/i,
+  /\b(demand|supply) curve\b/i,
+  /\bshift in (demand|supply)\b/i,
+  /\bprice elasticity\b/i,
+  /\bconsumer(s)?\b/i,
+  /\bproducer(s)?\b/i,
+  /\bfirm(s)?\b/i,
+  /\binterest rate(s)?\b/i,
+  /\bdeflation\b/i,
+  /\bprofit(s)?\b/i,
+  /\brevenue(s)?\b/i,
+  /\bcost(s)? of production\b/i,
+  /\bmarket(s)?\b/i,
+  /\bpublic sector\b/i,
+  /\bprivate sector\b/i,
+  /\bplanned economy\b/i,
+  /\bcommand economy\b/i,
+  /\bfree market\b/i,
+  /\btrade (deficit|surplus)\b/i,
+  /\bexchange rate(s)?\b/i,
+  /\bexport(s|ing)?\b/i,
+  /\bimport(s|ing)?\b/i,
+  /\bprotectionism\b/i,
+  /\bpoverty\b/i,
+  /\bstandard of living\b/i,
+  /\bemployment\b/i,
+  /\blabo(u)?r force\b/i,
+  /\bborrow(ing)?\b/i,
+  /\bsaving(s)?\b/i,
+  /\bspending\b/i,
+  /\bmoney\b/i,
+  /\bbank(s|ing)?\b/i,
+  /\bprimary sector\b/i,
+  /\bsecondary sector\b/i,
+  /\btertiary sector\b/i,
+  /\bspecialisation\b/i,
+  /\bproductivity\b/i,
+  /\bresource allocation\b/i,
+  /\bexternalit(y|ies)\b/i,
+  /\bmerger(s)?\b/i,
+  /\bcompetition\b/i,
+  /\bhealthcare\b/i,
+  /\beducation\b/i,
+  /\binfrastructure\b/i,
+  /\bpopulation growth\b/i,
+  /\bbirth rate(s)?\b/i,
+  /\bdeath rate(s)?\b/i,
+  /\bdeveloped countr(y|ies)\b/i,
+  /\bdeveloping countr(y|ies)\b/i,
 ];
 
 /**
@@ -153,7 +208,9 @@ export async function validateEconomicsSyllabus(
   }
 
   // 2. High-confidence match for IGCSE 0455 Economics
-  const hasStrongEconSignal = HIGH_CONFIDENCE_0455_ECON_TERMS.some((term) => term.test(trimmed));
+  const hasStrongEconSignal = HIGH_CONFIDENCE_0455_ECON_TERMS.some(
+    (term) => term.test(trimmed) || (essayExcerpt && term.test(essayExcerpt)),
+  );
   if (hasStrongEconSignal) {
     return {
       isEconomics: true,

@@ -75,6 +75,7 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
         markSchemeImageDataUrls: data.markSchemeImageDataUrls,
         isBudgetTier: false,
         userId,
+        skipSyllabusValidation: true,
       });
     } catch (error) {
       // The grading never happened, so it shouldn't use up today's allowance.

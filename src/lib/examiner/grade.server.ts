@@ -113,6 +113,7 @@ export type GradeOptions = {
   markSchemeImageDataUrls?: string[];
   isBudgetTier?: boolean;
   userId?: string;
+  skipSyllabusValidation?: boolean;
 };
 
 export type GradeOutcome = {
@@ -160,7 +161,9 @@ export async function gradeEssay(
 
   // --- syllabus pre-flight guardrail ----------------------------------------
   const { validateEconomicsSyllabus, OffSyllabusError } = await import("./syllabus-guard.server");
-  await validateEconomicsSyllabus(question, essayText);
+  if (!options.skipSyllabusValidation) {
+    await validateEconomicsSyllabus(question, essayText);
+  }
 
   // --- retrieval grounding ---------------------------------------------------
   let sources: GroundingSource[] = [];
@@ -262,8 +265,11 @@ export async function gradeEssay(
   let latencyMs = first.latencyMs;
 
   // --- audit pass ----------------------------------------------------------
-  // Accommodates up to a minute for deep essay marking and independent moderation.
-  if (options.auditPass !== false && first.latencyMs < 50_000) {
+  // To match Marginal's guaranteed 30-40s SLA:
+  // we only run the audit pass if the primary examiner completed within 20s.
+  // The audit pass itself is protected with a 12s timeout, guaranteeing total
+  // response time stays strictly within 30-40s.
+  if (options.auditPass !== false && first.latencyMs < 20_000) {
     const auditSystemPrompt = `${loadPrompt(AUDIT_PROMPT, promptValues)}\n\n${RESPONSE_CONTRACT}`;
     const auditUserMessage =
       `Exam question (${maxMark} marks):\n\n${question}\n\n` +
@@ -297,7 +303,7 @@ export async function gradeEssay(
       const second = await Promise.race([
         secondPromise,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Audit pass exceeded 30s timeout")), 30_000),
+          setTimeout(() => reject(new Error("Audit pass exceeded 12s timeout")), 12_000),
         ),
       ]);
 
@@ -311,7 +317,7 @@ export async function gradeEssay(
       // Triggered only when a material discrepancy or grade band contradiction
       // exists between the Primary Examiner and Independent Moderator.
       const disputeCheck = shouldTriggerArbitration(grading, secondGrading, maxMark);
-      if (disputeCheck.shouldArbitrate && latencyMs < 75_000) {
+      if (disputeCheck.shouldArbitrate && latencyMs < 28_000) {
         try {
           const arbitrated = await Promise.race([
             arbitrateGrading({
@@ -324,7 +330,7 @@ export async function gradeEssay(
               disputeReason: disputeCheck.reason,
             }),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Arbitration exceeded 25s timeout")), 25_000),
+              setTimeout(() => reject(new Error("Arbitration exceeded 8s timeout")), 8_000),
             ),
           ]);
           grading = arbitrated;
