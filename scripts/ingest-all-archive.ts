@@ -4,8 +4,8 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { parseCambridge0455Filename, parseMcqAnswerKey, extractTextFromPdfBuffer, chunkText, hashContent } from "./harvest-papers";
 
-const SUPABASE_URL = "https://tmuhpnorjydfijjotvoc.supabase.co";
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWhwbm9yanlkZmlqam90dm9jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjIwOTQyNywiZXhwIjoyMTA3Nzg1NDI3fQ.WXBjD-Z797BZmO5D8i7NFHOm-1LhsRxuZm0wYSBitaw";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://tmuhpnorjydfijjotvoc.supabase.co";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

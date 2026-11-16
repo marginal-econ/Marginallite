@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
+import { unwrapData } from "@/lib/safe-validator";
 
 const CheckInput = z.object({
   essayText: z.string().trim().min(20, "That's too short to check.").max(40_000),
@@ -33,7 +34,7 @@ Keep "issues" capped at the 40 most significant problems. If the essay is alread
  */
 export const checkWritingQuality = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => CheckInput.parse(input))
+  .inputValidator((input: unknown) => CheckInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { chat } = await import("./ai.server");
     const { MODEL_FAST } = await import("./examiner/config");
@@ -73,15 +74,17 @@ export const checkWritingQuality = createServerFn({ method: "POST" })
           ? raw.corrected_text
           : data.essayText;
 
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "check_writing_quality",
-        model: result.model,
-        prompt_tokens: result.promptTokens,
-        completion_tokens: result.completionTokens,
-        latency_ms: result.latencyMs,
-        ok: true,
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "check_writing_quality",
+          model: result.model,
+          prompt_tokens: result.promptTokens,
+          completion_tokens: result.completionTokens,
+          latency_ms: result.latencyMs,
+          ok: true,
+        });
+      } catch {}
 
       return {
         issues,
@@ -89,13 +92,15 @@ export const checkWritingQuality = createServerFn({ method: "POST" })
         clean: issues.length === 0,
       };
     } catch (error) {
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "check_writing_quality",
-        model: "spelling-grammar-check",
-        ok: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "check_writing_quality",
+          model: "spelling-grammar-check",
+          ok: false,
+          error_message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch {}
       // Proofreading is an enhancement, never a hard gate — a failed check
       // must not block the student from marking their essay.
       return { issues: [], correctedText: data.essayText, clean: true, checkFailed: true };

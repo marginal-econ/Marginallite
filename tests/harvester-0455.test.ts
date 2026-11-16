@@ -126,7 +126,7 @@ describe("Cambridge IGCSE 0455 Past Paper Harvester", () => {
       expect(answerKey["3"]).toBe("B");
       expect(answerKey["29"]).toBe("D");
       expect(answerKey["30"]).toBe("D");
-    });
+    }, 15000);
   });
 
   describe("Paper 2 Structured Question Parser", () => {

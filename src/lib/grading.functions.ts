@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import { supabaseAdmin } from "@/integrations/backend/client.server";
 import { isAdmin } from "@/lib/auth-admin";
+import { unwrapData } from "@/lib/safe-validator";
 import { checkUserEssayLimit } from "@/server/rate-limit";
 
 const GradeInput = z.object({
@@ -35,7 +36,7 @@ const GradeInput = z.object({
  */
 export const gradeEssaySubmission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => GradeInput.parse(input))
+  .inputValidator((input: unknown) => GradeInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -84,82 +85,119 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
       } catch {
         /* best-effort */
       }
-      await supabaseAdmin.from("ai_usage_log").insert({
-        user_id: userId,
-        feature: "grade_essay",
-        model: "google/gemini-3.8-flash",
-        ok: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      });
+      try {
+        await supabaseAdmin.from("ai_usage_log").insert({
+          user_id: userId,
+          feature: "grade_essay",
+          model: "ministral-14b-2512",
+          ok: false,
+          error_message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch {}
       throw error;
     }
 
     const { grading } = outcome;
 
-    // Reuse the existing essay thread on a rewrite; otherwise open a new one.
+    // Persist to database (essay_submissions, with legacy fallback).
+    // Database errors must NEVER prevent the student from receiving their grade.
     let essayId = data.essayId ?? null;
-    if (essayId) {
-      await supabase
-        .from("essays")
-        .update({ latest_mark: grading.total_mark, updated_at: new Date().toISOString() })
-        .eq("id", essayId)
-        .eq("user_id", userId);
-    } else {
-      const { data: essay, error } = await supabase
-        .from("essays")
-        .insert({
-          user_id: userId,
-          question: data.question,
-          max_mark: data.maxMark,
-          latest_mark: grading.total_mark,
-        })
-        .select("id")
-        .single();
-      if (error || !essay) throw new Error(error?.message ?? "Could not save this essay.");
-      essayId = essay.id;
+    let versionId: string | null = null;
+    const versionNumber = 1;
+
+    try {
+      if (essayId) {
+        await supabase
+          .from("essay_submissions")
+          .update({
+            essay_text: gradedText,
+            max_marks: data.maxMark,
+            awarded_marks: grading.total_mark,
+            band: grading.band,
+            grading_result: grading as unknown as never,
+          })
+          .eq("id", essayId)
+          .eq("user_id", userId);
+        versionId = essayId;
+      } else {
+        const { data: saved, error: saveErr } = await supabase
+          .from("essay_submissions")
+          .insert({
+            user_id: userId,
+            question: data.question,
+            essay_text: gradedText,
+            max_marks: data.maxMark,
+            awarded_marks: grading.total_mark,
+            band: grading.band,
+            grading_result: grading as unknown as never,
+          })
+          .select("id")
+          .single();
+
+        if (!saveErr && saved) {
+          essayId = (saved as any).id;
+          versionId = (saved as any).id;
+        } else if (saveErr) {
+          console.warn("Failed to persist to essay_submissions:", saveErr.message);
+        }
+      }
+    } catch (persistErr) {
+      console.warn("Non-fatal error persisting essay to essay_submissions:", persistErr);
     }
 
-    const { count } = await supabase
-      .from("essay_versions")
-      .select("id", { count: "exact", head: true })
-      .eq("essay_id", essayId);
+    // Best-effort write to legacy essays / essay_versions tables if present
+    try {
+      if (data.essayId) {
+        await supabase
+          .from("essays")
+          .update({ latest_mark: grading.total_mark, updated_at: new Date().toISOString() })
+          .eq("id", data.essayId)
+          .eq("user_id", userId);
+      } else {
+        const { data: legacyEssay } = await supabase
+          .from("essays")
+          .insert({
+            user_id: userId,
+            question: data.question,
+            max_mark: data.maxMark,
+            latest_mark: grading.total_mark,
+          })
+          .select("id")
+          .single();
+        if (legacyEssay) {
+          if (!essayId) essayId = legacyEssay.id;
+          await supabase.from("essay_versions").insert({
+            essay_id: legacyEssay.id,
+            user_id: userId,
+            version: 1,
+            essay_text: gradedText,
+            grading: grading as unknown as never,
+            total_mark: grading.total_mark,
+            confidence: grading.confidence,
+            audited: grading.audited,
+          });
+        }
+      }
+    } catch {
+      /* legacy table best-effort */
+    }
 
-    const { data: version, error: versionError } = await supabase
-      .from("essay_versions")
-      .insert({
-        essay_id: essayId,
+    try {
+      await supabaseAdmin.from("ai_usage_log").insert({
         user_id: userId,
-        version: (count ?? 0) + 1,
-        essay_text: gradedText,
-        grading: grading as unknown as never,
-        total_mark: grading.total_mark,
-        ao1_awarded: grading.ao_breakdown.knowledge.awarded,
-        ao2_awarded: grading.ao_breakdown.analysis.awarded,
-        ao3_awarded: grading.ao_breakdown.evaluation.awarded,
-        confidence: grading.confidence,
-        audited: grading.audited,
-        sources: grading.sources as unknown as never,
-        model: outcome.model,
-      })
-      .select("id, version")
-      .single();
-
-    if (versionError) throw new Error(versionError.message);
-
-    await supabaseAdmin.from("ai_usage_log").insert({
-      user_id: userId,
-      feature: "grade_essay",
-      model: outcome.model || "google/gemini-3.8-flash",
-      prompt_tokens: outcome.promptTokens,
-      completion_tokens: outcome.completionTokens,
-      latency_ms: outcome.latencyMs,
-      ok: true,
-    });
+        feature: "grade_essay",
+        model: outcome.model || "ministral-14b-2512",
+        prompt_tokens: outcome.promptTokens,
+        completion_tokens: outcome.completionTokens,
+        latency_ms: outcome.latencyMs,
+        ok: true,
+      });
+    } catch {}
 
     return {
       essayId,
-      versionId: version?.id ?? null,
-      version: version?.version ?? 1,
+      versionId: versionId ?? essayId,
+      version: versionNumber,
       grading,
       latencyMs: outcome.latencyMs,
     };
@@ -168,25 +206,84 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
 export const listMyEssays = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("essays")
-      .select("id, question, max_mark, latest_mark, created_at, updated_at")
-      .eq("user_id", context.userId)
-      .order("updated_at", { ascending: false })
-      .limit(50);
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    try {
+      const { data, error } = await context.supabase
+        .from("essay_submissions")
+        .select("id, question, max_marks, awarded_marks, created_at")
+        .eq("user_id", context.userId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!error && data && data.length > 0) {
+        return data.map((row: any) => ({
+          id: row.id,
+          question: row.question,
+          max_mark: row.max_marks ?? 8,
+          latest_mark: row.awarded_marks,
+          created_at: row.created_at,
+          updated_at: row.created_at,
+        }));
+      }
+    } catch {}
+
+    try {
+      const { data } = await context.supabase
+        .from("essays")
+        .select("id, question, max_mark, latest_mark, created_at, updated_at")
+        .eq("user_id", context.userId)
+        .order("updated_at", { ascending: false })
+        .limit(50);
+      if (data) return data;
+    } catch {}
+
+    return [];
   });
 
 export const getEssayThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ essayId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ essayId: z.string().uuid() }).parse(unwrapData(input)),
+  )
   .handler(async ({ data, context }) => {
     const { isUserAdmin } = await import("@/lib/auth-admin");
     const isAdmin = isUserAdmin(context.userId);
     const client = isAdmin
       ? (await import("@/integrations/backend/client.server")).supabaseAdmin
       : context.supabase;
+
+    try {
+      const { data: sub, error: subError } = await client
+        .from("essay_submissions")
+        .select("*")
+        .eq("id", data.essayId)
+        .maybeSingle();
+
+      if (!subError && sub) {
+        const s = sub as any;
+        const gradingResult = (s.grading_result || {}) as any;
+        return {
+          essay: {
+            id: s.id,
+            question: s.question,
+            max_mark: s.max_marks ?? 8,
+            latest_mark: s.awarded_marks,
+            created_at: s.created_at,
+            user_id: s.user_id,
+          },
+          versions: [
+            {
+              id: s.id,
+              version: 1,
+              essay_text: s.essay_text,
+              grading: gradingResult,
+              total_mark: s.awarded_marks,
+              confidence: gradingResult?.confidence ?? 0.9,
+              audited: gradingResult?.audited ?? false,
+              created_at: s.created_at,
+            },
+          ],
+        };
+      }
+    } catch {}
 
     const { data: essay, error } = await client
       .from("essays")
@@ -210,21 +307,47 @@ export const getEssayThread = createServerFn({ method: "POST" })
 export const getProgress = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("essay_versions")
-      .select("total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
-      .eq("user_id", context.userId)
-      .order("created_at", { ascending: true })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    try {
+      const { data, error } = await context.supabase
+        .from("essay_submissions")
+        .select("awarded_marks, grading_result, created_at")
+        .eq("user_id", context.userId)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (!error && data && data.length > 0) {
+        return data.map((row: any) => {
+          const g = (row.grading_result || {}) as any;
+          return {
+            total_mark: row.awarded_marks,
+            ao1_awarded: g?.ao_breakdown?.knowledge?.awarded ?? 0,
+            ao2_awarded: g?.ao_breakdown?.analysis?.awarded ?? 0,
+            ao3_awarded: g?.ao_breakdown?.evaluation?.awarded ?? 0,
+            confidence: g?.confidence ?? 0.9,
+            created_at: row.created_at,
+          };
+        });
+      }
+    } catch {}
+
+    try {
+      const { data } = await context.supabase
+        .from("essay_versions")
+        .select("total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
+        .eq("user_id", context.userId)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (data) return data;
+    } catch {}
+
+    return [];
   });
 
 /** Proactively check if a question matches verified Cambridge Knowledge Base materials */
 export const checkQuestionGrounding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ question: z.string().trim().max(2000) }).parse(input),
+    z.object({ question: z.string().trim().max(2000) }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     if (data.question.length < 15) return { checked: false, grounded: false, sourceCount: 0 };

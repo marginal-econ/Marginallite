@@ -132,26 +132,30 @@ const DiagramUrlInput = z.object({ url: z.string().trim().url("Paste a valid ima
 /** Describes a diagram image (URL) into the same [DIAGRAM: ...] tag the handwriting OCR uses. */
 export const describeDiagramUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => DiagramUrlInput.parse(input))
+  .inputValidator((input: unknown) => DiagramUrlInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { describeDiagramFromUrl } = await import("./diagrams/describe.server");
     try {
       const tag = await describeDiagramFromUrl(data.url);
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "describe_diagram_url",
-        model: "diagram-url-describe",
-        ok: true,
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "describe_diagram_url",
+          model: "diagram-url-describe",
+          ok: true,
+        });
+      } catch {}
       return { tag };
     } catch (error) {
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "describe_diagram_url",
-        model: "diagram-url-describe",
-        ok: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "describe_diagram_url",
+          model: "diagram-url-describe",
+          ok: false,
+          error_message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch {}
       throw error;
     }
   });
@@ -169,7 +173,7 @@ const DiagramImageInput = z.object({
  */
 export const describeDiagramImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => DiagramImageInput.parse(input))
+  .inputValidator((input: unknown) => DiagramImageInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { checkUserVisionLimit } = await import("@/server/rate-limit");
     await checkUserVisionLimit(context.userId);
@@ -177,21 +181,25 @@ export const describeDiagramImage = createServerFn({ method: "POST" })
     const { describeDiagramFromDataUrl } = await import("./diagrams/describe.server");
     try {
       const tag = await describeDiagramFromDataUrl(data.image);
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "describe_diagram_image",
-        model: "diagram-image-describe",
-        ok: true,
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "describe_diagram_image",
+          model: "diagram-image-describe",
+          ok: true,
+        });
+      } catch {}
       return { tag };
     } catch (error) {
-      await context.supabase.from("ai_usage_log").insert({
-        user_id: context.userId,
-        feature: "describe_diagram_image",
-        model: "diagram-image-describe",
-        ok: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      });
+      try {
+        await context.supabase.from("ai_usage_log").insert({
+          user_id: context.userId,
+          feature: "describe_diagram_image",
+          model: "diagram-image-describe",
+          ok: false,
+          error_message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch {}
       throw error;
     }
   });
@@ -226,7 +234,7 @@ const AutofillResult = z.object({
  */
 export const autofillDiagramFromImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => AutofillInput.parse(input))
+  .inputValidator((input: unknown) => AutofillInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { visionChat } = await import("./ai.server");
     const { extractFirstJsonObject } = await import("./examiner/json");
