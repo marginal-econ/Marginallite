@@ -21,12 +21,14 @@ export const AO_DEFINITIONS = {
   ao2: {
     code: "AO2",
     name: "Analysis",
-    description: "chains of economic reasoning: select, organise, apply data/diagrams, and develop causes and consequences",
+    description:
+      "chains of economic reasoning: select, organise, apply data/diagrams, and develop causes and consequences",
   },
   ao3: {
     code: "AO3",
     name: "Evaluation",
-    description: "balanced discussions, weighing different sides, assessing uncertainties of outcomes, and justified conclusions",
+    description:
+      "balanced discussions, weighing different sides, assessing uncertainties of outcomes, and justified conclusions",
   },
 } as const;
 
@@ -41,7 +43,10 @@ export function renderAoDefinitions(): string {
   return (["ao1", "ao2", "ao3"] as AoKey[]).map((key) => `- ${formatAoLine(key)}`).join("\n");
 }
 
-export const TEMPERATURE_EXAMINER = 0;
+/** Balanced dual-pass temperatures: Pass 1 at 0.0 for analytical precision; Pass 2 at 0.2 for holistic evaluation. */
+export const TEMPERATURE_PASS1 = 0.0;
+export const TEMPERATURE_PASS2 = 0.2;
+export const TEMPERATURE_EXAMINER = 0.0;
 export const TEMPERATURE_TUTOR = 0.4;
 export const MAX_ANCHORS_PER_BAND = 2;
 
@@ -65,8 +70,20 @@ export const MODEL_EMBEDDING = "google/gemini-embedding-2";
 export const EMBEDDING_DIMS = 2048;
 
 /**
+ * Checks whether a question requires evaluation (AO3).
+ * In Cambridge IGCSE 0455, "Discuss whether or not...", "Discuss...", "Evaluate...",
+ * "Assess...", "Consider whether..." require balanced two-sided evaluation.
+ */
+export function isEvaluativeQuestion(question?: string | null): boolean {
+  if (!question || typeof question !== "string") return false;
+  return /\b(discuss|evaluate|assess|whether\s+or\s+not|whether|to\s+what\s+extent|consider\s+whether|justify|should)\b/i.test(
+    question,
+  );
+}
+
+/**
  * Authoritative Cambridge IGCSE 0455 Question Tariffs.
- * Derived directly from 0455/22 February/March 2026 Mark Scheme.
+ * Derived directly from 0455 Paper 2 Mark Schemes.
  */
 export const TARIFF_SPLITS: Record<number, AoSplit> = {
   1: { ao1_marks: 1, ao2_marks: 0, ao3_marks: 0 },
@@ -81,9 +98,13 @@ export const TARIFF_SPLITS: Record<number, AoSplit> = {
 };
 
 /**
- * Determine AO split based on mark value and command word.
+ * Determine AO split based on mark value, command word, or question prompt.
  */
-export function defaultSplitForMaxMark(maxMark: number, commandWord?: string): AoSplit {
+export function defaultSplitForMaxMark(
+  maxMark: number,
+  commandWord?: string,
+  question?: string,
+): AoSplit {
   const numericMax =
     typeof maxMark === "number" && Number.isFinite(maxMark) && maxMark > 0
       ? maxMark
@@ -93,8 +114,14 @@ export function defaultSplitForMaxMark(maxMark: number, commandWord?: string): A
 
   const cmd = commandWord?.toLowerCase().trim();
 
-  // Special discuss 6-marker with evaluation
-  if (numericMax === 6 && (cmd === "discuss" || cmd === "evaluate")) {
+  // Section A 6-mark Discuss / Evaluate question (e.g. Q1g / Q1h)
+  if (
+    numericMax === 6 &&
+    (cmd === "discuss" ||
+      cmd === "evaluate" ||
+      cmd === "6_discuss" ||
+      (!cmd && question && isEvaluativeQuestion(question)))
+  ) {
     return { ao1_marks: 2, ao2_marks: 2, ao3_marks: 2 };
   }
 
@@ -106,7 +133,6 @@ export function defaultSplitForMaxMark(maxMark: number, commandWord?: string): A
   const exact = TARIFF_SPLITS[numericMax];
   if (exact) return { ...exact };
 
-  // For arbitrary tariffs:
   if (numericMax <= 2) {
     return { ao1_marks: numericMax, ao2_marks: 0, ao3_marks: 0 };
   }
@@ -115,7 +141,6 @@ export function defaultSplitForMaxMark(maxMark: number, commandWord?: string): A
     return { ao1_marks: ao1, ao2_marks: numericMax - ao1, ao3_marks: 0 };
   }
 
-  // Levels-based extended essays (8, 10, 12, 20)
   const ao1 = Math.max(1, Math.round(numericMax * 0.25));
   const ao3 = Math.max(1, Math.round(numericMax * 0.35));
   const ao2 = numericMax - ao1 - ao3;
@@ -125,6 +150,82 @@ export function defaultSplitForMaxMark(maxMark: number, commandWord?: string): A
 export function aoMaxMarks(maxMark: number): { ao1: number; ao2: number; ao3: number } {
   const split = defaultSplitForMaxMark(maxMark);
   return { ao1: split.ao1_marks, ao2: split.ao2_marks, ao3: split.ao3_marks };
+}
+
+/**
+ * Builds the authoritative Cambridge IGCSE 0455 directive for evaluation based on tariff.
+ */
+export function buildAoEvaluationDirective(
+  maxMark: number,
+  split: AoSplit,
+  isDiagram?: boolean,
+): string {
+  if (split.ao3_marks === 0) {
+    if (maxMark <= 2) {
+      return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 ${maxMark}-MARK DEFINE / IDENTIFY / CALCULATE QUESTIONS (AO1: ${split.ao1_marks}, AO2: 0, AO3: 0):
+- Pure point-marked knowledge/identification/calculation question.
+- Award 1 mark per accurate syllabus component or identified factor up to ${maxMark} marks.
+- EVALUATION AND EXTENDED ANALYSIS ARE STRICTLY NOT REQUIRED. Never penalise brevity when the exact economic definition or calculation is accurate.
+- Set "ao_breakdown.evaluation" to { "awarded": 0, "out_of": 0, "comment": "Evaluation is not required for this question." } and keep "missing_elements.evaluation" empty [].`;
+    }
+    if (maxMark === 4) {
+      return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 4-MARK EXPLAIN QUESTIONS (AO1: 2, AO2: 2, AO3: 0):
+- Point-marked: 2 distinct points × 2 marks each (1 mark for valid identification + 1 mark for logical economic explanation/consequence).
+- EVALUATION IS STRICTLY NOT REQUIRED. Never penalise for missing counter-arguments or conclusions.
+- Set "ao_breakdown.evaluation" to { "awarded": 0, "out_of": 0, "comment": "Evaluation is not required for a 4-mark Explain question." } and keep "missing_elements.evaluation" empty [].`;
+    }
+    if (maxMark === 6 && isDiagram) {
+      return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 6-MARK DIAGRAM ANALYSIS QUESTIONS (AO1: 0, AO2: 6, AO3: 0):
+- Pure AO2 Analysis: 4 marks for the technical diagram (1m axes P/Q, 1m original curves & equilibrium, 1m correct curve shift with arrow/label, 1m new equilibrium P2/Q2) + 2 marks for written explanation (1m cause of shift, 1m market outcome on equilibrium price & quantity).
+- EVALUATION IS STRICTLY NOT REQUIRED. Set "ao_breakdown.knowledge" and "ao_breakdown.evaluation" awarded: 0, out_of: 0.`;
+    }
+    return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 ${maxMark}-MARK NON-EVALUATIVE ANALYSIS QUESTIONS (AO1: ${split.ao1_marks}, AO2: ${split.ao2_marks}, AO3: 0):
+- Pure explanation/analysis question (e.g. 6-mark 'Analyse' in Section B Part c).
+- EVALUATION IS STRICTLY NOT REQUIRED. Candidates MUST NOT be penalised for omitting counter-arguments or conclusions.
+- Official 0455 Cap: On 6-mark 'Analyse' questions, merely listing points without causal development is capped at a MAXIMUM of 3 marks.
+- Set "ao_breakdown.evaluation" to { "awarded": 0, "out_of": 0, "comment": "Evaluation is not required for this question. No marks are lost for its omission." } and keep "missing_elements.evaluation" empty [].`;
+  }
+
+  if (maxMark === 6 && split.ao3_marks === 2) {
+    return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 SECTION A 6-MARK DISCUSS QUESTIONS (AO1: 2, AO2: 2, AO3: 2):
+- Up to 4 marks for logical reasons on one side ('why it might') and up to 4 marks for logical reasons on the other side ('why it might not'), capped at 6 marks total.
+- Balanced two-sided discussion with clear economic links earns full 6/6 marks. One-sided answers are capped at max 4/6.`;
+  }
+
+  if (maxMark === 8) {
+    return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 8-MARK DISCUSS QUESTIONS (AO1: ${split.ao1_marks}, AO2: ${split.ao2_marks}, AO3: ${split.ao3_marks}):
+- Marked using Official Cambridge 0455 Table A Levels of Response (Levels 1–3):
+  * Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, applying clear logical analysis, and providing thoughtful evaluation of uncertainties/conditions and a reasoned verdict.
+  * Level 2 (3–5 marks): Reasoned discussion making use of economic information and clear analysis, but may lack depth or be one-sided (one-sided responses are capped in Level 2, max 5/8).
+  * Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
+- EVALUATION IS MANDATORY. Grade AO3 out of exactly ${split.ao3_marks} marks.`;
+  }
+
+  return `SPECIAL DIRECTIVE FOR EVALUATIVE IGCSE 0455 RESPONSES (${maxMark} marks: AO1: ${split.ao1_marks}, AO2: ${split.ao2_marks}, AO3: ${split.ao3_marks}):
+- EVALUATION IS MANDATORY. Examine both sides of the argument, weigh uncertainties/trade-offs, and reach a reasoned conclusion.`;
+}
+
+/**
+ * Renders syllabus-exact AO3 level descriptors matching the IGCSE 0455 tariff.
+ */
+export function renderAo3Descriptors(maxMark: number, ao3Marks: number): string {
+  if (ao3Marks === 0) {
+    return `- AO3 Evaluation (0 marks): Evaluation is NOT required for this ${maxMark}-mark IGCSE 0455 question. Never penalise candidates for omitting evaluation or conclusions.`;
+  }
+  if (maxMark === 6 && ao3Marks === 2) {
+    return `- AO3 Evaluation (${ao3Marks} marks) — IGCSE 0455 Section A 6-Mark Discuss:
+      * 2 of 2: Clear two-sided discussion weighing reasons why it might and why it might not, linked to the extract/context.
+      * 1 of 2: Brief second side or undeveloped evaluative comment.
+      * 0 of 2: Strictly one-sided answer with no counter-perspective.`;
+  }
+  if (maxMark === 8) {
+    return `- AO3 Evaluation (${ao3Marks} marks) — IGCSE 0455 Section B 8-Mark Discuss (Table A):
+      * Level 3 (${ao3Marks} of ${ao3Marks}): Balanced two-sided discussion with thoughtful evaluative judgement (weighing short run vs long run, elasticity, scale, or stakeholder impacts) and a reasoned conclusion directly answering 'whether or not'.
+      * Level 2 (${Math.max(1, ao3Marks - 1)} of ${ao3Marks}): Both sides addressed with some evaluative comment, or a conclusion that summarises rather than weighs decisive factors.
+      * Level 1 (1 of ${ao3Marks}): Minimal counter-argument or unsupported assertion.
+      * Level 0 (0 of ${ao3Marks}): Strictly one-sided description with zero evaluative weighing.`;
+  }
+  return `- AO3 Evaluation (${ao3Marks} marks): Assess balanced two-sided discussion, weighing of uncertainties/trade-offs, and justified conclusion out of ${ao3Marks} marks.`;
 }
 
 export type StructureStep = { title: string; detail: string };
@@ -282,7 +383,9 @@ export function getStructureGuidance(
 }
 
 export function formatStructureNote(guidance: StructureGuidance): string {
-  return `Target structure for ${guidance.label} (${guidance.aoSummary}):\n` +
+  return (
+    `Target structure for ${guidance.label} (${guidance.aoSummary}):\n` +
     guidance.steps.map((s, i) => `${i + 1}. ${s.title}: ${s.detail}`).join("\n") +
-    `\nNote: ${guidance.note}`;
+    `\nNote: ${guidance.note}`
+  );
 }

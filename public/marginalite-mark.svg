@@ -1,9 +1,7 @@
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Marginalite">
-  <rect x="0" y="0" width="256" height="256" rx="56" fill="#ec4899"/>
-  <g fill="none" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 104 L128 62 L224 104 L128 146 Z" fill="#ffffff" stroke="none"/>
-    <path d="M74 122 V172 C74 172 96 194 128 194 C160 194 182 172 182 172 V122" />
-    <path d="M212 112 V162" />
-    <circle cx="212" cy="176" r="8" fill="#ffffff" stroke="none"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Marginalite">
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#291c52"/>
+  <rect x="5.5" y="5.5" width="53" height="53" rx="13" fill="#a68cfb"/>
+  <path d="M19 42 V27.5 A6.5 6.5 0 0 1 32 27.5 V42 M32 27.5 A6.5 6.5 0 0 1 45 27.5 V42"
+        fill="none" stroke="#FFFFFF" stroke-width="6.5"
+        stroke-linecap="square" stroke-linejoin="round"/>
 </svg>

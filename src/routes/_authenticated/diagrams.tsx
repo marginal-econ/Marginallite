@@ -1,29 +1,44 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, BookMarked, Globe2, Lightbulb, Search, Tags } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertTriangle, BookMarked, Globe2, Lightbulb, Plus, Search, Tags } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/app/app-shell";
+import { Button } from "@/components/ui/button";
 import { EconomicsDiagram } from "@/components/diagrams/economics-diagram";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DIAGRAMS as BUILT_IN, SECTIONS } from "@/lib/diagrams/catalog";
 import { toDiagramEntry } from "@/lib/diagrams/custom";
 import { listCustomDiagrams } from "@/lib/diagrams.functions";
+import { getMe } from "@/lib/account.functions";
 import type { DiagramEntry, DiagramSection } from "@/lib/diagrams/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/diagrams")({
+  validateSearch: (search: Record<string, unknown>): { id?: string; q?: string } => ({
+    id: typeof search.id === "string" ? search.id : undefined,
+    q: typeof search.q === "string" ? search.q : undefined,
+  }),
   head: () => ({
     meta: [
-      { title: "Diagram library — Cambridge 0455 Economics" },
+      { title: "Diagram library — Cambridge IGCSE 0455 Economics" },
       {
         name: "description",
         content:
           "Every Cambridge IGCSE Economics (0455) diagram, drawn to exam convention, with label-by-label definitions, examiner tips, common mistakes and real-world examples.",
       },
-      { property: "og:title", content: "Diagram library — Cambridge 0455 Economics" },
+      { property: "og:title", content: "Diagram library — Cambridge IGCSE 0455 Economics" },
       {
         property: "og:description",
         content:
@@ -37,9 +52,24 @@ export const Route = createFileRoute("/_authenticated/diagrams")({
 });
 
 function DiagramLibraryPage() {
+  const routeSearch = Route.useSearch();
   const [section, setSection] = useState<DiagramSection>("Microeconomics");
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string>(BUILT_IN[0]?.id ?? "");
+  const [query, setQuery] = useState(() => routeSearch.q ?? "");
+  const [selectedId, setSelectedId] = useState<string>(() => routeSearch.id ?? BUILT_IN[0]?.id ?? "");
+
+  useEffect(() => {
+    if (routeSearch.id) {
+      setSelectedId(routeSearch.id);
+      const found = BUILT_IN.find((d) => d.id === routeSearch.id);
+      if (found) setSection(found.section);
+    }
+    if (typeof routeSearch.q === "string") {
+      setQuery(routeSearch.q);
+    }
+  }, [routeSearch.id, routeSearch.q]);
+
+  const fetchMe = useServerFn(getMe);
+  const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
 
   const fetchCustom = useServerFn(listCustomDiagrams);
   const custom = useQuery({ queryKey: ["custom-diagrams"], queryFn: () => fetchCustom() });
@@ -88,11 +118,64 @@ function DiagramLibraryPage() {
     <>
       <PageHeader
         title="Diagram library"
-        description={`${DIAGRAMS.length} Cambridge 0455 diagrams drawn to exam convention — with label definitions, examiner tips, common mistakes and real-world examples.`}
+        description={`${DIAGRAMS.length} Cambridge IGCSE 0455 diagrams drawn to exam convention — with label definitions, examiner tips, common mistakes and real-world examples.`}
+        action={
+          me.data?.isAdmin ? (
+            <Link to="/admin" search={{ tab: "diagrams" }}>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="size-4" /> Add custom diagram
+              </Button>
+            </Link>
+          ) : null
+        }
       />
 
+      {/* Mobile Diagram Selector (< lg screens) */}
+      <div className="lg:hidden p-3.5 border-b border-border bg-card/60 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <BookMarked className="size-3.5 text-primary" /> Diagram ({DIAGRAMS.length})
+          </span>
+          <div className="flex gap-1 rounded-md bg-muted p-0.5">
+            {SECTIONS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setSection(item);
+                  setQuery("");
+                }}
+                className={cn(
+                  "rounded px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors",
+                  section === item && !query.trim() && "bg-background text-foreground font-semibold shadow-2xs",
+                )}
+              >
+                {item === "Microeconomics" ? "Micro" : "Macro"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Select value={selected?.id} onValueChange={(val) => setSelectedId(val)}>
+          <SelectTrigger className="w-full bg-background text-xs font-semibold h-9">
+            <SelectValue placeholder="Choose a diagram..." />
+          </SelectTrigger>
+          <SelectContent className="max-h-80">
+            {groups.map((group) => (
+              <SelectGroup key={group.topic}>
+                <SelectLabel className="text-[10px] font-bold text-muted-foreground uppercase">{group.topic}</SelectLabel>
+                {group.items.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id} className="text-xs">
+                    {entry.title}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[300px_1fr]">
-        <aside className="border-border lg:border-r">
+        <aside className="hidden lg:block border-border lg:border-r lg:sticky lg:top-12 lg:self-start lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto custom-scrollbar">
           <div className="space-y-3 border-b border-border p-4">
             <div className="flex gap-1 rounded-lg bg-muted p-1">
               {SECTIONS.map((item) => (

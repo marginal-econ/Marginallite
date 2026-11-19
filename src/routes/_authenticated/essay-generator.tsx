@@ -7,6 +7,7 @@ import {
   ExternalLink,
   GraduationCap,
   Loader2,
+  PenLine,
   Quote,
   ShieldCheck,
   Sparkles,
@@ -16,6 +17,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/app/app-shell";
+import { CompactProgressBar, type ProgressStage } from "@/components/app/grading-progress";
 import { getMe } from "@/lib/account.functions";
 import { EconomicsDiagram } from "@/components/diagrams/economics-diagram";
 import { Badge } from "@/components/ui/badge";
@@ -40,13 +42,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/essay-generator")({
   head: () => ({
     meta: [
-      { title: "Perfect response generator — Cambridge 0455 Economics" },
+      { title: "Sample Essay Generator — Cambridge IGCSE 0455 Economics" },
       {
         name: "description",
         content:
-          "Generate a full-mark Cambridge IGCSE Economics (0455) response, structured exactly as taught in class — knowledge, analysis with application, evaluation and a reasoned conclusion — with correct diagrams and an AO mark breakdown.",
+          "Generate full-mark Cambridge IGCSE Economics (0455) model essays, structured exactly as taught in class — knowledge, analysis with application, evaluation and a reasoned conclusion — with correct diagrams and an AO mark breakdown.",
       },
-      { property: "og:title", content: "Perfect response generator — Cambridge 0455 Economics" },
+      { property: "og:title", content: "Sample Essay Generator — Cambridge IGCSE 0455 Economics" },
       {
         property: "og:description",
         content:
@@ -59,13 +61,14 @@ export const Route = createFileRoute("/_authenticated/essay-generator")({
   component: EssayGeneratorPage,
 });
 
-// Cambridge IGCSE 0455 Paper 2 structured question tariffs: 2m, 4m, 6m, 8m.
+// There is no 25-mark question in the 0455 syllabus — Paper 2's extended
+// essays (Section B/C) are each worth 20 marks. See src/lib/examiner/config.ts.
 const MARKS = [2, 4, 6, 8];
 const ESSAY_DRAFT_VERSION = 1;
 
 type EssayGeneratorDraft = {
   version: number;
-  era: "legacy" | "2027";
+  level: "as" | "a2";
   topic: string;
   question: string;
   maxMark: number;
@@ -76,16 +79,16 @@ type EssayGeneratorDraft = {
 };
 
 function essayDraftKey(userId: string) {
-  return `marginalite.essay-generator.v${ESSAY_DRAFT_VERSION}.${userId}`;
+  return `marginal.essay-generator.v${ESSAY_DRAFT_VERSION}.${userId}`;
 }
 
 function EssayGeneratorPage() {
   const fetchMe = useServerFn(getMe);
   const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
-  const [era, setEra] = useState<"legacy" | "2027">("legacy");
-  const [topic, setTopic] = useState("Government and the macroeconomy");
+  const [level, setLevel] = useState<"as" | "a2">("as");
+  const [topic, setTopic] = useState("Government microeconomic intervention");
   const [question, setQuestion] = useState("");
-  const [maxMark, setMaxMark] = useState(8);
+  const [maxMark, setMaxMark] = useState(12);
   const [savedEssay, setSavedEssay] = useState<GeneratedEssay | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -94,7 +97,7 @@ function EssayGeneratorPage() {
     if (!essay) return;
     const fullText = [
       `# ${essay.question}`,
-      `Tariff: ${essay.maxMark} marks | Estimated Mark: ${essay.estimatedMark}/${essay.maxMark}`,
+      `Level: ${(essay.level ?? "IGCSE 0455").toUpperCase()} | Tariff: ${essay.maxMark} marks | Estimated Mark: ${essay.estimatedMark}/${essay.maxMark}`,
       "",
       ...essay.sections.map((s) => `## ${s.heading}\n\n${s.paragraphs.join("\n\n")}`),
     ].join("\n\n");
@@ -116,7 +119,7 @@ function EssayGeneratorPage() {
 
   const generateQuestion = useServerFn(generateEssayQuestionAI);
   const aiQuestionMutation = useMutation({
-    mutationFn: () => generateQuestion({ data: { era, topic } }),
+    mutationFn: () => generateQuestion({ data: { level, topic } }),
     onSuccess: (result) => {
       setQuestion(result.question);
       setTopic(result.topic);
@@ -127,24 +130,24 @@ function EssayGeneratorPage() {
 
   const fetchBankTopics = useServerFn(listBankTopics);
   const bankTopics = useQuery({
-    queryKey: ["essay-bank-topics", era],
-    queryFn: () => fetchBankTopics({ data: { kind: "essay", era } }),
+    queryKey: ["essay-bank-topics", level],
+    queryFn: () => fetchBankTopics({ data: { kind: "essay", level } }),
     enabled: questionSource === "bank",
   });
 
   const [bankTopicFilter, setBankTopicFilter] = useState<string>("__any__");
   const fetchBankQuestions = useServerFn(listApprovedEssayQuestions);
   const bankQuestions = useQuery({
-    queryKey: ["essay-bank-questions", era, bankTopicFilter],
+    queryKey: ["essay-bank-questions", level, bankTopicFilter],
     queryFn: () =>
       fetchBankQuestions({
-        data: { era, topic: bankTopicFilter === "__any__" ? undefined : bankTopicFilter },
+        data: { level, topic: bankTopicFilter === "__any__" ? undefined : bankTopicFilter },
       }),
     enabled: questionSource === "bank",
   });
 
   const mutation = useMutation({
-    mutationFn: () => generate({ data: { era, topic, question, maxMark } }),
+    mutationFn: () => generate({ data: { level, topic, question, maxMark } }),
     onSuccess: (result) => setSavedEssay(result.essay),
     onError: (error: Error) => toast.error(error.message),
   });
@@ -158,10 +161,10 @@ function EssayGeneratorPage() {
       if (raw) {
         const draft = JSON.parse(raw) as EssayGeneratorDraft;
         if (draft.version === ESSAY_DRAFT_VERSION) {
-          setEra(draft.era || "legacy");
+          setLevel(draft.level);
           setTopic(draft.topic);
           setQuestion(draft.question);
-          setMaxMark(MARKS.includes(draft.maxMark) ? draft.maxMark : 8);
+          setMaxMark(MARKS.includes(draft.maxMark) ? draft.maxMark : 12);
           setQuestionSource(draft.questionSource);
           setBankTopicFilter(draft.bankTopicFilter);
           setSavedEssay(draft.essay);
@@ -180,7 +183,7 @@ function EssayGeneratorPage() {
     const timer = window.setTimeout(() => {
       const draft: EssayGeneratorDraft = {
         version: ESSAY_DRAFT_VERSION,
-        era,
+        level,
         topic,
         question,
         maxMark,
@@ -195,8 +198,8 @@ function EssayGeneratorPage() {
   }, [
     bankTopicFilter,
     draftReady,
-    era,
     essay,
+    level,
     maxMark,
     me.data?.userId,
     question,
@@ -207,21 +210,21 @@ function EssayGeneratorPage() {
   return (
     <>
       <PageHeader
-        title="Perfect essay generator"
-        description="An examiner-standard model answer, structured exactly as the mark scheme rewards, capped at 650 words to match real exam-script length, with the correct diagrams inserted and an AO breakdown."
+        title="Sample Essay Generator"
+        description="Generate examiner-standard model answers structured exactly as Cambridge mark schemes reward, capped at realistic exam length, with verified SVG diagrams and AO mark breakdowns."
       />
 
       <div className="grid gap-0 lg:grid-cols-[380px_1fr]">
         <section className="space-y-4 border-border p-5 lg:border-r md:p-6">
           <div className="space-y-2">
-            <Label>Syllabus era</Label>
-            <Tabs value={era} onValueChange={(value) => setEra(value as "legacy" | "2027")}>
+            <Label>Level</Label>
+            <Tabs value={level} onValueChange={(value) => setLevel(value as "as" | "a2")}>
               <TabsList className="w-full">
-                <TabsTrigger value="legacy" className="flex-1">
-                  Legacy (≤ 2026)
+                <TabsTrigger value="as" className="flex-1">
+                  IGCSE 0455
                 </TabsTrigger>
-                <TabsTrigger value="2027" className="flex-1">
-                  2027–2029 Syllabus
+                <TabsTrigger value="a2" className="flex-1">
+                  IGCSE 0455
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -264,23 +267,36 @@ function EssayGeneratorPage() {
           </div>
 
           {questionSource === "ai" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={aiQuestionMutation.isPending}
-              onClick={() => aiQuestionMutation.mutate()}
-            >
-              {aiQuestionMutation.isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" /> Writing a unique question…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4" /> Generate a unique question on this topic
-                </>
-              )}
-            </Button>
+            <div className="space-y-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={aiQuestionMutation.isPending}
+                onClick={() => aiQuestionMutation.mutate()}
+              >
+                {aiQuestionMutation.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Writing a unique question…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-4" /> Generate a unique question on this topic
+                  </>
+                )}
+              </Button>
+              <CompactProgressBar
+                active={aiQuestionMutation.isPending}
+                stages={[
+                  { label: "Checking Cambridge IGCSE 0455 syllabus scope", weight: 2 },
+                  { label: "Drafting authentic command-word question", weight: 4 },
+                  { label: "Verifying mark tariff suitability", weight: 2 },
+                ] satisfies ProgressStage[]}
+                totalMs={10_000}
+                title="Generating Cambridge-style question…"
+                estimatedTimeLabel="Est: ~5–10s"
+              />
+            </div>
           ) : null}
 
           {questionSource === "bank" ? (
@@ -387,8 +403,25 @@ function EssayGeneratorPage() {
           </p>
         </section>
 
-        <section className="min-w-0 p-5 md:p-8">
-          {!essay ? (
+        <section className="min-w-0 p-5 md:p-8 space-y-5">
+          {mutation.isPending ? (
+            <CompactProgressBar
+              active={mutation.isPending}
+              stages={[
+                { label: "Grounding response in Cambridge IGCSE 0455 syllabus notes", weight: 3 },
+                { label: "Selecting appropriate diagram & curve mechanics", weight: 3 },
+                { label: "Structuring AO1/AO2 analytical chains & examples", weight: 5 },
+                { label: "Writing evaluative conclusion within word limit", weight: 4 },
+              ] satisfies ProgressStage[]}
+              totalMs={28_000}
+              title="Writing principal-examiner model essay…"
+              estimatedTimeLabel="Est: ~20–30s"
+              statusBadge="Generating"
+              showStages
+            />
+          ) : null}
+
+          {!essay && !mutation.isPending ? (
             <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center">
               <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <GraduationCap className="size-5" />
@@ -398,11 +431,11 @@ function EssayGeneratorPage() {
                 model answer appears here with diagrams and an AO breakdown.
               </p>
             </div>
-          ) : (
+          ) : essay ? (
             <article className="space-y-6">
               <header className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{essay.era === "2027" ? "2027–2029" : "Legacy"}</Badge>
+                  <Badge variant="secondary">{(essay.level ?? "IGCSE 0455") === "a2" ? "IGCSE 0455" : "IGCSE 0455"}</Badge>
                   <Badge variant="outline">{essay.topic}</Badge>
                   <Badge variant="outline">{essay.maxMark} marks</Badge>
                   <Badge variant={essay.wordCount > essay.wordLimit ? "destructive" : "outline"}>
@@ -436,7 +469,7 @@ function EssayGeneratorPage() {
                     </Button>
                     <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
                       <Link to="/grade">
-                        <Sparkles className="size-3.5 text-primary" /> Mark an Answer
+                        <PenLine className="size-3.5 text-primary" /> Mark Essay
                       </Link>
                     </Button>
                   </div>
@@ -594,7 +627,7 @@ function EssayGeneratorPage() {
                 </div>
               ) : null}
             </article>
-          )}
+          ) : null}
         </section>
       </div>
     </>

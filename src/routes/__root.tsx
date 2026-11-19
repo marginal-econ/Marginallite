@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { ThemeToggle } from "../components/marketing/theme-toggle";
 import { Toaster } from "../components/ui/sonner";
 import appCss from "../styles.css?url";
 import waitlistCss from "../waitlist.css?url";
@@ -110,38 +109,52 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "theme-color", content: "#ec4899" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "theme-color", content: "#7c3aed" },
       {
-        title: "Marginalite — Cambridge IGCSE Economics (0455) marking & practice",
+        title: "Marginalite | AI Cambridge IGCSE Economics (0455) Prep & Essay Examiner",
       },
       {
         name: "description",
         content:
-          "Examiner-standard marking for Cambridge IGCSE Economics (0455), grounded in official syllabus and mark schemes.",
+          "Master Cambridge IGCSE Economics (0455) with Marginalite. Features instant two-pass AI essay grading, Paper 2 Data Response, and Paper 1 MCQ practice.",
       },
-      { property: "og:title", content: "Marginalite — Cambridge IGCSE Economics (0455) marking & practice" },
+      { property: "og:site_name", content: "Marginalite" },
+      { property: "og:title", content: "Marginalite | AI Cambridge IGCSE Economics (0455) Prep" },
       {
         property: "og:description",
-        content: "Cambridge 0455 essays and MCQs marked with exact official syllabus tariffs and AO breakdown.",
+        content: "The complete Cambridge IGCSE 0455 Economics mastery platform with AI essay grading, Data Response, and Paper 1 MCQ practice.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://lite.marginal-econ.com" },
+      { property: "og:image", content: "https://lite.marginal-econ.com/marginal-m-icon-clean.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Marginalite | AI Cambridge IGCSE Economics (0455) Prep" },
+      {
+        name: "twitter:description",
+        content: "The complete Cambridge IGCSE 0455 Economics mastery platform with AI essay grading and MCQ practice.",
+      },
+      { name: "application-name", content: "Marginalite AI" },
+      { name: "apple-mobile-web-app-title", content: "Marginalite AI" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300..500;1,6..72,300..400&family=JetBrains+Mono:wght@400;500&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300..500;1,6..72,300..400&family=JetBrains+Mono:wght@400;500&display=swap",
       },
       {
         rel: "stylesheet",
         href: appCss,
       },
       { rel: "stylesheet", href: waitlistCss },
-      { rel: "icon", href: "/favicon.svg?v=4", type: "image/svg+xml" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=4" },
+      { rel: "icon", href: "/favicon.ico?v=5", sizes: "48x48" },
+      { rel: "icon", href: "/favicon-48x48.png?v=5", type: "image/png", sizes: "48x48" },
+      { rel: "icon", href: "/favicon-96x96.png?v=5", type: "image/png", sizes: "96x96" },
+      { rel: "icon", href: "/favicon-192x192.png?v=5", type: "image/png", sizes: "192x192" },
+      { rel: "icon", href: "/favicon.svg?v=5", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=5", sizes: "180x180" },
       { rel: "manifest", href: "/manifest.json" },
     ],
   }),
@@ -157,8 +170,26 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
         <script
+          type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem("marginalite-theme");document.documentElement.classList.toggle("dark",s==="dark")}catch(e){document.documentElement.classList.remove("dark")}document.documentElement.classList.add("motion-ready")})()`,
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Course",
+              name: "Cambridge IGCSE Economics (0455) Prep",
+              courseCode: "0455",
+              provider: {
+                "@type": "Organization",
+                name: "Marginalite",
+                url: "https://lite.marginal-econ.com",
+              },
+              educationalLevel: "IGCSE",
+              description: "Complete prep platform for Cambridge IGCSE Economics (0455) Paper 1 MCQ and Paper 2 Structured & Data Response.",
+            }),
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem("marginal-theme");document.documentElement.classList.toggle("dark",s==="dark")}catch(e){document.documentElement.classList.remove("dark")}document.documentElement.classList.add("motion-ready")})()`,
           }}
         />
       </head>
@@ -177,7 +208,6 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
-      <ThemeToggle />
       <Toaster />
     </QueryClientProvider>
   );

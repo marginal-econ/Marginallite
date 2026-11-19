@@ -17,22 +17,31 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/backend/client";
 import { registerTeacher, getTeacherProfileStatus } from "@/lib/teacher.functions";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 export const Route = createFileRoute("/teacher-auth")({
+  validateSearch: (search: Record<string, unknown>): { tab?: string } => ({
+    tab: typeof search.tab === "string" ? search.tab : undefined,
+  }),
   head: () => ({
     meta: [
-      { title: "Teacher & Department Portal — Marginalite | Cambridge IGCSE 0455 Economics" },
+      { title: "Teacher & Department Portal — Marginalite AI | Cambridge IGCSE 0455 Economics" },
       {
         name: "description",
         content:
-          "Official Teacher Portal for Cambridge IGCSE Economics (0455) educators. Ingest mark schemes, calibrate anchors, manage cohorts, and moderate student scripts.",
+          "Official Teacher Portal for Marginalite AI and Cambridge IGCSE 0455 Economics educators. Ingest mark schemes, manage cohorts, and moderate student scripts.",
       },
+      { name: "robots", content: "noindex, follow" },
+      { property: "og:site_name", content: "Marginalite AI" },
+      { property: "og:title", content: "Teacher & Department Portal — Marginalite AI" },
     ],
+    links: [{ rel: "canonical", href: "https://lite.marginal-econ.com/teacher-auth" }],
   }),
   component: TeacherAuthPage,
 });
@@ -60,10 +69,20 @@ function readRecoveryLinkState(): "recovery" | "error" | null {
 
 export function TeacherAuthPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const registerTeacherFn = useServerFn(registerTeacher);
   const checkTeacherStatusFn = useServerFn(getTeacherProfileStatus);
 
   const [view, setView] = useState<TeacherAuthView>("credentials");
+  const [activeTab, setActiveTab] = useState<string>(search.tab === "signup" ? "signup" : "signin");
+
+  useEffect(() => {
+    if (search.tab === "signup") {
+      setActiveTab("signup");
+    } else if (search.tab === "signin") {
+      setActiveTab("signin");
+    }
+  }, [search.tab]);
 
   // Sign in state
   const [signInEmail, setSignInEmail] = useState("");
@@ -179,23 +198,11 @@ export function TeacherAuthPage() {
         return;
       }
 
-      // Check teacher verification status
-      const statusRes = await checkTeacherStatusFn();
+      // Check teacher verification status (auto-activates teacher access)
+      await checkTeacherStatusFn();
 
-      if (statusRes.isStaff || statusRes.isAdmin || (statusRes.status as string) === "approved") {
-        toast.success("Welcome, Educator! Staff privileges verified.");
-        navigate({ to: "/classes", replace: true });
-      } else if (statusRes.status === "pending") {
-        // Teacher registered but admin hasn't approved yet
-        await supabase.auth.signOut();
-        setPendingAccountWarning(
-          "Your teacher registration for this school is currently pending administrative verification. For exam security, access is granted once your institutional email is verified by our team.",
-        );
-      } else {
-        // Normal student account trying to sign in through teacher portal
-        await supabase.auth.signOut();
-        toast.error("This account does not have teacher staff privileges. Please use the student sign-in portal.");
-      }
+      toast.success("Welcome, Educator! Staff privileges active.");
+      navigate({ to: "/classes", replace: true });
     } catch (err: any) {
       toast.error(err?.message || "Sign in failed.");
     } finally {
@@ -230,8 +237,20 @@ export function TeacherAuthPage() {
       });
 
       if (res.success) {
-        setSubmittedSuccess(true);
-        toast.success("Teacher registration submitted for administrative verification!");
+        toast.success("Teacher account created! Signing you in…");
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: schoolEmail.trim(),
+          password: signUpPassword,
+        });
+
+        if (signInErr) {
+          setSignInEmail(schoolEmail.trim());
+          setActiveTab("signin");
+          toast.info("Please enter your password to sign in.");
+        } else {
+          toast.success("Welcome, Educator! Full staff privileges active.");
+          navigate({ to: "/classes", replace: true });
+        }
       }
     } catch (err: any) {
       toast.error(err?.message || "Registration failed.");
@@ -286,18 +305,8 @@ export function TeacherAuthPage() {
         return;
       }
       toast.success("Educator password successfully updated!");
-      const statusRes = await checkTeacherStatusFn();
-      if (statusRes.isStaff || statusRes.isAdmin || (statusRes.status as string) === "approved") {
-        navigate({ to: "/classes", replace: true });
-      } else if (statusRes.status === "pending") {
-        await supabase.auth.signOut();
-        setView("credentials");
-        setPendingAccountWarning(
-          "Your password was updated, but your teacher account is still pending administrative verification before full workspace access is granted.",
-        );
-      } else {
-        navigate({ to: "/classes", replace: true });
-      }
+      await checkTeacherStatusFn();
+      navigate({ to: "/classes", replace: true });
     } catch (err: any) {
       toast.error(err?.message || "Failed to update password.");
     } finally {
@@ -308,39 +317,42 @@ export function TeacherAuthPage() {
   return (
     <div className="hero-glow relative flex min-h-dvh items-start justify-center overflow-x-hidden overflow-y-auto px-3 py-6 sm:items-center sm:px-4 sm:py-12">
       <div className="paper-grid pointer-events-none absolute inset-0 opacity-25" aria-hidden="true" />
-      <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -top-24 -right-24 size-96 rounded-full bg-purple-500/10 blur-3xl" aria-hidden="true" />
 
       <div className="relative w-full max-w-xl">
         {/* Navigation Bar */}
         <div className="mb-6 flex items-center justify-between gap-4">
           <Link to="/" className="group flex items-center gap-2.5">
             <img
-              src="/marginalite-mark.svg"
-              alt="Marginalite"
+              src="/marginal-m-icon-clean.png"
+              alt="Marginalite AI Cambridge Economics 0455 Teacher Workspace"
               className="size-9 object-contain transition-transform group-hover:-rotate-6"
             />
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold">Marginalite</span>
-              <span className="rounded-full bg-primary/15 border border-primary/30 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
                 Teacher Portal
               </span>
             </div>
           </Link>
 
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-3.5" />
-            Back to site
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="size-8" />
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              Back to site
+            </Link>
+          </div>
         </div>
 
         {/* Auth Card */}
         <div className="panel border-2 border-border shadow-xl p-6 sm:p-8 rounded-2xl bg-card">
           {submittedSuccess ? (
             <div className="text-center py-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/30">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
                 <Clock className="size-7" />
               </div>
               <h2 className="text-xl font-bold">Teacher Application Under Review</h2>
@@ -349,13 +361,13 @@ export function TeacherAuthPage() {
               </p>
               <div className="rounded-xl border border-border bg-muted/50 p-4 text-xs text-left space-y-2 text-muted-foreground">
                 <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <ShieldCheck className="size-4 text-primary" />
+                  <ShieldCheck className="size-4 text-purple-500" />
                   Why is verification required?
                 </div>
                 <p>
                   To protect confidential Cambridge IGCSE 0455 mark schemes, examination anchor calibrations, and student classwork, all teacher privileges require one-time manual verification of institutional affiliation.
                 </p>
-                <p className="text-primary font-medium">
+                <p className="text-purple-600 dark:text-purple-400 font-medium">
                   You will receive an email confirmation once your account is verified.
                 </p>
               </div>
@@ -373,7 +385,7 @@ export function TeacherAuthPage() {
             </div>
           ) : view === "verifying" ? (
             <div className="text-center py-8 space-y-4 animate-in fade-in duration-300">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/30">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
                 <KeyRound className="size-7 animate-pulse" />
               </div>
               <h2 className="text-xl font-bold">Verifying Educator Link</h2>
@@ -381,7 +393,7 @@ export function TeacherAuthPage() {
                 Confirming your security token with the Teacher Portal. This only takes a moment…
               </p>
               <div className="flex justify-center pt-2">
-                <Loader2 className="size-6 animate-spin text-primary" />
+                <Loader2 className="size-6 animate-spin text-purple-600" />
               </div>
             </div>
           ) : view === "forgot" ? (
@@ -400,7 +412,7 @@ export function TeacherAuthPage() {
               </button>
 
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/30 shrink-0">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 border border-purple-500/30 shrink-0">
                   <KeyRound className="size-5" />
                 </div>
                 <div>
@@ -418,8 +430,8 @@ export function TeacherAuthPage() {
               )}
 
               {resetSent ? (
-                <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5 text-center space-y-3">
-                  <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-primary/20 text-primary">
+                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-5 text-center space-y-3">
+                  <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-purple-500/20 text-purple-600">
                     <CheckCircle2 className="size-5" />
                   </div>
                   <h3 className="text-sm font-bold text-foreground">Check Your School Email</h3>
@@ -459,7 +471,7 @@ export function TeacherAuthPage() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
                     disabled={resetBusy}
                   >
                     {resetBusy ? (
@@ -477,7 +489,7 @@ export function TeacherAuthPage() {
           ) : view === "recovery" ? (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-3 duration-300">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/30 shrink-0">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 border border-purple-500/30 shrink-0">
                   <Lock className="size-5" />
                 </div>
                 <div>
@@ -520,7 +532,7 @@ export function TeacherAuthPage() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
                   disabled={recoveryBusy}
                 >
                   {recoveryBusy ? (
@@ -536,10 +548,28 @@ export function TeacherAuthPage() {
             </div>
           ) : (
             <div>
+              {/* Role Switcher: Student vs Teacher */}
+              <div className="grid grid-cols-2 p-1 bg-muted/70 rounded-xl mb-6 border border-border/80">
+                <Link
+                  to="/auth"
+                  className="flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg text-muted-foreground hover:text-foreground transition-all"
+                >
+                  <GraduationCap className="size-3.5 text-muted-foreground" />
+                  <span>Student Workspace</span>
+                </Link>
+                <button
+                  type="button"
+                  className="flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg bg-background text-purple-600 dark:text-purple-400 shadow-xs cursor-default"
+                >
+                  <School className="size-3.5 text-purple-600 dark:text-purple-400" />
+                  <span>Teacher &amp; School</span>
+                </button>
+              </div>
+
               <div className="mb-6">
-                <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-1">
+                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-xs font-semibold uppercase tracking-wider mb-1">
                   <GraduationCap className="size-4" />
-                  Cambridge IGCSE (0455) Educators
+                  Cambridge IGCSE 0455 Educators
                 </div>
                 <h1 className="text-2xl font-bold">Teacher &amp; Department Workspace</h1>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -557,14 +587,32 @@ export function TeacherAuthPage() {
                 </div>
               )}
 
-              <Tabs defaultValue="signin">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="signin">Teacher Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Register as Teacher</TabsTrigger>
+                  <TabsTrigger value="signup">Create Teacher Account</TabsTrigger>
                 </TabsList>
 
                 {/* Teacher Sign In Tab */}
                 <TabsContent value="signin">
+                  <div className="space-y-3 mb-5">
+                    <GoogleSignInButton
+                      redirectTo="/classes"
+                      label="Sign in with Google"
+                    />
+
+                    <div className="relative flex items-center justify-center my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border/80" />
+                      </div>
+                      <div className="relative flex justify-center text-[11px] uppercase">
+                        <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                          or sign in with email
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="t-signin-email">School / Institutional Email</Label>
@@ -589,7 +637,7 @@ export function TeacherAuthPage() {
                             setLinkError(false);
                             setView("forgot");
                           }}
-                          className="text-xs text-primary hover:underline cursor-pointer font-medium"
+                          className="text-xs text-purple-600 dark:text-purple-400 hover:underline cursor-pointer font-medium"
                         >
                           Forgot password?
                         </button>
@@ -604,13 +652,13 @@ export function TeacherAuthPage() {
                       />
                     </div>
 
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={signInBusy}>
+                    <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white" disabled={signInBusy}>
                       {signInBusy ? "Verifying Credentials…" : "Sign In to Teacher Portal →"}
                     </Button>
 
                     <div className="pt-2 text-center text-xs text-muted-foreground">
                       Student looking for revision?{" "}
-                      <Link to="/auth" className="text-primary font-semibold hover:underline">
+                      <Link to="/auth" className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">
                         Go to Student Portal
                       </Link>
                     </div>
@@ -619,6 +667,24 @@ export function TeacherAuthPage() {
 
                 {/* Teacher Sign Up Tab */}
                 <TabsContent value="signup">
+                  <div className="space-y-3 mb-5">
+                    <GoogleSignInButton
+                      redirectTo="/classes"
+                      label="Sign up with Google"
+                    />
+
+                    <div className="relative flex items-center justify-center my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border/80" />
+                      </div>
+                      <div className="relative flex justify-center text-[11px] uppercase">
+                        <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                          or register with school email
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <form onSubmit={handleSignUp} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="t-signup-name">Full Name</Label>
@@ -634,7 +700,7 @@ export function TeacherAuthPage() {
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="t-signup-school">Official School / Institution Name</Label>
-                        <span className="text-[11px] text-primary font-medium">Compulsory</span>
+                        <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">Compulsory</span>
                       </div>
                       <Input
                         id="t-signup-school"
@@ -648,7 +714,7 @@ export function TeacherAuthPage() {
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="t-signup-email">School / Institutional Email</Label>
-                        <span className="text-[11px] text-primary font-medium">Compulsory</span>
+                        <span className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">Compulsory</span>
                       </div>
                       <Input
                         id="t-signup-email"
@@ -675,22 +741,22 @@ export function TeacherAuthPage() {
                       />
                     </div>
 
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1">
+                    <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 text-xs text-muted-foreground space-y-1">
                       <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                        <School className="size-3.5 text-primary" />
-                        Staff Verification Safeguard
+                        <School className="size-3.5 text-purple-600" />
+                        Instant Educator Access
                       </div>
                       <p>
-                        Teacher accounts receive authority to ingest custom syllabus mark schemes, calibrate exam anchors, and manage student grades. All accounts require administrator verification before activation.
+                        Teacher accounts receive authority to create Cambridge cohorts, assign essays, ingest mark schemes, and track diagnostics. Open access is active.
                       </p>
                     </div>
 
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={signUpBusy}>
-                      {signUpBusy ? "Submitting Application…" : "Submit Teacher Registration →"}
+                    <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white" disabled={signUpBusy}>
+                      {signUpBusy ? "Creating Teacher Account…" : "Create Teacher Account & Enter Workspace →"}
                     </Button>
 
                     <div className="pt-1 text-center text-xs text-muted-foreground">
-                      Already verified? Switch to the <strong>Teacher Sign In</strong> tab above.
+                      Already have an account? Switch to the <strong>Teacher Sign In</strong> tab above.
                     </div>
                   </form>
                 </TabsContent>
@@ -702,15 +768,15 @@ export function TeacherAuthPage() {
         {/* Feature Highlights Grid */}
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-2 p-3 rounded-xl border border-border bg-card/60">
-            <BookOpen className="size-4 text-primary shrink-0" />
+            <BookOpen className="size-4 text-purple-500 shrink-0" />
             <span>Mark Scheme &amp; RAG Ingestion</span>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-xl border border-border bg-card/60">
-            <ShieldCheck className="size-4 text-primary shrink-0" />
+            <ShieldCheck className="size-4 text-purple-500 shrink-0" />
             <span>Anchor Calibration Standards</span>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-xl border border-border bg-card/60">
-            <School className="size-4 text-primary shrink-0" />
+            <School className="size-4 text-purple-500 shrink-0" />
             <span>Cohort Classroom Management</span>
           </div>
         </div>

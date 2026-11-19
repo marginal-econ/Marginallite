@@ -65,18 +65,18 @@ export async function sendAccessInvitation(
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fdf2f8;padding:36px 14px">
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:2px solid #21172d;border-radius:24px;box-shadow:8px 8px 0 #21172d;overflow:hidden">
-        <tr><td style="height:10px;background:#ec4899"></td></tr>
+        <tr><td style="height:10px;background:#7c6df0"></td></tr>
         <tr><td style="padding:36px 38px 16px">
           <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-            <td style="width:44px;height:44px;background:#ec4899;border:2px solid #21172d;border-radius:13px;text-align:center;color:white;font-size:24px;font-weight:700">m</td>
+            <td style="width:44px;height:44px;background:#7c6df0;border:2px solid #21172d;border-radius:13px;text-align:center;color:white;font-size:24px;font-weight:700">m</td>
             <td style="padding-left:12px;font-size:22px;font-weight:700">Marginalite</td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:12px 38px 38px">
-          <p style="margin:0 0 12px;color:#ec4899;font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Your access is ready</p>
+          <p style="margin:0 0 12px;color:#7c6df0;font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Your access is ready</p>
           <h1 style="margin:0 0 18px;font-size:34px;line-height:1.12">Welcome to Marginalite, ${firstName}.</h1>
           <p style="margin:0 0 24px;color:#625d6c;font-size:17px;line-height:1.65">You’ve been invited to use Marginalite for Cambridge IGCSE Economics (0455). Choose a password to open your student account.</p>
-          <a href="${actionLink}" style="display:inline-block;background:#ec4899;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:15px 24px;border:2px solid #21172d;border-radius:13px;box-shadow:4px 4px 0 #21172d">Set up my account →</a>
+          <a href="${actionLink}" style="display:inline-block;background:#7c6df0;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:15px 24px;border:2px solid #21172d;border-radius:13px;box-shadow:4px 4px 0 #21172d">Set up my account →</a>
           <p style="margin:28px 0 0;color:#777180;font-size:13px;line-height:1.55">This secure invitation is for ${escapeHtml(member.email)}. If you weren’t expecting it, you can safely ignore this email.</p>
         </td></tr>
       </table>

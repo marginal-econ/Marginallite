@@ -8,6 +8,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
+import { Minimize2 } from "lucide-react";
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 const PRODUCT_LINKS = [
@@ -87,7 +88,7 @@ function FooterWordmark() {
           copy back out of it — the remainder is a uniform 1.5px edge around
           the union of every contour, with no internal seams. */}
       <svg width="0" height="0" className="absolute" aria-hidden="true" focusable="false">
-        <filter id="marginalite-wordmark-outline" colorInterpolationFilters="sRGB">
+        <filter id="marginal-wordmark-outline" colorInterpolationFilters="sRGB">
           <feMorphology in="SourceAlpha" operator="erode" radius="1.5" result="eroded" />
           <feComposite in="SourceGraphic" in2="eroded" operator="out" />
         </filter>
@@ -100,10 +101,10 @@ function FooterWordmark() {
             className="m-0 block text-center font-bold whitespace-nowrap text-foreground opacity-15"
             style={{
               ...WORDMARK_TYPE,
-              filter: "url(#marginalite-wordmark-outline)",
+              filter: "url(#marginal-wordmark-outline)",
             }}
           >
-            MARGINALITE
+            MARGINAL
           </p>
 
           {/* Shine: the same word filled with a colour ramp, revealed only
@@ -114,7 +115,7 @@ function FooterWordmark() {
               ...WORDMARK_TYPE,
               opacity: "var(--shine)",
               backgroundImage:
-                "linear-gradient(100deg, #f472b6 0%, #fb923c 22%, #fbbf24 40%, #34d399 58%, #38bdf8 78%, #f43f5e 100%)",
+                "linear-gradient(100deg, #a78bfa 0%, #fb923c 22%, #fbbf24 40%, #34d399 58%, #38bdf8 78%, #a78bfa 100%)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -125,7 +126,7 @@ function FooterWordmark() {
                 "radial-gradient(18rem circle at var(--shine-x) var(--shine-y), #000 0%, rgba(0,0,0,0.55) 45%, transparent 72%)",
             }}
           >
-            MARGINALITE
+            MARGINAL
           </p>
         </div>
       </div>
@@ -133,7 +134,7 @@ function FooterWordmark() {
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ onToggleMinimalist }: { onToggleMinimalist?: () => void } = {}) {
   return (
     <footer className="relative overflow-hidden border-t border-border bg-background text-foreground">
       <div
@@ -146,15 +147,14 @@ export function SiteFooter() {
           <div>
             <span className="flex items-center gap-2.5">
               <img
-                src="/marginalite-mark.svg"
-                alt=""
-                aria-hidden="true"
+                src="/marginal-m-icon-clean.png"
+                alt="Marginalite AI Cambridge Economics 0455 Prep logo"
                 className="size-9 object-contain"
               />
               <span className="font-semibold">Marginalite</span>
             </span>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Cambridge IGCSE Economics (0455) responses, marked to the syllabus your school actually
+              IGCSE 0455 Economics (0455) essays, marked to the syllabus your school actually
               teaches — with the AO breakdown that says where the grade went.
             </p>
           </div>
@@ -164,8 +164,8 @@ export function SiteFooter() {
               About Marginalite
             </p>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Built by Saikrish and Suthir for one syllabus — Cambridge IGCSE Economics (0455). We
-              are closing the gap between writing a response and knowing exactly how to improve it.
+              Built by Saikrish and Suthir for one syllabus — IGCSE 0455 Economics (0455). We
+              are closing the gap between writing an essay and knowing exactly how to improve it.
             </p>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="Marginalite facts">
               <span className="rounded-full border border-border bg-surface/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -247,7 +247,7 @@ export function SiteFooter() {
           <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
             Marginalite is an independent study tool. It is not affiliated with, endorsed by, connected
             to, or in partnership with Cambridge Assessment International Education, Cambridge
-            University Press &amp; Assessment, or the University of Cambridge. “Cambridge IGCSE
+            University Press &amp; Assessment, or the University of Cambridge. “IGCSE 0455
             Economics (0455)” is used only to describe the syllabus this tool supports. Marks
             produced by Marginalite are a second opinion for revision; they are not official Cambridge
             marks and carry no weight in any qualification.
@@ -267,6 +267,17 @@ export function SiteFooter() {
             <Link to="/privacy" className="transition-colors hover:text-foreground">
               Privacy
             </Link>
+            {onToggleMinimalist ? (
+              <button
+                type="button"
+                onClick={onToggleMinimalist}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title="Switch to Minimalist View (Zero animations, clean screen)"
+              >
+                <Minimize2 className="size-3 text-primary" />
+                <span>Minimalist View</span>
+              </button>
+            ) : null}
             <span className="ml-auto">Built for one syllabus, and nothing else.</span>
           </div>
         </div>

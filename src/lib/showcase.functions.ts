@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { unwrapData } from "@/lib/safe-validator";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
-import { isAdmin } from "@/lib/auth-admin";
+import { unwrapData } from "@/lib/safe-validator";
+import { isAdmin as checkIsAdmin } from "@/lib/auth-admin";
 
 export type ShowcaseAoScore = {
   awarded: number;
@@ -43,12 +43,139 @@ export type ShowcaseEssayItem = {
   author_initials: string;
   showcased_at: string;
   is_hidden?: boolean;
+  is_removed?: boolean;
   source?: "student_auto" | "teacher_model" | "cambridge_model" | "admin_added";
 };
 
-// In-memory / server state for admin overrides
-const ADMIN_HIDDEN_ESSAY_IDS = new Set<string>();
-const ADMIN_CUSTOM_EXEMPLARS: ShowcaseEssayItem[] = [];
+export type ShowcaseModerationData = {
+  hidden_ids: string[];
+  removed_ids: string[];
+  custom_exemplars: ShowcaseEssayItem[];
+};
+
+// Edge-resilient in-memory cache with short TTL backed by persistent database storage
+let cachedModeration: ShowcaseModerationData | null = null;
+let cachedModerationAt = 0;
+const CACHE_TTL_MS = 15_000;
+
+async function loadShowcaseModeration(client: any): Promise<ShowcaseModerationData> {
+  const now = Date.now();
+  if (cachedModeration && now - cachedModerationAt < CACHE_TTL_MS) {
+    return cachedModeration;
+  }
+
+  const result: ShowcaseModerationData = {
+    hidden_ids: [],
+    removed_ids: [],
+    custom_exemplars: [],
+  };
+
+  // 1. Primary Store: definitions table key '__SYS_SHOWCASE_MODERATION__'
+  try {
+    const { data: defRow, error: defErr } = await client
+      .from("definitions")
+      .select("definition_text")
+      .eq("term", "__SYS_SHOWCASE_MODERATION__")
+      .maybeSingle();
+
+    if (!defErr && defRow?.definition_text) {
+      const parsed = JSON.parse(defRow.definition_text);
+      if (parsed && typeof parsed === "object") {
+        result.hidden_ids = Array.isArray(parsed.hidden_ids) ? parsed.hidden_ids : [];
+        result.removed_ids = Array.isArray(parsed.removed_ids) ? parsed.removed_ids : [];
+        result.custom_exemplars = Array.isArray(parsed.custom_exemplars) ? parsed.custom_exemplars : [];
+        cachedModeration = result;
+        cachedModerationAt = now;
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed reading showcase moderation from definitions table:", err);
+  }
+
+  // 2. Secondary Store: site_settings table (JSONB column 'value.showcase_moderation')
+  try {
+    const { data: settingsRow, error: sErr } = await client
+      .from("site_settings")
+      .select("value")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (!sErr && settingsRow?.value && typeof settingsRow.value === "object") {
+      const mod = (settingsRow.value as any).showcase_moderation;
+      if (mod && typeof mod === "object") {
+        result.hidden_ids = Array.isArray(mod.hidden_ids) ? mod.hidden_ids : [];
+        result.removed_ids = Array.isArray(mod.removed_ids) ? mod.removed_ids : [];
+        result.custom_exemplars = Array.isArray(mod.custom_exemplars) ? mod.custom_exemplars : [];
+        cachedModeration = result;
+        cachedModerationAt = now;
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed reading showcase moderation from site_settings table:", err);
+  }
+
+  cachedModeration = result;
+  cachedModerationAt = now;
+  return result;
+}
+
+async function saveShowcaseModeration(client: any, data: ShowcaseModerationData): Promise<void> {
+  // Update cache immediately
+  cachedModeration = data;
+  cachedModerationAt = Date.now();
+
+  const payloadStr = JSON.stringify(data);
+
+  // 1. Primary: Save to definitions table
+  try {
+    const { data: existing } = await client
+      .from("definitions")
+      .select("id")
+      .eq("term", "__SYS_SHOWCASE_MODERATION__")
+      .maybeSingle();
+
+    if (existing?.id) {
+      await client
+        .from("definitions")
+        .update({
+          definition_text: payloadStr,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+    } else {
+      await client.from("definitions").insert({
+        term: "__SYS_SHOWCASE_MODERATION__",
+        definition_text: payloadStr,
+        category: "system_config",
+        source_label: "admin_showcase_moderation",
+      });
+    }
+  } catch (err) {
+    console.warn("Failed saving showcase moderation to definitions table:", err);
+  }
+
+  // 2. Secondary: Save to site_settings table
+  try {
+    const { data: row } = await client
+      .from("site_settings")
+      .select("value")
+      .eq("id", 1)
+      .maybeSingle();
+    const existingVal = row?.value && typeof row.value === "object" ? row.value : {};
+    await client.from("site_settings").upsert({
+      id: 1,
+      value: {
+        ...existingVal,
+        showcase_moderation: data,
+      },
+      updated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn("Failed saving showcase moderation to site_settings table:", err);
+  }
+}
 
 // Built-in Cambridge exemplar storage (AI model answers removed in favor of real student distinction submissions)
 const CAMBRIDGE_SHOWCASE_EXEMPLARS: ShowcaseEssayItem[] = [];
@@ -117,12 +244,14 @@ export const listShowcaseEssays = createServerFn({ method: "GET" })
     // 1. Decoupled, schema-resilient database query for student and teacher submissions
     try {
       const client = await getAdminDatabaseClient(context.supabase);
+      const mod = await loadShowcaseModeration(client);
+      const blockedIds = new Set([...mod.hidden_ids, ...mod.removed_ids]);
 
-      // Query raw essay_versions directly without fragile relational joins
+      // Query raw essay_versions directly with showcased flags
       const { data: dbVersions, error: vError } = await client
         .from("essay_versions")
         .select(
-          "id, essay_id, user_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, essay_text, grading, created_at",
+          "id, essay_id, user_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, essay_text, grading, created_at, showcased, showcase_consented",
         )
         .not("total_mark", "is", null)
         .order("created_at", { ascending: false })
@@ -199,15 +328,21 @@ export const listShowcaseEssays = createServerFn({ method: "GET" })
           const totalMark = row.total_mark;
           const userRole = roleMap.get(row.user_id);
           const isTeacher = userRole === "teacher";
+          const versionId = row.id as string;
+          const essayId = row.essay_id as string;
+
+          // PERMANENT EXCLUSION 1: Blacklisted in persistent moderation store
+          if (blockedIds.has(versionId) || (essayId && blockedIds.has(essayId))) {
+            continue;
+          }
+
+          // PERMANENT EXCLUSION 2: Explicitly un-showcased or removed in database row
+          if (row.showcased === false && row.showcase_consented === false) {
+            continue;
+          }
 
           // Qualifies if teacher response or score meets distinction threshold (e.g. 10/12, 8/8, 15/20)
           if (totalMark !== null && (isTeacher || isShowcaseScore(totalMark, maxMark))) {
-            const versionId = row.id as string;
-            // Check if hidden by administrator
-            if (ADMIN_HIDDEN_ESSAY_IDS.has(versionId) || ADMIN_HIDDEN_ESSAY_IDS.has(row.essay_id)) {
-              continue;
-            }
-
             let parsedGrading: ShowcaseGrading | null = null;
             if (typeof row.grading === "string") {
               try {
@@ -231,9 +366,9 @@ export const listShowcaseEssays = createServerFn({ method: "GET" })
               : "Cambridge Economics";
 
             results.push({
-              essay_id: row.essay_id,
+              essay_id: essayId,
               version_id: versionId,
-              question: essayMeta?.question || "Cambridge 0455 Economics Question",
+              question: essayMeta?.question || "Cambridge IGCSE 0455 Economics Question",
               max_mark: maxMark,
               total_mark: totalMark,
               ao1_awarded: row.ao1_awarded ?? null,
@@ -254,38 +389,39 @@ export const listShowcaseEssays = createServerFn({ method: "GET" })
           }
         }
       }
+
+      // 2. Append Cambridge Model Answers & Admin Custom Exemplars (strictly filtered)
+      const visibleCambridge = CAMBRIDGE_SHOWCASE_EXEMPLARS.filter(
+        (e) => !blockedIds.has(e.version_id) && !blockedIds.has(e.essay_id) && !e.is_hidden,
+      );
+      const visibleCustom = mod.custom_exemplars.filter(
+        (e) => !blockedIds.has(e.version_id) && !blockedIds.has(e.essay_id) && !e.is_hidden,
+      );
+
+      let combined = [...visibleCustom, ...results, ...visibleCambridge];
+
+      // Filter by topic if requested
+      if (data.topicId) {
+        combined = combined.filter((e) => e.topic_id === data.topicId);
+      }
+
+      // Filter by tariff if requested
+      if (data.tariff) {
+        combined = combined.filter((e) => e.max_mark === data.tariff);
+      }
+
+      // Sort by highest mark percentage first, then date
+      combined.sort((a, b) => {
+        const scoreDiff = b.total_mark / b.max_mark - a.total_mark / a.max_mark;
+        if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
+        return new Date(b.showcased_at).getTime() - new Date(a.showcased_at).getTime();
+      });
+
+      return combined.slice(0, data.limit ?? 100);
     } catch (err) {
       console.warn("Database query for showcase essays encountered error:", err);
+      return [];
     }
-
-    // 2. Append Cambridge Model Answers & Admin Custom Exemplars
-    const visibleCambridge = CAMBRIDGE_SHOWCASE_EXEMPLARS.filter(
-      (e) => !ADMIN_HIDDEN_ESSAY_IDS.has(e.version_id) && !ADMIN_HIDDEN_ESSAY_IDS.has(e.essay_id),
-    );
-    const visibleCustom = ADMIN_CUSTOM_EXEMPLARS.filter(
-      (e) => !ADMIN_HIDDEN_ESSAY_IDS.has(e.version_id) && !ADMIN_HIDDEN_ESSAY_IDS.has(e.essay_id),
-    );
-
-    let combined = [...visibleCustom, ...results, ...visibleCambridge];
-
-    // Filter by topic if requested
-    if (data.topicId) {
-      combined = combined.filter((e) => e.topic_id === data.topicId);
-    }
-
-    // Filter by tariff if requested
-    if (data.tariff) {
-      combined = combined.filter((e) => e.max_mark === data.tariff);
-    }
-
-    // Sort by highest mark percentage first, then date
-    combined.sort((a, b) => {
-      const scoreDiff = b.total_mark / b.max_mark - a.total_mark / a.max_mark;
-      if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
-      return new Date(b.showcased_at).getTime() - new Date(a.showcased_at).getTime();
-    });
-
-    return combined.slice(0, data.limit ?? 100);
   });
 
 /* ------------------------------------------------------------------ */
@@ -298,23 +434,26 @@ export const listShowcaseEssays = createServerFn({ method: "GET" })
 export const adminListShowcaseEssays = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const userIsAdmin = isAdmin({
+    const isAdmin = checkIsAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!userIsAdmin) throw new Error("Administrator permissions required.");
+    if (!isAdmin) throw new Error("Administrator permissions required. Marginal is the platform administrator.");
 
     const allItems: ShowcaseEssayItem[] = [];
 
     // Decoupled DB query
     try {
       const client = await getAdminDatabaseClient(context.supabase);
+      const mod = await loadShowcaseModeration(client);
+      const hiddenSet = new Set(mod.hidden_ids);
+      const removedSet = new Set(mod.removed_ids);
 
       const { data: dbVersions } = await client
         .from("essay_versions")
         .select(
-          "id, essay_id, user_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, essay_text, grading, created_at",
+          "id, essay_id, user_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, essay_text, grading, created_at, showcased, showcase_consented",
         )
         .not("total_mark", "is", null)
         .order("created_at", { ascending: false });
@@ -388,8 +527,14 @@ export const adminListShowcaseEssays = createServerFn({ method: "GET" })
 
           if (totalMark !== null && (isTeacher || isShowcaseScore(totalMark, maxMark))) {
             const versionId = row.id as string;
+            const essayId = row.essay_id as string;
+
+            const isRemoved = removedSet.has(versionId) || (essayId ? removedSet.has(essayId) : false);
             const isHidden =
-              ADMIN_HIDDEN_ESSAY_IDS.has(versionId) || ADMIN_HIDDEN_ESSAY_IDS.has(row.essay_id);
+              isRemoved ||
+              hiddenSet.has(versionId) ||
+              (essayId ? hiddenSet.has(essayId) : false) ||
+              (row.showcased === false && row.showcase_consented === false);
 
             let parsedGrading: ShowcaseGrading | null = null;
             if (typeof row.grading === "string") {
@@ -412,9 +557,9 @@ export const adminListShowcaseEssays = createServerFn({ method: "GET" })
               : "Cambridge Economics";
 
             allItems.push({
-              essay_id: row.essay_id,
+              essay_id: essayId,
               version_id: versionId,
-              question: essayMeta?.question || "Cambridge 0455 Economics Question",
+              question: essayMeta?.question || "Cambridge IGCSE 0455 Economics Question",
               max_mark: maxMark,
               total_mark: totalMark,
               ao1_awarded: row.ao1_awarded ?? null,
@@ -427,6 +572,7 @@ export const adminListShowcaseEssays = createServerFn({ method: "GET" })
               author_initials: authorInitials,
               showcased_at: row.created_at,
               is_hidden: isHidden,
+              is_removed: isRemoved,
               source: isTeacher
                 ? "teacher_model"
                 : userRole === "admin"
@@ -436,52 +582,134 @@ export const adminListShowcaseEssays = createServerFn({ method: "GET" })
           }
         }
       }
+
+      // Append custom admin exemplars
+      for (const custom of mod.custom_exemplars) {
+        const isRemoved = removedSet.has(custom.version_id) || removedSet.has(custom.essay_id);
+        const isHidden =
+          isRemoved ||
+          Boolean(custom.is_hidden) ||
+          hiddenSet.has(custom.version_id) ||
+          hiddenSet.has(custom.essay_id);
+        allItems.push({
+          ...custom,
+          is_hidden: isHidden,
+          is_removed: isRemoved,
+          source: "admin_added",
+        });
+      }
+
+      // Append Cambridge exemplars
+      for (const ex of CAMBRIDGE_SHOWCASE_EXEMPLARS) {
+        const isRemoved = removedSet.has(ex.version_id) || removedSet.has(ex.essay_id);
+        const isHidden =
+          isRemoved ||
+          Boolean(ex.is_hidden) ||
+          hiddenSet.has(ex.version_id) ||
+          hiddenSet.has(ex.essay_id);
+        allItems.push({
+          ...ex,
+          is_hidden: isHidden,
+          is_removed: isRemoved,
+          source: "cambridge_model",
+        });
+      }
+
+      return allItems;
     } catch {
-      // Fallback
+      return [];
     }
-
-    // Append custom admin exemplars
-    for (const custom of ADMIN_CUSTOM_EXEMPLARS) {
-      allItems.push({
-        ...custom,
-        is_hidden: ADMIN_HIDDEN_ESSAY_IDS.has(custom.version_id),
-        source: "admin_added",
-      });
-    }
-
-    // Append Cambridge exemplars
-    for (const ex of CAMBRIDGE_SHOWCASE_EXEMPLARS) {
-      allItems.push({
-        ...ex,
-        is_hidden: ADMIN_HIDDEN_ESSAY_IDS.has(ex.version_id),
-        source: "cambridge_model",
-      });
-    }
-
-    return allItems;
   });
 
 /**
- * Toggle visibility of an essay in the showcase (hide / unhide).
+ * Toggle visibility of an essay in the showcase (hide / restore).
  */
 export const adminToggleShowcaseVisibility = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ versionId: z.string(), hidden: z.boolean() }).parse(input),
+    z
+      .object({
+        versionId: z.string(),
+        hidden: z.boolean(),
+        essayId: z.string().optional(),
+      })
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
-    const userIsAdmin = isAdmin({
+    const isAdmin = checkIsAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!userIsAdmin) throw new Error("Administrator permissions required.");
+    if (!isAdmin) throw new Error("Administrator permissions required. Marginal is the platform administrator.");
+
+    const client = await getAdminDatabaseClient(context.supabase);
+    const mod = await loadShowcaseModeration(client);
+
+    const hiddenSet = new Set(mod.hidden_ids);
+    const removedSet = new Set(mod.removed_ids);
 
     if (data.hidden) {
-      ADMIN_HIDDEN_ESSAY_IDS.add(data.versionId);
+      // HIDE from student public showcase
+      hiddenSet.add(data.versionId);
+      if (data.essayId) hiddenSet.add(data.essayId);
+      removedSet.delete(data.versionId);
+      if (data.essayId) removedSet.delete(data.essayId);
+
+      for (const c of mod.custom_exemplars) {
+        if (c.version_id === data.versionId || (data.essayId && c.essay_id === data.essayId)) {
+          c.is_hidden = true;
+        }
+      }
+
+      try {
+        await client
+          .from("essay_versions")
+          .update({ showcased: false, showcase_consented: false })
+          .eq("id", data.versionId);
+        if (data.essayId) {
+          await client
+            .from("essay_versions")
+            .update({ showcased: false, showcase_consented: false })
+            .eq("essay_id", data.essayId);
+        }
+      } catch (err) {
+        console.warn("Failed updating essay_versions for hidden showcase:", err);
+      }
     } else {
-      ADMIN_HIDDEN_ESSAY_IDS.delete(data.versionId);
+      // RESTORE to student showcase
+      hiddenSet.delete(data.versionId);
+      removedSet.delete(data.versionId);
+      if (data.essayId) {
+        hiddenSet.delete(data.essayId);
+        removedSet.delete(data.essayId);
+      }
+
+      for (const c of mod.custom_exemplars) {
+        if (c.version_id === data.versionId || (data.essayId && c.essay_id === data.essayId)) {
+          c.is_hidden = false;
+        }
+      }
+
+      try {
+        await client
+          .from("essay_versions")
+          .update({ showcased: true, showcase_consented: true })
+          .eq("id", data.versionId);
+        if (data.essayId) {
+          await client
+            .from("essay_versions")
+            .update({ showcased: true, showcase_consented: true })
+            .eq("essay_id", data.essayId);
+        }
+      } catch (err) {
+        console.warn("Failed updating essay_versions for restored showcase:", err);
+      }
     }
+
+    mod.hidden_ids = Array.from(hiddenSet);
+    mod.removed_ids = Array.from(removedSet);
+    await saveShowcaseModeration(client, mod);
 
     return { ok: true, versionId: data.versionId, hidden: data.hidden };
   });
@@ -508,15 +736,15 @@ export const adminAddShowcaseExemplar = createServerFn({ method: "POST" })
           .enum(["student_auto", "teacher_model", "cambridge_model", "admin_added"])
           .optional(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
-    const userIsAdmin = isAdmin({
+    const isAdmin = checkIsAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!userIsAdmin) throw new Error("Administrator permissions required.");
+    if (!isAdmin) throw new Error("Administrator permissions required. Marginal is the platform administrator.");
 
     const id = `custom-ex-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const newExemplar: ShowcaseEssayItem = {
@@ -563,40 +791,96 @@ export const adminAddShowcaseExemplar = createServerFn({ method: "POST" })
       showcased_at: new Date().toISOString(),
       source: data.source || "admin_added",
       is_hidden: false,
+      is_removed: false,
     };
 
-    ADMIN_CUSTOM_EXEMPLARS.unshift(newExemplar);
+    const client = await getAdminDatabaseClient(context.supabase);
+    const mod = await loadShowcaseModeration(client);
+    mod.custom_exemplars.unshift(newExemplar);
+    await saveShowcaseModeration(client, mod);
+
     return { ok: true, exemplar: newExemplar };
   });
 
 /**
- * Remove or delete an essay from the showcase.
+ * Remove or delete an essay from the showcase permanently.
  */
 export const adminDeleteShowcaseExemplar = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => {
-    const raw = unwrapData(input);
-    const id = typeof raw === "string" ? raw : (raw as any)?.id;
-    return z.object({ id: z.string() }).parse({ id });
-  })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        essayId: z.string().optional(),
+      })
+      .parse(unwrapData(input)),
+  )
   .handler(async ({ data, context }) => {
-    const userIsAdmin = isAdmin({
+    const isAdmin = checkIsAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!userIsAdmin) throw new Error("Administrator permissions required.");
+    if (!isAdmin) throw new Error("Administrator permissions required. Marginal is the platform administrator.");
 
-    // Remove from custom exemplars if present
-    const customIdx = ADMIN_CUSTOM_EXEMPLARS.findIndex(
-      (e) => e.version_id === data.id || e.essay_id === data.id,
-    );
-    if (customIdx !== -1) {
-      ADMIN_CUSTOM_EXEMPLARS.splice(customIdx, 1);
-    } else {
-      // Add to hidden set
-      ADMIN_HIDDEN_ESSAY_IDS.add(data.id);
+    const client = await getAdminDatabaseClient(context.supabase);
+    const mod = await loadShowcaseModeration(client);
+
+    // Look up essay_id if not provided
+    let targetEssayId = data.essayId;
+    if (!targetEssayId) {
+      try {
+        const { data: verRow } = await client
+          .from("essay_versions")
+          .select("essay_id")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (verRow?.essay_id) {
+          targetEssayId = verRow.essay_id;
+        }
+      } catch {
+        /* ignore */
+      }
     }
 
-    return { ok: true, id: data.id };
+    // Remove from custom exemplars if present
+    mod.custom_exemplars = mod.custom_exemplars.filter(
+      (e) =>
+        e.version_id !== data.id &&
+        e.essay_id !== data.id &&
+        (!targetEssayId || e.essay_id !== targetEssayId),
+    );
+
+    // Permanently blacklist in removed_ids and hidden_ids
+    const removedSet = new Set(mod.removed_ids);
+    const hiddenSet = new Set(mod.hidden_ids);
+    removedSet.add(data.id);
+    hiddenSet.add(data.id);
+    if (targetEssayId) {
+      removedSet.add(targetEssayId);
+      hiddenSet.add(targetEssayId);
+    }
+    mod.removed_ids = Array.from(removedSet);
+    mod.hidden_ids = Array.from(hiddenSet);
+
+    // Update database row: permanently set showcased = false, showcase_consented = false
+    try {
+      await client
+        .from("essay_versions")
+        .update({ showcased: false, showcase_consented: false })
+        .eq("id", data.id);
+      if (targetEssayId) {
+        await client
+          .from("essay_versions")
+          .update({ showcased: false, showcase_consented: false })
+          .eq("essay_id", targetEssayId);
+      }
+    } catch (err) {
+      console.warn("Failed updating essay_versions on deletion:", err);
+    }
+
+    // Persist to definitions table and site_settings table
+    await saveShowcaseModeration(client, mod);
+
+    return { ok: true, id: data.id, essayId: targetEssayId };
   });

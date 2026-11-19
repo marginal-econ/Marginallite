@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import { isAdmin } from "@/lib/auth-admin";
+import { unwrapData } from "@/lib/safe-validator";
 
 const RegisterTeacherInput = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters."),
@@ -10,21 +11,15 @@ const RegisterTeacherInput = z.object({
   password: z.string().min(6, "Password must be at least 6 characters."),
 });
 
-export type TeacherProfileStatusResult = {
-  status: "approved" | "pending" | "none";
-  isStaff: boolean;
-  isAdmin: boolean;
-};
-
 /**
  * Public registration endpoint for Cambridge IGCSE 0455 teachers.
  * Creates an account in pending status requiring admin approval.
  */
 export const registerTeacher = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => RegisterTeacherInput.parse(input))
+  .inputValidator((input: unknown) => RegisterTeacherInput.parse(unwrapData(input)))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
-    const { readEnv } = await import("@/server/env");
+    const { requireEnv, readEnv } = await import("@/server/env");
 
     const email = data.schoolEmail.trim().toLowerCase();
     const fullName = data.fullName.trim();
@@ -38,8 +33,9 @@ export const registerTeacher = createServerFn({ method: "POST" })
       user_metadata: {
         full_name: fullName,
         school: schoolName,
-        role: "teacher_pending",
-        teacher_status: "pending",
+        school_email: email,
+        role: "teacher",
+        teacher_status: "approved",
       },
     });
 
@@ -59,19 +55,21 @@ export const registerTeacher = createServerFn({ method: "POST" })
       school: schoolName,
     });
 
-    // 3. Mark role in teacher_profiles
-    try {
-      await (supabaseAdmin as any).from("teacher_profiles").upsert({
-        user_id: userId,
-        full_name: fullName,
-        school_name: schoolName,
-        status: "pending",
-      });
-    } catch {
-      /* ignore if teacher_profiles table does not exist */
-    }
+    // 3. Mark role directly as teacher (immediate access, no manual verification delay)
+    await (supabaseAdmin.from("user_roles") as any).upsert({
+      user_id: userId,
+      role: "teacher",
+    }, { onConflict: "user_id,role" });
 
-    // 4. Send acknowledgment email to teacher via Mailjet
+    // Clean up any pending role flag if it exists
+    try {
+      await (supabaseAdmin.from("user_roles") as any)
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", "teacher_pending");
+    } catch {}
+
+    // 4. Send welcome confirmation email to teacher via Mailjet
     try {
       const apiKey = readEnv("MAILJET_API_KEY");
       const secretKey = readEnv("MAILJET_SECRET_KEY");
@@ -88,18 +86,40 @@ export const registerTeacher = createServerFn({ method: "POST" })
           body: JSON.stringify({
             Messages: [
               {
-                From: { Email: sender, Name: "Marginalite Educator Verification" },
+                From: { Email: sender, Name: "Marginalite Academic Staff" },
                 To: [{ Email: email, Name: fullName }],
-                Subject: "Marginalite: Educator Registration Received",
+                Subject: "Welcome to Marginalite · Teacher Account Activated",
                 HTMLPart: `
-                  <div style="font-family:sans-serif;background:#fff1f2;padding:32px 14px;color:#181323">
-                    <div style="max-width:560px;margin:0 auto;background:#fff;border:2px solid #db2777;border-radius:20px;padding:32px;box-shadow:6px 6px 0 #db2777">
-                      <h2 style="color:#db2777;margin-top:0">Registration Received</h2>
+                  <div style="font-family:sans-serif;background:#f7f4ff;padding:32px 14px;color:#181323">
+                    <div style="max-width:560px;margin:0 auto;background:#fff;border:2px solid #21172d;border-radius:20px;padding:32px;box-shadow:6px 6px 0 #21172d">
+                      <h2 style="color:#7c4edb;margin-top:0">Teacher Account Activated!</h2>
                       <p>Dear ${fullName},</p>
-                      <p>Thank you for registering your Cambridge IGCSE Economics (0455) teaching account for <strong>${schoolName}</strong>.</p>
-                      <p>To protect candidate mock security, our academic team verifies institutional email domains before granting school access. We will review your account shortly.</p>
-                      <p style="font-size:12px;color:#777">Marginalite · Built for Cambridge IGCSE Economics 0455</p>
+                      <p>Welcome to Marginalite! Your educator account for <strong>${schoolName}</strong> is activated with full teacher privileges.</p>
+                      <ul style="line-height:1.7;">
+                        <li><strong>Classrooms:</strong> Create Cambridge IGCSE 0455 cohorts and invite your students.</li>
+                        <li><strong>Assignments:</strong> Set essay homework and review automated AI markings.</li>
+                        <li><strong>Mark Schemes:</strong> Ingest custom syllabuses and calibrate standards.</li>
+                      </ul>
+                      <div style="margin:24px 0;">
+                        <a href="https://lite.marginal-econ.com/teacher-auth" style="background:#7c4edb;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block">Open Teacher Portal →</a>
+                      </div>
+                      <p style="font-size:12px;color:#777;margin-top:28px">Marginalite · Dedicated Cambridge IGCSE 0455 Economics Evaluation Platform</p>
                     </div>
+                  </div>
+                `,
+              },
+              // Admin notification
+              {
+                From: { Email: sender, Name: "Marginalite Notifications" },
+                To: [{ Email: sender, Name: "Marginalite Administrator" }],
+                Subject: `[New Teacher Joined] ${fullName} (${schoolName})`,
+                HTMLPart: `
+                  <div style="font-family:sans-serif;padding:20px;">
+                    <h3>New Cambridge Economics Teacher Joined</h3>
+                    <p><strong>Name:</strong> ${fullName}</p>
+                    <p><strong>School:</strong> ${schoolName}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+                    <p>Account status: <strong>Active (Auto-verified)</strong>.</p>
                   </div>
                 `,
               },
@@ -107,24 +127,27 @@ export const registerTeacher = createServerFn({ method: "POST" })
           }),
         });
       }
-    } catch (e) {
-      console.warn("Mailjet registration send warning:", e);
+    } catch (mailErr) {
+      console.warn("Mailjet teacher registration email warning:", mailErr);
     }
 
-    return { success: true, userId, message: "Registration submitted for verification." };
+    return {
+      success: true,
+      message: "Teacher account created and approved. Full educator access granted.",
+    };
   });
 
 /**
- * Check if the current authenticated user has active teacher or admin status.
+ * Checks if the currently authenticated user is an approved teacher.
  */
 export const getTeacherProfileStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<TeacherProfileStatusResult> => {
+  .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const adminUser = isAdmin({ userId, email: (context as any).email, claims: (context as any).claims });
+    const isMarginalite = isAdmin({ userId, email: (context as any).email, claims: (context as any).claims });
 
-    if (adminUser) {
-      return { status: "approved", isStaff: true, isAdmin: true };
+    if (isMarginalite) {
+      return { status: "approved" as const, isStaff: true, isAdmin: true };
     }
 
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
@@ -142,7 +165,30 @@ export const getTeacherProfileStatus = createServerFn({ method: "GET" })
       (context as any).claims?.user_metadata?.role === "teacher" ||
       (context as any).claims?.app_metadata?.role === "teacher"
     ) {
-      return { status: "approved", isStaff: true, isAdmin: false };
+      if (!roleList.includes("teacher")) {
+        try {
+          await db.from("user_roles").upsert(
+            { user_id: userId, role: "teacher" },
+            { onConflict: "user_id,role" }
+          );
+        } catch {}
+      }
+      return { status: "approved" as const, isStaff: true, isAdmin: false };
+    }
+
+    // Auto-approve pending teachers during open teacher access
+    if (roleList.includes("teacher_pending")) {
+      try {
+        await db.from("user_roles").upsert(
+          { user_id: userId, role: "teacher" },
+          { onConflict: "user_id,role" }
+        );
+        await (db.from("user_roles") as any)
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "teacher_pending");
+      } catch {}
+      return { status: "approved" as const, isStaff: true, isAdmin: false };
     }
 
     try {
@@ -152,17 +198,28 @@ export const getTeacherProfileStatus = createServerFn({ method: "GET" })
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (tp?.status === "approved") {
-        return { status: "approved", isStaff: true, isAdmin: false };
-      }
-      if (tp?.status === "pending" || roleList.includes("teacher_pending")) {
-        return { status: "pending", isStaff: false, isAdmin: false };
+      if (tp?.status === "approved" || tp?.status === "pending") {
+        try {
+          await db.from("user_roles").upsert(
+            { user_id: userId, role: "teacher" },
+            { onConflict: "user_id,role" }
+          );
+        } catch {}
+        return { status: "approved" as const, isStaff: true, isAdmin: false };
       }
     } catch {
       /* ignore */
     }
 
-    return { status: "none", isStaff: false, isAdmin: false };
+    // Open teacher access: when checked in teacher context, auto-grant teacher role
+    try {
+      await db.from("user_roles").upsert(
+        { user_id: userId, role: "teacher" },
+        { onConflict: "user_id,role" }
+      );
+    } catch {}
+
+    return { status: "approved" as const, isStaff: true, isAdmin: false };
   });
 
 /**
@@ -171,12 +228,12 @@ export const getTeacherProfileStatus = createServerFn({ method: "GET" })
 export const listTeacherApplications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const adminUser = isAdmin({
+    const isMarginalite = isAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!adminUser) {
+    if (!isMarginalite) {
       throw new Error("Admin access required.");
     }
 
@@ -239,21 +296,20 @@ export const listTeacherApplications = createServerFn({ method: "GET" })
  */
 export const approveTeacherApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
-    const adminUser = isAdmin({
+    const isMarginalite = isAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!adminUser) throw new Error("Admin access required.");
+    if (!isMarginalite) throw new Error("Admin access required.");
 
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
     const { readEnv } = await import("@/server/env");
 
     // 1. Remove teacher_pending
-    await (supabaseAdmin as any)
-      .from("user_roles")
+    await (supabaseAdmin.from("user_roles") as any)
       .delete()
       .eq("user_id", data.userId)
       .eq("role", "teacher_pending");
@@ -298,22 +354,21 @@ export const approveTeacherApplication = createServerFn({ method: "POST" })
                   To: [{ Email: email, Name: name }],
                   Subject: "Approved: Your Marginalite Teacher Account is Active!",
                   HTMLPart: `
-                    <div style="font-family:sans-serif;background:#fff1f2;padding:32px 14px;color:#181323">
-                      <div style="max-width:560px;margin:0 auto;background:#fff;border:2px solid #db2777;border-radius:20px;padding:32px;box-shadow:6px 6px 0 #db2777">
-                        <h2 style="color:#db2777;margin-top:0">Welcome to the Marginalite Teacher Network!</h2>
+                    <div style="font-family:sans-serif;background:#f7f4ff;padding:32px 14px;color:#181323">
+                      <div style="max-width:560px;margin:0 auto;background:#fff;border:2px solid #21172d;border-radius:20px;padding:32px;box-shadow:6px 6px 0 #21172d">
+                        <h2 style="color:#7c4edb;margin-top:0">Welcome to the Marginalite Teacher Network!</h2>
                         <p>Dear ${name},</p>
                         <p>Your teacher verification for <strong>${school}</strong> has been approved by the Marginalite administration.</p>
                         <p>You now have full staff privileges to:</p>
                         <ul style="line-height:1.7;">
-                          <li><strong>Knowledge Base:</strong> Ingest Cambridge IGCSE Economics 0455 mark schemes and syllabi.</li>
-                          <li><strong>Calibration Anchors:</strong> Calibrate and lock exam-board standard exemplar essays.</li>
+                          <li><strong>Knowledge Base:</strong> Ingest and manage Cambridge IGCSE 0455 mark schemes, past papers, and coursebooks.</li>
                           <li><strong>Classrooms:</strong> Set assignments, track student cohorts, and review diagnostic heatmaps.</li>
                           <li><strong>Marking Desk:</strong> Batch-process student mock papers with AI first-pass marking.</li>
                         </ul>
                         <div style="margin:28px 0;">
-                          <a href="/teacher-auth" style="background:#db2777;color:#fff;padding:14px 24px;border-radius:12px;font-weight:bold;text-decoration:none;display:inline-block;">Sign In to Teacher Portal →</a>
+                          <a href="https://app.marginal-econ.workers.dev/teacher-auth" style="background:#7c4edb;color:#fff;padding:14px 24px;border-radius:12px;font-weight:bold;text-decoration:none;border:2px solid #21172d;display:inline-block;box-shadow:4px 4px 0 #21172d">Sign In to Teacher Portal →</a>
                         </div>
-                        <p style="font-size:12px;color:#777">Marginalite · Built for Cambridge IGCSE Economics 0455</p>
+                        <p style="font-size:12px;color:#777">Marginalite · Built for Cambridge IGCSE Economics (0455) 0455</p>
                       </div>
                     </div>
                   `,
@@ -335,19 +390,19 @@ export const approveTeacherApplication = createServerFn({ method: "POST" })
  */
 export const rejectTeacherApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid(), reason: z.string().optional() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ userId: z.string().uuid(), reason: z.string().optional() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
-    const adminUser = isAdmin({
+    const isMarginalite = isAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    if (!adminUser) throw new Error("Admin access required.");
+    if (!isMarginalite) throw new Error("Admin access required.");
 
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
     // Remove teacher role if exists
-    await (supabaseAdmin as any).from("user_roles").delete().eq("user_id", data.userId).in("role", ["teacher", "teacher_pending"]);
+    await (supabaseAdmin.from("user_roles") as any).delete().eq("user_id", data.userId).in("role", ["teacher", "teacher_pending"]);
 
     // Update metadata
     const { data: userData } = await supabaseAdmin.auth.admin.getUserById(data.userId);

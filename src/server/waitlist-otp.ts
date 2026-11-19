@@ -52,15 +52,15 @@ function verificationEmailHtml(code: string, brand: EmailBrandSettings): string 
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fdf2f8;padding:36px 14px">
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:2px solid #21172d;border-radius:24px;box-shadow:8px 8px 0 #21172d;overflow:hidden">
-        <tr><td style="height:10px;background:#ec4899"></td></tr>
+        <tr><td style="height:10px;background:#7c6df0"></td></tr>
         <tr><td style="padding:30px 38px 20px;border-bottom:1px solid #e6dfef">
           <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-            <td style="width:44px;height:44px;background:#ec4899;border:2px solid #21172d;border-radius:13px;text-align:center;color:#ffffff;font-size:24px;font-weight:700">m</td>
+            <td style="width:44px;height:44px;background:#7c6df0;border:2px solid #21172d;border-radius:13px;text-align:center;color:#ffffff;font-size:24px;font-weight:700">m</td>
             <td style="padding-left:12px"><div style="font-size:22px;font-weight:700;color:#21172d">Marginalite</div><div style="font-size:12px;color:#726b7c">Cambridge IGCSE Economics (0455)</div></td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:32px 38px 36px">
-          <p style="margin:0 0 12px;color:#ec4899;font-size:12px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase">${escapeHtml(brand.eyebrow)}</p>
+          <p style="margin:0 0 12px;color:#7c6df0;font-size:12px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase">${escapeHtml(brand.eyebrow)}</p>
           <h1 style="margin:0 0 16px;font-size:32px;line-height:1.15;color:#181323">${escapeHtml(brand.heading)}</h1>
           <p style="margin:0 0 26px;color:#625d6c;font-size:16px;line-height:1.65">${escapeHtml(brand.intro)}</p>
           <table role="presentation" cellspacing="0" cellpadding="0" aria-label="Verification code"><tr>${digits}</tr></table>

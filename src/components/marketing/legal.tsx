@@ -39,7 +39,7 @@ export function LegalPage({
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-3 md:px-8">
           <Link to="/" className="group flex items-center gap-2.5">
             <img
-              src="/marginalite-mark.svg"
+              src="/marginal-m-icon-clean.png"
               alt=""
               aria-hidden="true"
               className="size-9 object-contain transition-transform duration-300 group-hover:-rotate-6"

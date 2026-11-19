@@ -4,17 +4,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, Menu, X } from "lucide-react";
+import { GraduationCap, Menu, School, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 
-type NavSection = { id: string; label: string; to?: string };
-
-const NAV_SECTIONS: NavSection[] = [
-  { id: "graded-exemplar", label: "Real Graded Essay" },
-  { id: "rag-engine", label: "RAG Engine & Syllabus" },
-  { id: "teachers-section", label: "For Teachers" },
+const NAV_SECTIONS: ReadonlyArray<{ id: string; label: string; to?: string }> = [
+  { id: "graded-exemplar", label: "Graded Essays" },
   { id: "tools", label: "Features" },
+  { id: "teachers-section", label: "For Teachers" },
   { id: "faq", label: "FAQ" },
 ];
 
@@ -67,14 +65,17 @@ export function SiteNavLinks() {
   const active = useScrollSpy(SECTION_IDS);
 
   return (
-    <nav aria-label="Sections" className="hidden items-center gap-7 text-sm font-medium lg:flex">
+    <nav
+      aria-label="Sections"
+      className="hidden items-center gap-3.5 xl:gap-6 2xl:gap-8 text-xs xl:text-sm font-medium lg:flex shrink-0 whitespace-nowrap"
+    >
       {NAV_SECTIONS.map((section) => {
-        if (section.to) {
+        if ("to" in section) {
           return (
             <Link
               key={section.id}
               to={section.to}
-              className="nav-link text-muted-foreground transition-colors hover:text-foreground"
+              className="nav-link whitespace-nowrap shrink-0 text-muted-foreground transition-colors hover:text-foreground text-xs xl:text-sm"
             >
               {section.label}
             </Link>
@@ -86,7 +87,7 @@ export function SiteNavLinks() {
             href={`#${section.id}`}
             aria-current={active === section.id ? "true" : undefined}
             className={cn(
-              "nav-link transition-colors",
+              "nav-link whitespace-nowrap shrink-0 transition-colors text-xs xl:text-sm py-0.5",
               active === section.id
                 ? "text-foreground font-semibold"
                 : "text-muted-foreground hover:text-foreground",
@@ -170,7 +171,7 @@ export function SiteNavMobile() {
       >
         <nav aria-label="Mobile sections" className="pop pop-in mt-2 overflow-hidden p-2">
           {NAV_SECTIONS.map((section) => {
-            if (section.to) {
+            if ("to" in section) {
               return (
                 <Link
                   key={section.id}
@@ -201,21 +202,57 @@ export function SiteNavMobile() {
               </a>
             );
           })}
-          <Link
-            to="/teacher-auth"
-            onClick={close}
-            className="mt-1 flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary"
-          >
-            <GraduationCap className="size-4" />
-            Teacher Portal
-          </Link>
-          <Link
-            to="/auth"
-            onClick={close}
-            className="mt-1.5 flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-semibold text-foreground"
-          >
-            Sign in
-          </Link>
+          <div className="mt-3 pt-3 border-t border-border/80 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1">
+              Student Access
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/auth"
+                onClick={close}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+              >
+                <GraduationCap className="size-3.5 text-primary" />
+                Sign in
+              </Link>
+              <Link
+                to="/auth"
+                search={{ tab: "signup" }}
+                onClick={close}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 border border-primary/30 px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary/20"
+              >
+                Create Account
+              </Link>
+            </div>
+
+            <div className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-1 pt-1">
+              Teacher &amp; School Access
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/teacher-auth"
+                search={{ tab: "signin" }}
+                onClick={close}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-2.5 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
+              >
+                <School className="size-3.5 text-purple-600 dark:text-purple-400" />
+                Teacher Sign In
+              </Link>
+              <Link
+                to="/teacher-auth"
+                search={{ tab: "signup" }}
+                onClick={close}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-600 text-white px-2.5 py-2 text-xs font-semibold hover:bg-purple-700 shadow-2xs"
+              >
+                <GraduationCap className="size-3.5 text-white" />
+                Teacher Sign Up
+              </Link>
+            </div>
+
+            <div className="pt-2 border-t border-border/80">
+              <ThemeToggle variant="menu-item" />
+            </div>
+          </div>
         </nav>
       </div>
     </>

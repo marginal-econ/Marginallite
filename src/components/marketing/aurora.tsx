@@ -91,11 +91,11 @@ void main() {
   float r2 = ribbon(q, 0.50, -0.11, 0.16, t + 21.0);
   float r3 = ribbon(q, 0.32, 0.08, 0.13, t + 47.0);
 
-  vec3 pink = mix(vec3(0.92, 0.35, 0.58), vec3(0.98, 0.42, 0.65), uDark);
-  vec3 cyan   = mix(vec3(0.42, 0.62, 0.95), vec3(0.24, 0.71, 0.99), uDark);
-  vec3 mint   = mix(vec3(0.40, 0.85, 0.75), vec3(0.30, 0.95, 0.73), uDark);
+  vec3 orchid     = mix(vec3(0.68, 0.56, 0.96), vec3(0.60, 0.48, 0.98), uDark);
+  vec3 periwinkle = mix(vec3(0.45, 0.58, 0.96), vec3(0.36, 0.55, 0.99), uDark);
+  vec3 lavender   = mix(vec3(0.78, 0.68, 0.98), vec3(0.66, 0.58, 0.96), uDark);
 
-  vec3 col = pink * r1 + cyan * r2 + mint * r3;
+  vec3 col = orchid * r1 + periwinkle * r2 + lavender * r3;
   float a = (r1 + r2 + r3);
 
   /* Stars, night only: a sparse lattice of points, each on its own phase. */

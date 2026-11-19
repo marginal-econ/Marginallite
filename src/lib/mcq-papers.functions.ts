@@ -113,6 +113,28 @@ export const listMcqPapers = createServerFn({ method: "GET" })
     };
   });
 
+/** Reliable single-paper answer-key lookup for live practice & tutor mode. */
+export const getMcqPaperAnswerKey = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ paperId: z.string().min(1) }).parse(unwrapData(input)),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: paper, error } = await context.supabase
+      .from("mcq_pdf_papers")
+      .select("id, title, question_count, answer_key, qp_url, ms_url")
+      .eq("id", data.paperId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!paper) return { answerKey: {} as Record<string, "A" | "B" | "C" | "D">, questionCount: 30 };
+    return {
+      answerKey: ((paper as any).answer_key ?? {}) as Record<string, "A" | "B" | "C" | "D">,
+      questionCount: Number((paper as any).question_count) || 30,
+      qpUrl: (paper as any).qp_url ?? null,
+      msUrl: (paper as any).ms_url ?? null,
+    };
+  });
+
 const PaperInput = z
   .object({
     title: z.string().trim().min(1).max(200),

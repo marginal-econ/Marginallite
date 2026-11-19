@@ -241,7 +241,7 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
               y1={s2Points.y1}
               x2={s2Points.x2}
               y2={s2Points.y2}
-              stroke="#c026d3"
+              stroke="#8b7cf6"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeDasharray="5 3"
@@ -249,7 +249,7 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
             <text
               x={s2Points.x2 + 4}
               y={s2Points.y2}
-              className="text-[12px] font-bold fill-pink-600 dark:fill-pink-400"
+              className="text-[12px] font-bold fill-violet-600 dark:fill-violet-400"
             >
               S₂ (S + Tax)
             </text>
@@ -345,21 +345,21 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
                   y1={toSvgY(state.worldPrice + state.tariffAmount)}
                   x2={margin.left + plotWidth}
                   y2={toSvgY(state.worldPrice + state.tariffAmount)}
-                  stroke="#ec4899"
+                  stroke="#7c6df0"
                   strokeWidth="2"
                 />
                 <text
                   x={margin.left - 6}
                   y={toSvgY(state.worldPrice + state.tariffAmount) + 4}
                   textAnchor="end"
-                  className="text-[11px] font-bold fill-pink-600 dark:fill-pink-400"
+                  className="text-[11px] font-bold fill-violet-600 dark:fill-violet-400"
                 >
                   P_w+t
                 </text>
                 <text
                   x={margin.left + plotWidth + 4}
                   y={toSvgY(state.worldPrice + state.tariffAmount) + 4}
-                  className="text-[11px] font-bold fill-pink-600 dark:fill-pink-400"
+                  className="text-[11px] font-bold fill-violet-600 dark:fill-violet-400"
                 >
                   S_world+tariff
                 </text>
@@ -459,7 +459,7 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
               x={margin.left - 6}
               y={toSvgY(metrics.eqP - state.taxAmount) + 4}
               textAnchor="end"
-              className="text-[11px] font-semibold fill-pink-600 dark:fill-pink-400"
+              className="text-[11px] font-semibold fill-violet-600 dark:fill-violet-400"
             >
               P_p
             </text>
@@ -468,12 +468,12 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
               cx={toSvgX(metrics.eqQ)}
               cy={toSvgY(metrics.eqP)}
               r="4.5"
-              className="fill-pink-600 stroke-background stroke-2"
+              className="fill-violet-600 stroke-background stroke-2"
             />
             <text
               x={toSvgX(metrics.eqQ) - 18}
               y={toSvgY(metrics.eqP) - 6}
-              className="text-[11px] font-bold fill-pink-600 dark:fill-pink-400"
+              className="text-[11px] font-bold fill-violet-600 dark:fill-violet-400"
             >
               E₂
             </text>
@@ -481,7 +481,7 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
               x={toSvgX(metrics.eqQ)}
               y={margin.top + plotHeight + 16}
               textAnchor="middle"
-              className="text-[11px] font-semibold fill-pink-600 dark:fill-pink-400"
+              className="text-[11px] font-semibold fill-violet-600 dark:fill-violet-400"
             >
               Q₂
             </text>
@@ -489,7 +489,7 @@ export function InteractiveDiagramCanvas({ state, metrics, className }: CanvasPr
               x={margin.left - 6}
               y={toSvgY(metrics.eqP) + 4}
               textAnchor="end"
-              className="text-[11px] font-semibold fill-pink-600 dark:fill-pink-400"
+              className="text-[11px] font-semibold fill-violet-600 dark:fill-violet-400"
             >
               P₂ (P_c)
             </text>

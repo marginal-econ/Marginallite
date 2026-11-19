@@ -74,109 +74,83 @@ export function expandEconomicQuery(query: string): string {
   const TOPIC_EXPANSIONS: Array<{ triggers: RegExp; keywords: string }> = [
     {
       triggers:
-        /\b(scarcit(y|ies)|opportunity cost|ppc|ppf|production possibilit(y|ies)|basic economic (problem|idea))\b/i,
+        /\b(scarcit(y|ies)|opportunity cost|ppc|ppf|production possibilit(y|ies)|basic economic (problem|idea)|factors of production)\b/i,
       keywords:
-        "scarcity, opportunity cost, production possibility curve, allocative efficiency, productive efficiency, normative and positive statements, capital goods, consumer goods, shift vs movement on PPC",
+        "scarcity, finite resources, unlimited wants, opportunity cost, next best alternative forgone, land labour capital enterprise, production possibility curve, PPC shift vs movement, economic goods, free goods",
     },
     {
       triggers:
-        /\b(demand|supply|equilibrium|consumer surplus|producer surplus|price mechanism)\b/i,
+        /\b(demand|supply|equilibrium|price mechanism|shortage|surplus)\b/i,
       keywords:
-        "law of demand, determinants of supply, equilibrium price, excess demand, excess supply, consumer surplus, producer surplus, rationing function, signalling function, incentive function",
+        "law of demand, determinants of demand, extension contraction shift, law of supply, equilibrium price, equilibrium quantity, excess demand shortage, excess supply surplus, market clearing price",
     },
     {
-      triggers: /\b(elasticit(y|ies)|ped|pes|yed|xed)\b/i,
+      triggers: /\b(elasticit(y|ies)|ped|pes|inelastic|elastic)\b/i,
       keywords:
-        "price elasticity of demand, price elasticity of supply, income elasticity, cross elasticity, tax incidence, total revenue test, normal and inferior goods",
-    },
-    {
-      triggers:
-        /\b(tax(es|ation)?|subsid(y|ies)|price ceiling|price floor|maximum price|minimum price|indirect tax)\b/i,
-      keywords:
-        "specific tax, ad valorem tax, tax incidence, producer burden, consumer burden, subsidy pass-through, deadweight loss, shortage, surplus, black markets, minimum wage",
-    },
-    {
-      triggers: /\b(externalit(y|ies)|market failure|merit|demerit|public goods?)\b/i,
-      keywords:
-        "marginal social benefit, marginal social cost, deadweight loss, non-rival, non-excludable, information failure, carbon tax, tradable permits, free-rider problem",
-    },
-    {
-      triggers: /\b(inflation|deflation|disinflation|price level)\b/i,
-      keywords:
-        "CPI, purchasing power, cost-push, demand-pull, money supply, Phillips curve, real wage, menu costs",
+        "price elasticity of demand, PED formula, elastic demand, inelastic demand, total revenue, consumer expenditure, price elasticity of supply, PES formula, spare capacity, time period, stock levels",
     },
     {
       triggers:
-        /\b(monetary policy|interest rates?|central bank|money supply|quantitative easing)\b/i,
+        /\b(tax(es|ation)?|subsid(y|ies)|price ceiling|price floor|maximum price|minimum price|indirect tax|mixed econom|regulation|privatisation|nationalisation)\b/i,
       keywords:
-        "interest rates, quantitative easing, commercial bank liquidity, transmission mechanism, borrowing costs, aggregate demand, exchange rate transmission",
+        "indirect tax, specific tax, subsidy, maximum price, shortage, minimum price, surplus, regulation, direct provision, privatisation, nationalisation, mixed economic system",
+    },
+    {
+      triggers: /\b(externalit(y|ies)|market failure|merit|demerit|public goods?|social cost|social benefit)\b/i,
+      keywords:
+        "market failure, private costs, external costs, social costs, private benefits, external benefits, social benefits, merit goods, demerit goods, public goods, non-rival, non-excludable, abuse of monopoly power",
+    },
+    {
+      triggers: /\b(money|bank(s|ing)?|central bank|commercial bank|household|saving|borrowing|spending)\b/i,
+      keywords:
+        "functions of money, medium of exchange, store of value, unit of account, commercial bank lending, central bank lender of last resort, disposable income, household spending, saving, borrowing",
+    },
+    {
+      triggers: /\b(worker|wage|trade union|minimum wage|division of labour|specialisation|mobility of labour)\b/i,
+      keywords:
+        "wage factors, non-wage factors, demand and supply of labour, trade unions, collective bargaining, industrial action, national minimum wage, occupational mobility, geographical mobility, division of labour",
+    },
+    {
+      triggers: /\b(firm|merger|economies of scale|diseconomies of scale|cost|revenue|profit|monopoly|competitive market|productivity)\b/i,
+      keywords:
+        "primary secondary tertiary sector, horizontal vertical conglomerate merger, internal external economies of scale, diseconomies of scale, labour-intensive, capital-intensive, productivity, total cost, average total cost, fixed cost, variable cost, total revenue, profit maximisation, monopoly, barriers to entry",
+    },
+    {
+      triggers: /\b(inflation|deflation|cpi|price level|price stability)\b/i,
+      keywords:
+        "inflation, deflation, consumer prices index CPI, purchasing power, demand-pull inflation, cost-push inflation, wage-price spiral, menu costs, shoe-leather costs",
     },
     {
       triggers:
-        /\b(fiscal policy|budget deficit|taxation|taxes?|government spending|national debt)\b/i,
+        /\b(monetary policy|interest rates?|central bank|money supply)\b/i,
       keywords:
-        "automatic stabilisers, discretionary fiscal policy, national debt, crowding out, marginal propensity to consume, multiplier effect",
+        "monetary policy, interest rates, money supply, borrowing, saving, consumer spending, investment, total demand, inflation control",
     },
     {
       triggers:
-        /\b(aggregate demand|aggregate supply|ad[- ]as|macroeconomic equilibrium|sras|lras)\b/i,
+        /\b(fiscal policy|budget deficit|budget surplus|taxation|government spending|direct tax|progressive tax|regressive tax)\b/i,
       keywords:
-        "consumption, investment, government expenditure, net exports, SRAS supply shocks, Keynesian AS, classical LRAS, inflationary gap, deflationary gap",
+        "fiscal policy, government spending, direct tax, indirect tax, progressive tax, regressive tax, proportional tax, budget deficit, budget surplus, redistribution of income",
     },
     {
-      triggers: /\b(economic growth|gdp|recession|standard of living|national income)\b/i,
+      triggers: /\b(economic growth|gdp|recession|standard of living|living standards|hdi|poverty|population)\b/i,
       keywords:
-        "real GDP vs nominal GDP, potential output vs actual output, negative output gap, positive output gap, GNI, HDI, sustainability, circular flow of income",
+        "economic growth, real GDP, GDP per head, recession, Human Development Index HDI, absolute poverty, relative poverty, birth rate, death rate, net migration, ageing population, dependency ratio",
     },
     {
-      triggers: /\b(supply[- ]side policy|deregulation|privatisation|labour market flexibility)\b/i,
+      triggers: /\b(supply[- ]side policy|deregulation|education|training|infrastructure)\b/i,
       keywords:
-        "interventionist supply-side, market-oriented supply-side, human capital, infrastructure investment, trade union power reduction, productive capacity, shifting LRAS",
+        "supply-side policy, education and training, labour productivity, deregulation, privatisation, lower direct taxes, subsidies for firms, productive capacity, long-run economic growth",
     },
     {
-      triggers: /\b(unemployment|employment|jobs?)\b/i,
+      triggers: /\b(unemployment|employment|full employment|jobs?)\b/i,
       keywords:
-        "cyclical unemployment, structural, frictional, natural rate of unemployment, labour market flexibility, minimum wage",
+        "unemployment rate, claimant count, labour force survey, cyclical unemployment, structural unemployment, frictional unemployment, seasonal unemployment, full employment",
     },
     {
-      triggers: /\b(balance of payments|current account|trade deficit|trade surplus)\b/i,
+      triggers: /\b(balance of payments|current account|trade deficit|trade surplus|exchange rate|depreciation|appreciation|globalisation|tariff|quota|protectionism|mnc|multinational)\b/i,
       keywords:
-        "trade in goods and services, primary income, secondary income, financial account, expenditure-switching, expenditure-reducing",
-    },
-    {
-      triggers: /\b(exchange rates?|depreciation|appreciation|devaluation)\b/i,
-      keywords:
-        "Marshall-Lerner condition, J-curve effect, current account balance, terms of trade, hot money flows, export competitiveness",
-    },
-    {
-      triggers:
-        /\b(comparative advantage|absolute advantage|terms of trade|free trade|protectionism|tariff|quota)\b/i,
-      keywords:
-        "opportunity cost ratio, law of comparative advantage, terms of trade index, trade creation, trade diversion, tariff welfare loss, domestic producer surplus, quota rent, infant industry argument",
-    },
-    {
-      triggers:
-        /\b(monopol(y|ies)|oligopol(y|ies)|market structure|perfect competition|monopolistic competition)\b/i,
-      keywords:
-        "kinked demand curve, price discrimination, barriers to entry, abnormal profit, contestable markets, collusion, allocative and productive efficiency, game theory",
-    },
-    {
-      triggers:
-        /\b(cost|revenue|economies of scale|diminishing returns|marginal cost|average cost)\b/i,
-      keywords:
-        "law of diminishing marginal returns, marginal revenue, average revenue, internal economies of scale, external economies of scale, minimum efficient scale, diseconomies of scale",
-    },
-    {
-      triggers:
-        /\b(labour market|wage determination|trade union|economic rent|transfer earnings)\b/i,
-      keywords:
-        "marginal revenue product of labour (MRPL), marginal productivity theory, elasticity of demand for labour, backward bending labour supply curve, transfer earnings, economic rent",
-    },
-    {
-      triggers:
-        /\b(utility|indifference curve|budget line|consumer equilibrium|marginal utility)\b/i,
-      keywords:
-        "law of diminishing marginal utility, equi-marginal principle, marginal rate of substitution, income effect, substitution effect, normal goods, inferior goods",
+        "current account, trade in goods, trade in services, primary income, secondary income, floating exchange rate, appreciation, depreciation, export competitiveness, import prices, globalisation, multinational companies MNCs, free trade, protectionism, tariffs, quotas, embargoes, infant industries",
     },
   ];
 
@@ -438,42 +412,46 @@ export async function retrieve(
     return cached.sources;
   }
 
-  let queryEmbedding: number[] | null = null;
-  try {
-    const expandedQuery = expandEconomicQuery(options.query);
-    queryEmbedding = await embedOne(expandedQuery, MODEL_EMBEDDING);
-  } catch (embedErr) {
-    console.warn("embedOne failed or provider unconfigured, using lexical retrieval:", embedErr);
-  }
+  // Run lexical fallback in parallel with dense vector embedding+RPC so that
+  // when embeddings are unpopulated or cold-starting, Cambridge IGCSE 0455 KB
+  // sources are returned in <1s without timing out.
+  const lexicalPromise = lexicalFallback(supabase, options).catch(() => [] as GroundingSource[]);
 
   const matchTarget = options.matchCount ?? 8;
   const fetchCount =
     options.enableHybridRrf !== false ? Math.min(24, Math.max(matchTarget * 2, 16)) : matchTarget;
 
   let rows: MatchRow[] = [];
-  if (queryEmbedding) {
+  const vectorSearch = async () => {
     try {
+      const expandedQuery = expandEconomicQuery(options.query);
+      const queryEmbedding = await embedOne(expandedQuery, MODEL_EMBEDDING);
+      if (!queryEmbedding) return;
       const { data, error } = await supabase.rpc("match_document_chunks", {
         query_embedding: JSON.stringify(queryEmbedding),
         match_count: fetchCount,
         filter_doc_types: options.docTypes ?? null,
         filter_topic_id: options.topicId ?? null,
       });
-
       if (!error && data) {
         rows = data as MatchRow[];
       }
-    } catch (rpcErr) {
-      console.warn("match_document_chunks RPC failed, falling back to lexical search:", rpcErr);
+    } catch (err) {
+      console.warn("Vector retrieval skipped/failed, using parallel lexical results:", err);
     }
-  }
+  };
+
+  await Promise.race([
+    vectorSearch(),
+    new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+  ]);
 
   const minSimilarity = options.minSimilarity ?? DEFAULT_GROUNDING_SIMILARITY_FLOOR; // Calibrated floor (>=0.50)
   const matches = rows.filter((row) => row.similarity >= minSimilarity);
 
-  // If vector search returned nothing or below floor, fall back to lexical search
+  // If vector search returned nothing or timed out at 2.5s, use parallel lexical results immediately
   if (matches.length === 0) {
-    const fallbackSources = await lexicalFallback(supabase, options);
+    const fallbackSources = await lexicalPromise;
     if (fallbackSources.length > 0) {
       if (RETRIEVAL_CACHE.size >= MAX_CACHE_ENTRIES) {
         const oldestKey = RETRIEVAL_CACHE.keys().next().value;

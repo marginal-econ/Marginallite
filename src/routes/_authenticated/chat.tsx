@@ -824,7 +824,7 @@ export function GroundedChatPage() {
             type="button"
             size="sm"
             onClick={openVoiceMode}
-            className="h-8 gap-1.5 px-3 rounded-xl bg-gradient-to-r from-primary via-rose-500 to-pink-600 hover:opacity-95 text-white font-medium shadow-sm transition-all"
+            className="h-8 gap-1.5 px-3 rounded-xl bg-gradient-to-r from-primary via-rose-500 to-violet-600 hover:opacity-95 text-white font-medium shadow-sm transition-all"
             title="Launch Interactive AI Voiceover Studio (ChatGPT Conversational Voice)"
           >
             <Radio className="size-3.5 animate-pulse text-white" />
@@ -1210,7 +1210,7 @@ export function GroundedChatPage() {
                     voiceStatus === "listening" &&
                       "bg-gradient-to-tr from-emerald-500 to-teal-400 shadow-emerald-500/40 scale-105 hover:brightness-110",
                     voiceStatus === "thinking" &&
-                      "bg-gradient-to-tr from-primary to-pink-500 shadow-primary/40 animate-pulse",
+                      "bg-gradient-to-tr from-primary to-violet-500 shadow-primary/40 animate-pulse",
                     voiceStatus === "speaking" &&
                       "bg-gradient-to-tr from-primary to-amber-500 shadow-primary/40 scale-105 animate-pulse hover:brightness-110",
                     voiceStatus === "idle" &&

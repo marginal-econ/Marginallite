@@ -1,43 +1,57 @@
 /**
- * Examiner engine — ported from the original Python `agents/examiner.py`.
+ * Examiner engine — calibrated for Cambridge IGCSE Economics (syllabus 0455).
  *
- * Preserved exactly:
- *  - the fixed AO1/AO2/AO3 allocation, validated against max_mark (never
- *    silently redistributed into equal thirds)
- *  - human-verified calibration anchors injected as few-shot ground truth,
- *    grouped by band and capped per band
- *  - two-pass grading: examiner pass, then an independent audit pass that can
- *    correct the mark in EITHER direction, falling back to the unaudited
- *    result if the audit call fails rather than blocking grading
- *
- * Added: retrieval grounding, so marking references the real syllabus and
- * mark scheme material rather than the model's recollection of it.
+ * Reproduces Marginal's complete Multi-Pass Examiner Architecture on IGCSE 0455:
+ *  - Pre-flight syllabus guardrail (validates Cambridge IGCSE 0455 economics scope)
+ *  - 4-Tier Retrieval Grounding (dense + hybrid RRF + lexical fallback against Marginalite's 0455 KB)
+ *  - 6-Unit IGCSE 0455 Gold Calibration Anchors (2m, 4m, 6m, 6m Diagram 4+2, 8m Table A)
+ *  - Dual Examiner Passes executed concurrently:
+ *      * Pass 1 (Temp 0.0): Rigorous analytical, mark-scheme & misconception precision check
+ *      * Pass 2 (Temp 0.2): Holistic Cambridge 0455 assessment & constructive human feedback
+ *  - Reconciliation:
+ *      * Selective Principal Examiner Arbitration if passes diverge beyond tolerance
+ *      * Dual-Pass Synthesis when passes converge closely
+ *  - Pass 3 Senior Report Refiner (time-budgeted): purges contradictions, [S#] tags, A-Level leaks & asterisks
+ *  - Writing Quality Guardrail + Indicative Cambridge IGCSE 0455 Grade Standard
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getCambridgeGradeStandard } from "@/lib/cambridge-thresholds";
+import { cleanStars } from "@/lib/utils";
 import { chat, visionChat } from "../ai.server";
 import { renderContext, retrieve } from "../retrieval.server";
 import {
   arbitrateGrading,
-  computeObjectiveConfidence,
   shouldTriggerArbitration,
+  synthesizeDualPasses,
 } from "./arbitration.server";
-import { AUDIT_PROMPT } from "./audit-prompt";
-import { buildAnchorBlock, fetchCalibrationAnchors } from "./calibration.server";
+import { buildAnchorBlock, fetchCalibrationAnchors, selectBestAnchors } from "./calibration.server";
 import {
+  buildAoEvaluationDirective,
   formatStructureNote,
   getStructureGuidance,
   MODEL_EXAMINER,
+  renderAo3Descriptors,
   renderAoDefinitions,
   SYLLABUS_CODE,
-  TEMPERATURE_EXAMINER,
+  TEMPERATURE_PASS1,
+  TEMPERATURE_PASS2,
   type AoSplit,
 } from "./config";
-import { EXAMINER_PROMPT } from "./examiner-prompt";
+import {
+  EXAMINER_PROMPT,
+  PASS1_ERROR_CHECK_DIRECTIVE,
+  PASS2_HOLISTIC_EVALUATION_DIRECTIVE,
+} from "./examiner-prompt";
 import { extractFirstJsonObject } from "./json";
-import { normaliseGrading, type Grading, type GroundingSource } from "./types";
+import { refineExaminerReport } from "./refine.server";
+import { normaliseGrading, purgeContradictions, type Grading, type GroundingSource } from "./types";
+import {
+  analyzeEssayQuality,
+  applyWritingQualityGuardrail,
+  buildQualityPromptDirective,
+} from "./writing-quality.server";
 
-/** Fill `{placeholder}` tokens in the ported prompt templates. */
 function loadPrompt(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) =>
     key in values ? String(values[key]) : match,
@@ -47,6 +61,11 @@ function loadPrompt(template: string, values: Record<string, string | number>): 
 const RESPONSE_CONTRACT = `
 Return ONLY a single JSON object with exactly this shape:
 {
+  "mechanism_validation": {
+    "core_mechanisms_sound": boolean,
+    "fatal_misconceptions_found": boolean,
+    "error_evidence_quotes": string[]
+  },
   "total_mark": number,
   "band": string,
   "points": [
@@ -85,15 +104,10 @@ Return ONLY a single JSON object with exactly this shape:
   "suggested_practice": string[],
   "confidence": number
 }
-"confidence" is your own 0-1 confidence that a real Cambridge examiner would award the same total mark.
-For 4-mark and 6-mark point-marking, enumerate the specific points in "points", awarding identify and development marks separately.
-Keep every comment specific to this candidate's actual text — never generic advice.
+- For 2-mark, 4-mark, and 6-mark point-marked questions, enumerate each credited point in "points" with separate identify_awarded (0 or 1) and development_awarded (0 or 1) marks.
+- "error_evidence_quotes": ONLY include exact verbatim quotes of proven economic falsehoods; leave [] if mechanisms are sound.
+- Strictly NO asterisks (* or **), NO [S#] retrieval tags, and NO score fractions in written prose.
 `.trim();
-
-/**
- * Build a few-shot calibration section from human-provided anchor essays,
- * grouped by band and capped so the prompt does not grow unbounded.
- */
 
 export type GradeOptions = {
   question: string;
@@ -101,19 +115,14 @@ export type GradeOptions = {
   maxMark: number;
   split: AoSplit;
   isDiagramQuestion?: boolean;
+  essayType?: string;
   auditPass?: boolean;
   topicId?: string | null;
-  /**
-   * Screenshot(s) of the relevant mark scheme page, pasted in by the
-   * student. When present, both the examiner pass and the audit pass read
-   * these directly (vision) as well as the text retrieved from the
-   * knowledge base — the screenshot is additional grounding, not a
-   * replacement for it.
-   */
   markSchemeImageDataUrls?: string[];
   isBudgetTier?: boolean;
   userId?: string;
   skipSyllabusValidation?: boolean;
+  skipSyllabusPreflight?: boolean;
 };
 
 export type GradeOutcome = {
@@ -129,23 +138,25 @@ export async function gradeEssay(
   supabase: SupabaseClient<any>,
   options: GradeOptions,
 ): Promise<GradeOutcome> {
+  const startedAt = Date.now();
   const { question, essayText, maxMark, split } = options;
   const { ao1_marks, ao2_marks, ao3_marks } = split;
 
   if (ao1_marks + ao2_marks + ao3_marks !== maxMark) {
     throw new Error(
-      `The AO split (${ao1_marks}+${ao2_marks}+${ao3_marks}) does not sum to the ` +
-        `total mark (${maxMark}). Set a matching split for questions that are not ` +
-        `the standard 12-mark type.`,
+      `The AO split (${ao1_marks}+${ao2_marks}+${ao3_marks}) does not sum to the total mark (${maxMark}).`,
     );
   }
 
   const isDiagram =
     Boolean(options.isDiagramQuestion) ||
-    question.toLowerCase().includes("diagram") ||
-    question.toLowerCase().includes("draw");
+    /\b(diagram|draw\s+a|using\s+a\s+(?:demand|supply|ppc|production\s+possibility))\b/i.test(
+      question,
+    );
 
   const structureNote = formatStructureNote(getStructureGuidance(maxMark, split, isDiagram));
+  const qualityAnalysis = analyzeEssayQuality(essayText, maxMark, split);
+  const qualityDirective = buildQualityPromptDirective(qualityAnalysis, maxMark);
 
   const promptValues = {
     syllabus_code: SYLLABUS_CODE,
@@ -154,56 +165,81 @@ export async function gradeEssay(
     ao2_marks,
     ao3_marks,
     ao_definitions: renderAoDefinitions(),
+    ao_evaluation_directive: buildAoEvaluationDirective(maxMark, split, isDiagram),
+    ao3_level_descriptors: renderAo3Descriptors(maxMark, ao3_marks),
     structure_note: structureNote,
+    essay_quality_profile: qualityDirective,
   };
 
-  let systemPrompt = loadPrompt(EXAMINER_PROMPT, promptValues);
+  let baseSystemPrompt = loadPrompt(EXAMINER_PROMPT, promptValues);
 
-  // --- syllabus pre-flight guardrail ----------------------------------------
+  // --- 1. Syllabus Pre-Flight Guardrail ---
   const { validateEconomicsSyllabus, OffSyllabusError } = await import("./syllabus-guard.server");
-  if (!options.skipSyllabusValidation) {
+  if (!options.skipSyllabusValidation && !options.skipSyllabusPreflight) {
     await validateEconomicsSyllabus(question, essayText);
   }
 
-  // --- retrieval grounding ---------------------------------------------------
+  // --- 2. Multi-Tier IGCSE 0455 Knowledge Base Retrieval ---
   let sources: GroundingSource[] = [];
-  try {
-    sources = await Promise.race([
+  const docTypes = ["mark_scheme", "examiner_report", "syllabus", "coursebook", "notes"] as const;
+
+  const tryRetrieve = async (query: string, minSimilarity: number, timeoutMs = 4500) => {
+    return Promise.race([
       retrieve(supabase, {
-        query: `${question}\n\nMark scheme, band descriptors and examiner report guidance for this question.`,
+        query,
         matchCount: 8,
-        docTypes: ["mark_scheme", "examiner_report", "syllabus", "coursebook", "notes"],
+        minSimilarity,
+        docTypes: [...docTypes],
         topicId: options.topicId ?? null,
         enableHybridRrf: true,
       }),
       new Promise<GroundingSource[]>((_, reject) =>
-        setTimeout(() => reject(new Error("Knowledge base lookup timed out (>5s)")), 5000),
+        setTimeout(() => reject(new Error("Knowledge base lookup timed out")), timeoutMs),
       ),
     ]);
-  } catch (error) {
-    console.warn(
-      `Knowledge base retrieval skipped or timed out, proceeding with Cambridge ${SYLLABUS_CODE} syllabus marking:`,
-      error instanceof Error ? error.message : error,
-    );
-    sources = [];
+  };
+
+  try {
+    sources = await tryRetrieve(question, 0.38, 4500);
+  } catch (err) {
+    console.warn("[grade.server] Tier 1 retrieval warning:", err instanceof Error ? err.message : err);
   }
+
+  if (!sources.length) {
+    try {
+      sources = await tryRetrieve(
+        `${question} Cambridge IGCSE 0455 mark scheme syllabus`,
+        0.2,
+        3500,
+      );
+    } catch (err) {
+      console.warn("[grade.server] Tier 2 retrieval warning:", err instanceof Error ? err.message : err);
+    }
+  }
+
   if (sources.length > 0) {
-    systemPrompt = `${systemPrompt}\n\n${renderContext(sources)}`;
+    baseSystemPrompt = `${baseSystemPrompt}\n\n${renderContext(sources)}`;
   }
 
-  // --- calibration anchors -----------------------------------------------
-  const anchors = await fetchCalibrationAnchors(supabase);
-  const anchorBlock = buildAnchorBlock(anchors);
-  if (anchorBlock) systemPrompt = `${systemPrompt}\n\n${anchorBlock}`;
+  // --- 3. Calibration Anchors (6-Unit IGCSE 0455 Gold Set + DB) ---
+  let anchors: Awaited<ReturnType<typeof fetchCalibrationAnchors>> = [];
+  try {
+    anchors = await fetchCalibrationAnchors(supabase);
+  } catch (anchorErr) {
+    console.warn("[grade.server] Calibration anchor fetch warning:", anchorErr);
+  }
+  // Match the 1 or 2 most relevant anchors by tariff and question syllabus topic
+  const selectedAnchors = selectBestAnchors(anchors, question, maxMark, 2);
+  const anchorBlock = buildAnchorBlock(anchors, question, maxMark);
+  if (anchorBlock) {
+    baseSystemPrompt = `${baseSystemPrompt}\n\n${anchorBlock}`;
+  }
 
-  systemPrompt = `${systemPrompt}\n\n${RESPONSE_CONTRACT}`;
+  baseSystemPrompt = `${baseSystemPrompt}\n\n${RESPONSE_CONTRACT}`;
 
   const markSchemeImages = options.markSchemeImageDataUrls?.slice(0, 4) ?? [];
   const imageNote = markSchemeImages.length
-    ? `\n\nThe candidate has attached ${markSchemeImages.length === 1 ? "a screenshot" : `${markSchemeImages.length} screenshots`} ` +
-      "of the mark scheme as image(s) above — read it directly and treat it as authoritative " +
-      "alongside the knowledge-base context, especially for anything the retrieved text might " +
-      "have missed or garbled."
+    ? `\n\nThe candidate has attached ${markSchemeImages.length === 1 ? "a screenshot" : `${markSchemeImages.length} screenshots`} of the official mark scheme — read it directly alongside the knowledge-base context.`
     : "";
 
   const isGroundedInKnowledgeBase = sources.length > 0;
@@ -215,157 +251,233 @@ export async function gradeEssay(
       : "unanchored";
 
   if (groundingStatus === "unanchored") {
-    systemPrompt = `${systemPrompt}\n\n` +
-      `CRITICAL KNOWLEDGE BASE NOTICE — NO SPECIFIC MARK SCHEME OR SYLLABUS MATCH FOUND:\n` +
-      `No specific Cambridge ${SYLLABUS_CODE} mark scheme, syllabus section, or examiner report was found in the institution's knowledge base for this question (${question}), and no mark scheme screenshot was attached.\n\n` +
-      `MARKING INSTRUCTIONS FOR UNANCHORED RESPONSES:\n` +
-      `1. You MUST notify the candidate in 'examiner_summary' with this exact prefix:\n` +
-      `   "[UNANCHORED ASSESSMENT: No official mark scheme found in Knowledge Base — evaluated against generic Cambridge ${SYLLABUS_CODE} Assessment Objectives (AO1/AO2/AO3)]. "\n` +
-      `2. Mark strictly against standard Cambridge IGCSE 0455 criteria without inventing question-specific requirements.\n` +
-      `3. In 'actionable_feedback', advise the student to attach a screenshot of the official mark scheme or have an administrator upload it to the Knowledge Base to unlock question-specific mark scheme grounding.\n` +
-      `4. Do NOT invent fake mark-scheme references or claim to have consulted specific unseen question mark schemes.`;
+    baseSystemPrompt = `${baseSystemPrompt}\n\n` +
+      `KNOWLEDGE BASE NOTICE — NO SPECIFIC PAST-PAPER MARK SCHEME MATCH FOUND:\n` +
+      `Evaluate strictly against official Cambridge IGCSE ${SYLLABUS_CODE} Assessment Objectives (AO1/AO2/AO3) and published generic marking principles without inventing unseen mark scheme points.`;
   }
+
+  const tariffSpecBanner =
+    split.ao3_marks > 0
+      ? `[CAMBRIDGE IGCSE 0455 SPECIFICATION: ${maxMark} Marks · EVALUATIVE RESPONSE (AO1: ${ao1_marks}, AO2: ${ao2_marks}, AO3: ${ao3_marks})]`
+      : `[CAMBRIDGE IGCSE 0455 SPECIFICATION: ${maxMark} Marks · POINT-MARKED NON-EVALUATIVE RESPONSE (AO1: ${ao1_marks}, AO2: ${ao2_marks}, AO3: 0)${isDiagram ? " · DIAGRAM REQUIRED (4m diagram + 2m written)" : ""}]`;
 
   const userMessage =
-    `Exam question (${maxMark} marks):\n\n${question}\n\n` +
-    `Candidate response to mark:\n\n${essayText}${imageNote}`;
+    `${tariffSpecBanner}\n\n` +
+    `EXAM QUESTION (${maxMark} marks):\n"""\n${question}\n"""\n\n` +
+    `CANDIDATE RESPONSE:\n"""\n${essayText}\n"""${imageNote}`;
 
-  const first = markSchemeImages.length
-    ? await visionChat({
-        model: MODEL_EXAMINER,
-        systemPrompt,
-        prompt: userMessage,
-        imageDataUrls: markSchemeImages,
-        maxCompletionTokens: 8000,
-        userId: options.userId,
-        feature: "grade_essay",
-      })
-    : await chat({
-        model: MODEL_EXAMINER,
-        temperature: TEMPERATURE_EXAMINER,
-        json: true,
-        isBudgetTier: options.isBudgetTier,
-        userId: options.userId,
-        feature: "grade_essay",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      });
+  const pass1SystemPrompt = `${baseSystemPrompt}\n\n${PASS1_ERROR_CHECK_DIRECTIVE}`;
+  const pass2SystemPrompt = `${baseSystemPrompt}\n\n${PASS2_HOLISTIC_EVALUATION_DIRECTIVE}`;
 
-  let grading = normaliseGrading(extractFirstJsonObject(first.text), maxMark, split);
-  if (grading.off_syllabus) {
-    throw new OffSyllabusError(
-      grading.detected_subject || "another subject",
-      grading.examiner_summary || `The examiner flagged this submission as outside the Cambridge ${SYLLABUS_CODE} Economics syllabus.`,
-    );
-  }
-  let promptTokens = first.promptTokens;
-  let completionTokens = first.completionTokens;
-  let latencyMs = first.latencyMs;
+  const executeExaminerPass = async (systemPrompt: string, feature: string, temperature: number) => {
+    if (markSchemeImages.length) {
+      try {
+        return await visionChat({
+          model: MODEL_EXAMINER,
+          systemPrompt,
+          prompt: userMessage,
+          imageDataUrls: markSchemeImages,
+          maxCompletionTokens: 6144,
+          userId: options.userId,
+          feature,
+        });
+      } catch (visionErr) {
+        console.warn(`[grade.server] visionChat fallback to text for ${feature}:`, visionErr);
+      }
+    }
+    return chat({
+      model: MODEL_EXAMINER,
+      temperature,
+      json: true,
+      isBudgetTier: options.isBudgetTier,
+      userId: options.userId,
+      feature,
+      reasoningEffort: "low",
+      maxCompletionTokens: 6144,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+  };
 
-  // --- audit pass ----------------------------------------------------------
-  // To match Marginal's guaranteed 30-40s SLA:
-  // we only run the audit pass if the primary examiner completed within 20s.
-  // The audit pass itself is protected with a 12s timeout, guaranteeing total
-  // response time stays strictly within 30-40s.
-  if (options.auditPass !== false && first.latencyMs < 20_000) {
-    const auditSystemPrompt = `${loadPrompt(AUDIT_PROMPT, promptValues)}\n\n${RESPONSE_CONTRACT}`;
-    const auditUserMessage =
-      `Exam question (${maxMark} marks):\n\n${question}\n\n` +
-      `Student essay:\n\n${essayText}\n\n` +
-      `Original examiner's grading JSON to audit:\n\n${JSON.stringify(grading, null, 2)}${imageNote}`;
+  let finalGrading: Grading;
+  let promptTokens: number | null = null;
+  let completionTokens: number | null = null;
+  let activeModel = MODEL_EXAMINER;
+  let keyRotated = false;
+  let modelSwapped = false;
+  let activeKeyType: "primary" | "backup_pool" | "vip_fallback" | undefined = undefined;
 
-    try {
-      const secondPromise = markSchemeImages.length
-        ? visionChat({
-            model: MODEL_EXAMINER,
-            systemPrompt: auditSystemPrompt,
-            prompt: auditUserMessage,
-            imageDataUrls: markSchemeImages,
-            maxCompletionTokens: 8000,
-            userId: options.userId,
-            feature: "grade_essay_audit",
-          })
-        : chat({
-            model: MODEL_EXAMINER,
-            temperature: TEMPERATURE_EXAMINER,
-            json: true,
-            isBudgetTier: options.isBudgetTier,
-            userId: options.userId,
-            feature: "grade_essay_audit",
-            messages: [
-              { role: "system", content: auditSystemPrompt },
-              { role: "user", content: auditUserMessage },
-            ],
-          });
+  const runSinglePass = options.auditPass === false;
 
-      const second = await Promise.race([
-        secondPromise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Audit pass exceeded 12s timeout")), 12_000),
-        ),
-      ]);
+  if (runSinglePass) {
+    const res = await executeExaminerPass(pass2SystemPrompt, "grade_essay", TEMPERATURE_PASS2);
+    finalGrading = normaliseGrading(extractFirstJsonObject(res.text), maxMark, split, essayText);
+    finalGrading = applyWritingQualityGuardrail(finalGrading, qualityAnalysis, maxMark, split, essayText);
+    if (finalGrading.off_syllabus) {
+      throw new OffSyllabusError(
+        finalGrading.detected_subject || "another subject",
+        finalGrading.examiner_summary ||
+          `The examiner flagged this submission as outside the Cambridge IGCSE ${SYLLABUS_CODE} Economics syllabus.`,
+      );
+    }
+    promptTokens = res.promptTokens;
+    completionTokens = res.completionTokens;
+    activeModel = res.model || MODEL_EXAMINER;
+    keyRotated = Boolean(res.keyRotated);
+    modelSwapped = Boolean(res.modelSwapped);
+    activeKeyType = res.activeKeyType;
+  } else {
+    // --- 4. Dual Examiner Passes (Concurrent: Pass 1 @ 0.0 + Pass 2 @ 0.2) ---
+    const [firstResult, secondResult] = await Promise.allSettled([
+      executeExaminerPass(pass1SystemPrompt, "grade_essay_pass1_error_audit", TEMPERATURE_PASS1),
+      executeExaminerPass(pass2SystemPrompt, "grade_essay_pass2_holistic", TEMPERATURE_PASS2),
+    ]);
 
-      const secondGrading = normaliseGrading(extractFirstJsonObject(second.text), maxMark, split);
-      secondGrading.audited = true;
-      promptTokens = (promptTokens ?? 0) + (second.promptTokens ?? 0);
-      completionTokens = (completionTokens ?? 0) + (second.completionTokens ?? 0);
-      latencyMs += second.latencyMs;
+    const first = firstResult.status === "fulfilled" ? firstResult.value : null;
+    const second = secondResult.status === "fulfilled" ? secondResult.value : null;
 
-      // --- Stage 3: Selective Principal Examiner Arbitration ---
-      // Triggered only when a material discrepancy or grade band contradiction
-      // exists between the Primary Examiner and Independent Moderator.
-      const disputeCheck = shouldTriggerArbitration(grading, secondGrading, maxMark);
-      if (disputeCheck.shouldArbitrate && latencyMs < 28_000) {
+    if (!first && !second) {
+      throw firstResult.status === "rejected"
+        ? firstResult.reason
+        : new Error("Both examiner passes failed.");
+    }
+
+    if (first && second) {
+      let grading1 = normaliseGrading(extractFirstJsonObject(first.text), maxMark, split, essayText);
+      grading1 = applyWritingQualityGuardrail(grading1, qualityAnalysis, maxMark, split, essayText);
+
+      let grading2 = normaliseGrading(extractFirstJsonObject(second.text), maxMark, split, essayText);
+      grading2 = applyWritingQualityGuardrail(grading2, qualityAnalysis, maxMark, split, essayText);
+
+      if (grading1.off_syllabus || grading2.off_syllabus) {
+        const rejected = grading1.off_syllabus ? grading1 : grading2;
+        throw new OffSyllabusError(
+          rejected.detected_subject || "another subject",
+          rejected.examiner_summary ||
+            `The examiner flagged this submission as outside the Cambridge IGCSE ${SYLLABUS_CODE} Economics syllabus.`,
+        );
+      }
+
+      promptTokens = (first.promptTokens ?? 0) + (second.promptTokens ?? 0);
+      completionTokens = (first.completionTokens ?? 0) + (second.completionTokens ?? 0);
+      activeModel = second.model || first.model || MODEL_EXAMINER;
+      keyRotated = Boolean(first.keyRotated || second.keyRotated);
+      modelSwapped = Boolean(first.modelSwapped || second.modelSwapped);
+      activeKeyType = second.activeKeyType ?? first.activeKeyType;
+
+      // --- 5. Reconciliation: Arbitration on dispute OR Dual-Pass Synthesis ---
+      const disputeCheck = shouldTriggerArbitration(grading1, grading2, maxMark);
+      const elapsedMs = Date.now() - startedAt;
+
+      if (disputeCheck.shouldArbitrate && elapsedMs < 28_000) {
         try {
-          const arbitrated = await Promise.race([
+          finalGrading = await Promise.race([
             arbitrateGrading({
               question,
               essayText,
               maxMark,
               split,
-              examinerGrading: grading,
-              moderatorGrading: secondGrading,
+              examinerGrading: grading1,
+              moderatorGrading: grading2,
               disputeReason: disputeCheck.reason,
+              userId: options.userId,
+              qualityAnalysis,
+              isDiagramQuestion: isDiagram,
             }),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Arbitration exceeded 8s timeout")), 8_000),
+              setTimeout(() => reject(new Error("Arbitration exceeded 12s budget")), 12_000),
             ),
           ]);
-          grading = arbitrated;
-        } catch (arbitrationError) {
-          console.warn(
-            "Arbitration pass timed out or failed; falling back to moderated grade",
-            arbitrationError,
+        } catch (arbErr) {
+          console.warn("[grade.server] Arbitration fallback to synthesis:", arbErr);
+          finalGrading = synthesizeDualPasses(
+            grading1,
+            grading2,
+            maxMark,
+            split,
+            qualityAnalysis,
+            essayText,
           );
-          grading = secondGrading;
-          grading.confidence = computeObjectiveConfidence(grading, secondGrading, false);
         }
       } else {
-        grading = secondGrading;
-        grading.confidence = computeObjectiveConfidence(grading, secondGrading, false);
+        finalGrading = synthesizeDualPasses(
+          grading1,
+          grading2,
+          maxMark,
+          split,
+          qualityAnalysis,
+          essayText,
+        );
       }
-    } catch (error) {
-      // The audit is a correction pass, not a gate. A transient audit failure
-      // returns the already-valid first-pass result instead of failing.
-      console.warn("Audit pass skipped or timed out; returning authoritative first-pass grading", error);
+    } else {
+      // Graceful resilience: one pass succeeded while the other hit transient rate limit
+      const single = (first ?? second)!;
+      finalGrading = normaliseGrading(extractFirstJsonObject(single.text), maxMark, split, essayText);
+      finalGrading = applyWritingQualityGuardrail(
+        finalGrading,
+        qualityAnalysis,
+        maxMark,
+        split,
+        essayText,
+      );
+      if (finalGrading.off_syllabus) {
+        throw new OffSyllabusError(
+          finalGrading.detected_subject || "another subject",
+          finalGrading.examiner_summary ||
+            `The examiner flagged this submission as outside the Cambridge IGCSE ${SYLLABUS_CODE} Economics syllabus.`,
+        );
+      }
+      promptTokens = single.promptTokens;
+      completionTokens = single.completionTokens;
+      activeModel = single.model || MODEL_EXAMINER;
+      keyRotated = Boolean(single.keyRotated);
+      modelSwapped = Boolean(single.modelSwapped);
+      activeKeyType = single.activeKeyType;
     }
   }
 
-  grading.sources = sources;
-  grading.anchorsUsed = anchors.length;
-  grading.grounding_status = groundingStatus;
-  grading.model = first.model || MODEL_EXAMINER;
-  grading.keyRotated = first.keyRotated;
-  grading.modelSwapped = first.modelSwapped;
-  grading.activeKeyType = first.activeKeyType;
+  // --- 6. Pass 3: Senior Report Refiner & Consistency Auditor (Time-budgeted) ---
+  if (Date.now() - startedAt < 26_000 && maxMark >= 4) {
+    try {
+      finalGrading = await Promise.race([
+        refineExaminerReport({
+          question,
+          essayText,
+          maxMark,
+          split,
+          draftGrading: finalGrading,
+          userId: options.userId,
+        }),
+        new Promise<Grading>((resolve) =>
+          setTimeout(() => resolve(finalGrading), 10_000),
+        ),
+      ]);
+    } catch (refineErr) {
+      console.warn("[grade.server] Pass 3 refinement skipped:", refineErr);
+    }
+  }
+
+  finalGrading.sources = sources;
+  finalGrading.anchorsUsed = Math.min(selectedAnchors.length, 4);
+  finalGrading.grounding_status = groundingStatus;
+  finalGrading.model = activeModel;
+  finalGrading.keyRotated = keyRotated;
+  finalGrading.modelSwapped = modelSwapped;
+  finalGrading.activeKeyType = activeKeyType;
+  const totalLatencyMs = Date.now() - startedAt;
+  finalGrading.latencyMs = totalLatencyMs;
+  finalGrading = cleanStars(purgeContradictions(finalGrading));
+  // Set indicative_grade AFTER cleanStars so "A*" keeps its asterisk!
+  const gradeStd = getCambridgeGradeStandard(finalGrading.total_mark, maxMark);
+  finalGrading.indicative_grade = gradeStd.letter;
 
   return {
-    grading,
-    model: first.model || MODEL_EXAMINER,
+    grading: finalGrading,
+    model: activeModel,
     promptTokens,
     completionTokens,
-    latencyMs,
+    latencyMs: totalLatencyMs,
   };
 }

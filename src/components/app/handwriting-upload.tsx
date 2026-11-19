@@ -17,6 +17,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { CompactProgressBar, type ProgressStage } from "@/components/app/grading-progress";
 import { Button } from "@/components/ui/button";
 import { filesToPageImages, rotateImageDataUrl } from "@/lib/handwriting-images";
 import { transcribeHandwriting } from "@/lib/ocr.functions";
@@ -284,6 +285,15 @@ export function HandwritingUpload({
             Upload PDF / text
           </Button>
           {typedStage ? <p className="text-[11px] text-muted-foreground">{typedStage}</p> : null}
+          <CompactProgressBar
+            active={typedMutation.isPending}
+            stages={[
+              { label: "Inspecting uploaded file text layer", weight: 2 },
+              { label: "Extracting clean essay paragraphs", weight: 4 },
+            ] satisfies ProgressStage[]}
+            totalMs={14_000}
+            title={typedStage || "Extracting uploaded answer…"}
+          />
           <input
             ref={typedInput}
             type="file"
@@ -344,6 +354,17 @@ export function HandwritingUpload({
               {readPages} of {totalPages} page{totalPages === 1 ? "" : "s"} read.
             </p>
           ) : null}
+          <CompactProgressBar
+            active={isProcessingUpload || handwrittenMutation.isPending}
+            stages={[
+              { label: "Preparing & optimizing page images", weight: 2 },
+              { label: "Reading handwriting & economics diagrams", weight: 5 },
+              { label: "Ordering & formatting transcript", weight: 2 },
+            ] satisfies ProgressStage[]}
+            totalMs={22_000}
+            title={handwrittenStage || (isProcessingUpload ? "Preparing page images…" : "Transcribing handwritten pages…")}
+            estimatedTimeLabel="Est: ~10–25s"
+          />
           {/* Gallery / Photos input: uncaptured, supports multiple image selection */}
           <input
             ref={galleryInput}
@@ -570,6 +591,15 @@ export function HandwritingUpload({
             )}
             Retry {outstanding.length} page{outstanding.length === 1 ? "" : "s"}
           </Button>
+          <CompactProgressBar
+            active={retryMutation.isPending}
+            stages={[
+              { label: "Re-scanning unreadable page images", weight: 3 },
+              { label: "Recovering handwritten text & diagrams", weight: 4 },
+            ] satisfies ProgressStage[]}
+            totalMs={15_000}
+            title={`Retrying ${outstanding.length} unreadable page${outstanding.length === 1 ? "" : "s"}…`}
+          />
         </div>
       ) : null}
     </div>

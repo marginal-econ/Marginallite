@@ -4,17 +4,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BookOpen,
+  Calculator as CalculatorIcon,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Eraser,
   Flag,
   History,
+  Layers,
   LayoutGrid,
   Loader2,
   Pencil,
+  Play,
   Search,
+  Shield,
   Sparkles,
+  Target,
   Timer as TimerIcon,
   Trash2,
   TrendingUp,
@@ -25,21 +31,40 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { PageHeader } from "@/components/app/app-shell";
+import { CompactProgressBar, type ProgressStage } from "@/components/app/grading-progress";
+import { McqCalculator } from "@/components/app/mcq-calculator";
+import {
+  ExamLockdownPromptDialog,
+  ExamViolationOverlay,
+  ExamToolbarControl,
+  ExamIntegrityReport,
+  requestExamFullscreen,
+  exitExamFullscreen,
+  isExamFullscreenActive,
+  type ExamViolation,
+  type ExamViolationType,
+} from "@/components/app/mcq-sat-lockdown";
 import { getMe } from "@/lib/account.functions";
 import {
   McqReviewPanel,
   McqQuestionReviewList,
   McqDomainBreakdown,
+  McqMistakeLedger,
+  buildTopicStatsFromQuestions,
   type ExplanationState,
   type TopicStat,
   type GradedQuestion,
 } from "@/components/app/mcq-review-panel";
+import { McqTutorMode } from "@/components/app/mcq-tutor-mode";
+import { type McqMistakeType } from "@/lib/mcq-mistakes";
 import { Badge as UiBadge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -59,26 +84,28 @@ import {
   submitPdfMcqAttempt,
   type PaperHistoryEntry,
 } from "@/lib/mcq-pdf.functions";
-import { listMcqPapers, startMcqAttempt, getServerTime } from "@/lib/mcq-papers.functions";
-import {
-  calculateClockOffset,
-  calculateRemainingSeconds,
-  shouldAutoSubmit,
-  getTimerAnnouncement,
-  formatTimer,
-} from "@/lib/mcq-timer";
-import { MCQ_PAPER_CONFIG, detectEraFromMetadata, type Era } from "@/lib/igcse/paper-config";
+import { listMcqPapers, getMcqPaperAnswerKey } from "@/lib/mcq-papers.functions";
 import {
   loadPdfjs,
-  extractQuestionStems,
+  extractQuestionSpans,
+  cropQuestionSliceCanvas,
   type PdfTextItem,
+  type QuestionPageSpan,
   type StemBlob,
 } from "@/lib/mcq-pdf-text";
 import {
   aggregateMcqDomains,
   aggregateMcqDomainsFromTopicStats,
+  classifyMcqQuestion,
   type DomainStat,
 } from "@/lib/mcq-domain";
+import {
+  TOPICAL_MCQ_PAPERS,
+  getTopicalPaperById,
+  renderTopicalPaperPages,
+  toMcqPaperSummaryFromTopical,
+  type TopicalMcqPaper,
+} from "@/lib/topical-mcq-papers";
 import { cn } from "@/lib/utils";
 
 /** Fixed render scale for the plain page image — no positions are computed
@@ -90,7 +117,7 @@ const RENDER_SCALE = 1.6;
 // Direct navigation still opens the library picker.
 const mcqLiveSearchSchema = z
   .object({
-    paperId: z.string().uuid().optional().catch(undefined),
+    paperId: z.string().optional().catch(undefined),
   })
   .passthrough()
   .catch({});
@@ -105,73 +132,184 @@ export const Route = createFileRoute("/_authenticated/mcq-live")({
 /* -------------------------------------------------------------------- */
 
 type Letter = "A" | "B" | "C" | "D";
-type EraType = "legacy" | "2027" | string;
+type Level = "as" | "a2";
+type PracticeMode = "full_paper" | "question_by_question";
 
 /**
- * Cambridge IGCSE Economics (0455) Paper 1 timings:
- * - Legacy (through June 2026): 30 questions, 45 minutes (2700s)
- * - 2027-2029 syllabus: 40 questions, 1 hour (3600s)
+ * Real Cambridge IGCSE 0455 paper timings — Paper 1 (AS) is 1 hour, Paper 1
+ * (IGCSE 0455) is 1 hour 15. Mirrors PAPER_DURATION_SECONDS in
+ * src/lib/mcq/mcq.server.ts (kept local here rather than imported since
+ * that file is server-side and only ever dynamically imported from
+ * handlers elsewhere in this codebase — this constant must stay in sync
+ * with it by hand).
  */
-function getPaperDurationSeconds(paper: {
-  questionCount?: number | null;
-  examYear?: number | null;
-  level?: string | null;
-}): number {
-  if (
-    paper.questionCount === 40 ||
-    (paper.examYear != null && paper.examYear >= 2027) ||
-    paper.level === "2027"
-  ) {
-    return MCQ_PAPER_CONFIG["2027"].durationSeconds;
-  }
-  return MCQ_PAPER_CONFIG.legacy.durationSeconds;
-}
+const PAPER_DURATION_SECONDS: Record<Level, number> = {
+  as: 60 * 60,
+  a2: 75 * 60,
+};
 
 const LOW_TIME_WARNING_SECONDS = 5 * 60;
 const MCQ_DRAFT_VERSION = 1;
 const MCQ_ACTIVE_VERSION = 1;
+export const MCQ_DRAFT_EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 type McqDraft = {
   version: number;
   paperId: string;
-  attemptId?: string | null;
-  examEndsAtMs?: number | null;
-  clockOffsetMs?: number;
+  paperTitle?: string;
+  level?: Level;
+  practiceMode?: PracticeMode;
   answers: Record<number, Letter>;
   flagged?: number[];
+  checkedQuestions?: number[];
+  mistakeTypes?: Record<number, McqMistakeType>;
+  eliminatedOptions?: Record<number, Letter[]>;
+  questionTimes?: Record<number, number>;
+  activeQuestion?: number;
   timeLeft: number | null;
   savedAt: number;
 };
 
 function mcqDraftKey(userId: string, paperId: string) {
-  return `marginalite.mcq-draft.v${MCQ_DRAFT_VERSION}.${userId}.${paperId}`;
+  const safeUser = userId || "guest";
+  return `marginal.mcq-draft.v${MCQ_DRAFT_VERSION}.${safeUser}.${paperId}`;
 }
 
 function mcqActiveKey(userId: string) {
-  return `marginalite.mcq-active.v${MCQ_ACTIVE_VERSION}.${userId}`;
+  const safeUser = userId || "guest";
+  return `marginal.mcq-active.v${MCQ_ACTIVE_VERSION}.${safeUser}`;
 }
 
 function readActiveMcqPaper(userId: string): string | null {
+  const safeUser = userId || "guest";
   try {
-    const raw = window.localStorage.getItem(mcqActiveKey(userId));
-    if (!raw) return null;
-    const value = JSON.parse(raw) as { version: number; paperId: string };
-    return value.version === MCQ_ACTIVE_VERSION ? value.paperId : null;
+    const raw = window.localStorage.getItem(mcqActiveKey(safeUser));
+    if (raw) {
+      const value = JSON.parse(raw) as { version: number; paperId: string; savedAt?: number };
+      if (value.version === MCQ_ACTIVE_VERSION && value.paperId) {
+        const draft = readMcqDraft(safeUser, value.paperId);
+        if (draft) return value.paperId;
+      }
+    }
+  } catch {}
+
+  // Fallback: search for any active, unexpired draft for this user
+  try {
+    const prefix = `marginal.mcq-draft.v${MCQ_DRAFT_VERSION}.${safeUser}.`;
+    let latestPaperId: string | null = null;
+    let latestSavedAt = 0;
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        const paperId = key.slice(prefix.length);
+        const draft = readMcqDraft(safeUser, paperId);
+        if (draft && draft.savedAt > latestSavedAt) {
+          latestSavedAt = draft.savedAt;
+          latestPaperId = paperId;
+        }
+      }
+    }
+    return latestPaperId;
   } catch {
     return null;
   }
 }
 
 function readMcqDraft(userId: string, paperId: string): McqDraft | null {
+  const safeUser = userId || "guest";
   try {
-    const raw = window.localStorage.getItem(mcqDraftKey(userId, paperId));
+    const key = mcqDraftKey(safeUser, paperId);
+    let raw = window.localStorage.getItem(key);
+    if (!raw && safeUser !== "guest") {
+      const guestRaw = window.localStorage.getItem(mcqDraftKey("guest", paperId));
+      if (guestRaw) {
+        raw = guestRaw;
+        try {
+          window.localStorage.setItem(key, guestRaw);
+          window.localStorage.removeItem(mcqDraftKey("guest", paperId));
+        } catch {}
+      }
+    }
     if (!raw) return null;
     const draft = JSON.parse(raw) as McqDraft;
     if (draft.version !== MCQ_DRAFT_VERSION || draft.paperId !== paperId) return null;
+
+    // Auto-expire after 12 hours
+    const age = Date.now() - (draft.savedAt || 0);
+    if (age > MCQ_DRAFT_EXPIRY_MS) {
+      window.localStorage.removeItem(key);
+      const activeRaw = window.localStorage.getItem(mcqActiveKey(safeUser));
+      if (activeRaw) {
+        try {
+          const parsed = JSON.parse(activeRaw);
+          if (parsed.paperId === paperId) {
+            window.localStorage.removeItem(mcqActiveKey(safeUser));
+          }
+        } catch {}
+      }
+      return null;
+    }
     return draft;
   } catch {
     return null;
   }
+}
+
+function getActiveDraftSummary(userId: string, papers: McqPaperSummary[]): {
+  paper: McqPaperSummary;
+  draft: McqDraft;
+  remainingMs: number;
+} | null {
+  const activePaperId = readActiveMcqPaper(userId);
+  if (!activePaperId) return null;
+  const draft = readMcqDraft(userId, activePaperId);
+  if (!draft) return null;
+  const paper = papers.find((p) => p.id === activePaperId);
+  if (!paper) return null;
+  const elapsed = Date.now() - (draft.savedAt || 0);
+  const remainingMs = Math.max(0, MCQ_DRAFT_EXPIRY_MS - elapsed);
+  if (remainingMs <= 0) return null;
+  return { paper, draft, remainingMs };
+}
+
+export function cleanupExpiredMcqDrafts(userId: string): void {
+  const safeUser = userId || "guest";
+  try {
+    const prefixes = [
+      `marginal.mcq-draft.v${MCQ_DRAFT_VERSION}.${safeUser}.`,
+      `marginalite_mcq_draft_${safeUser}_`,
+    ];
+    const toRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && prefixes.some((p) => key.startsWith(p))) {
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (raw) {
+            const draft = JSON.parse(raw);
+            if (Date.now() - (draft.savedAt || 0) > MCQ_DRAFT_EXPIRY_MS) {
+              toRemove.push(key);
+            }
+          }
+        } catch {
+          toRemove.push(key);
+        }
+      }
+    }
+    for (const key of toRemove) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {}
+}
+
+function formatRemainingTime(ms: number): string {
+  const totalMinutes = Math.floor(ms / (60 * 1000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -244,35 +382,274 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 
 function McqLivePage() {
   const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const routeContext = Route.useRouteContext() as { user?: { id?: string; email?: string } } | undefined;
   const queryClient = useQueryClient();
   const fetchMe = useServerFn(getMe);
   const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
+  const effectiveUserId = routeContext?.user?.id || me.data?.userId || "guest";
   const [stage, setStage] = useState<"library" | "practice">("library");
+
+  // Sync exam session state to AppShell and CSS to hide conflicting bottom navs
+  useEffect(() => {
+    if (stage === "practice") {
+      document.body.dataset.inExamSession = "true";
+    } else {
+      delete document.body.dataset.inExamSession;
+    }
+    window.dispatchEvent(new Event("marginal-exam-state"));
+    return () => {
+      delete document.body.dataset.inExamSession;
+      window.dispatchEvent(new Event("marginal-exam-state"));
+    };
+  }, [stage]);
+  const [libraryTab, setLibraryTab] = useState<"past_papers" | "topical" | "analytics">("past_papers");
+  const [showAttemptDiagnostics, setShowAttemptDiagnostics] = useState(false);
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
-  const [level, setLevel] = useState<EraType>("legacy");
+  const [level, setLevel] = useState<Level>("as");
   const [qCount, setQCount] = useState(30);
   const [paperTitle, setPaperTitle] = useState("Past paper practice");
   const [answerKey, setAnswerKey] = useState<Record<number, Letter>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
 
   const [pages, setPages] = useState<PageImage[]>([]);
+  const [questionSlices, setQuestionSlices] = useState<Record<number, HTMLCanvasElement>>({});
   const [stemBlobs, setStemBlobs] = useState<StemBlob[]>([]);
   const [answers, setAnswers] = useState<Record<number, Letter>>({});
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
 
-  const toggleFlag = useCallback((number: number) => {
-    setFlagged((prev) => {
-      const next = new Set(prev);
-      if (next.has(number)) next.delete(number);
-      else next.add(number);
-      return next;
-    });
-  }, []);
+  // ---- Question-by-Question (Tutor & Mistake Diagnostic) Mode state ----
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>("full_paper");
+  const [checkedQuestions, setCheckedQuestions] = useState<Set<number>>(new Set());
+  const [mistakeTypes, setMistakeTypes] = useState<Record<number, McqMistakeType>>({});
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<number, Letter[]>>({});
+  const [questionTimes, setQuestionTimes] = useState<Record<number, number>>({});
+  const [annotationClearSeq, setAnnotationClearSeq] = useState(0);
+
+  // Autosave status & immediate-persistence tracking
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+  const saveTimerRef = useRef<number | null>(null);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const flaggedRef = useRef(flagged);
+  flaggedRef.current = flagged;
+  const practiceModeRef = useRef(practiceMode);
+  practiceModeRef.current = practiceMode;
+  const checkedQuestionsRef = useRef(checkedQuestions);
+  checkedQuestionsRef.current = checkedQuestions;
+  const mistakeTypesRef = useRef(mistakeTypes);
+  mistakeTypesRef.current = mistakeTypes;
+  const eliminatedOptionsRef = useRef(eliminatedOptions);
+  eliminatedOptionsRef.current = eliminatedOptions;
+  const questionTimesRef = useRef(questionTimes);
+  questionTimesRef.current = questionTimes;
+  const selectedPaperIdRef = useRef(selectedPaperId);
+  selectedPaperIdRef.current = selectedPaperId;
+  const paperTitleRef = useRef(paperTitle);
+  paperTitleRef.current = paperTitle;
+  const levelRef = useRef(level);
+  levelRef.current = level;
 
   const [graded, setGraded] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
+
+  // ---- Full Screen Proctored Test Mode (Window & Tab Lockdown) ----
+  const [examModeActive, setExamModeActive] = useState<boolean>(false);
+  const [examPromptOpen, setExamPromptOpen] = useState<boolean>(false);
+  const [examViolations, setExamViolations] = useState<ExamViolation[]>([]);
+  const [activeViolation, setActiveViolation] = useState<ExamViolation | null>(null);
+  const [startInExamMode, setStartInExamMode] = useState<boolean>(false);
+  const isLeavingExamModeRef = useRef<boolean>(false);
+  const hadExamModeRef = useRef<boolean>(false);
+
+  const handleEnableExamMode = useCallback(async () => {
+    isLeavingExamModeRef.current = true;
+    const res = await requestExamFullscreen();
+    if (res.success) {
+      setExamModeActive(true);
+      hadExamModeRef.current = true;
+      setExamPromptOpen(false);
+      setActiveViolation(null);
+      toast.success("Full Screen Proctored Test Mode active. Fullscreen locked and window focus monitored.");
+    } else {
+      toast.error(res.error || "Could not enter full-screen mode. Please allow permissions in browser settings.");
+    }
+    setTimeout(() => {
+      isLeavingExamModeRef.current = false;
+    }, 500);
+  }, []);
+
+  const handleDisableExamMode = useCallback(async () => {
+    isLeavingExamModeRef.current = true;
+    setExamModeActive(false);
+    setActiveViolation(null);
+    await exitExamFullscreen();
+    toast.info("Full Screen Test Mode turned off. Returned to standard view.");
+    setTimeout(() => {
+      isLeavingExamModeRef.current = false;
+    }, 500);
+  }, []);
+
+  const handleResumeFullscreen = useCallback(async () => {
+    isLeavingExamModeRef.current = true;
+    const res = await requestExamFullscreen();
+    if (res.success) {
+      setActiveViolation(null);
+      toast.success("Returned to Full Screen Test Mode.");
+    } else {
+      toast.error(res.error || "Please grant full-screen permission to resume.");
+    }
+    setTimeout(() => {
+      isLeavingExamModeRef.current = false;
+    }, 500);
+  }, []);
+
+  // Strict anti-cheat monitoring: fullscreen exits, tab switches, blur, contextmenu, clipboard
+  useEffect(() => {
+    if (!examModeActive || stage !== "practice" || graded) return;
+
+    const triggerViolation = (
+      type: ExamViolationType,
+      title: string,
+      description: string,
+    ) => {
+      if (isLeavingExamModeRef.current) return;
+      setActiveViolation((current) => {
+        if (current) return current;
+        const newViolation: ExamViolation = {
+          id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type,
+          timestamp: Date.now(),
+          title,
+          description,
+        };
+        setExamViolations((prev) => [...prev, newViolation]);
+        return newViolation;
+      });
+    };
+
+    const handleFullscreenChange = () => {
+      if (!isExamFullscreenActive() && !isLeavingExamModeRef.current) {
+        triggerViolation(
+          "fullscreen_exit",
+          "Exited full-screen view",
+          "You exited full-screen mode. Please return to full screen to resume your exam.",
+        );
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && !isLeavingExamModeRef.current) {
+        triggerViolation(
+          "tab_switch",
+          "Switched browser tabs or minimized window",
+          "You navigated away from the exam tab. Please return to full screen to resume.",
+        );
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (!isLeavingExamModeRef.current) {
+        triggerViolation(
+          "window_blur",
+          "Window minimized or lost focus",
+          "You minimized the window, switched applications, or clicked outside the exam window.",
+        );
+      }
+    };
+
+    // Watchdog interval (100ms) for instantaneous minimize/blur/fullscreen-loss detection
+    const watchdogInterval = window.setInterval(() => {
+      if (isLeavingExamModeRef.current) return;
+      if (!isExamFullscreenActive()) {
+        triggerViolation(
+          "fullscreen_exit",
+          "Exited full-screen view",
+          "You exited full-screen mode. Please return to full screen to resume your exam.",
+        );
+      } else if (document.hidden || document.visibilityState === "hidden") {
+        triggerViolation(
+          "tab_switch",
+          "Window minimized or tab switched",
+          "You minimized or navigated away from the exam tab. Please resume full screen.",
+        );
+      } else if (typeof document.hasFocus === "function" && !document.hasFocus()) {
+        triggerViolation(
+          "window_blur",
+          "Window minimized or lost focus",
+          "You switched applications, minimized the browser, or clicked outside the exam window.",
+        );
+      }
+    }, 100);
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      toast.error("Right-click is disabled in Proctored Exam Mode to maintain integrity.");
+    };
+
+    const handleClipboard = (e: ClipboardEvent) => {
+      e.preventDefault();
+      toast.error("Copy and paste are disabled in Proctored Exam Mode.");
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isModifier = e.ctrlKey || e.metaKey;
+      if (isModifier && ["c", "v", "x", "u", "C", "V", "X", "U"].includes(e.key)) {
+        e.preventDefault();
+        toast.error("Keyboard shortcuts are restricted in Proctored Exam Mode.");
+      }
+      if (e.key === "F12") {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleClipboard);
+    document.addEventListener("cut", handleClipboard);
+    document.addEventListener("paste", handleClipboard);
+    window.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      window.clearInterval(watchdogInterval);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleClipboard);
+      document.removeEventListener("cut", handleClipboard);
+      document.removeEventListener("paste", handleClipboard);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [examModeActive, stage, graded]);
+
+  // Clean up full screen if component unmounts while in exam mode
+  useEffect(() => {
+    return () => {
+      if (isExamFullscreenActive()) {
+        void exitExamFullscreen();
+      }
+    };
+  }, []);
+
+  // Global Alt+C shortcut to toggle Cambridge Economics Calculator
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        setCalcOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKey);
+    return () => window.removeEventListener("keydown", handleGlobalKey);
+  }, []);
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
   const [attemptTopics, setAttemptTopics] = useState<TopicStat[]>([]);
-  // SAT-"Reading vs Writing" style micro/macro split for this one paper,
+  // Sectional micro/macro domain split for this paper,
   // computed alongside attemptTopics from the same graded questions.
   const [attemptDomains, setAttemptDomains] = useState<DomainStat[]>([]);
   // Full per-question breakdown for the click-to-review list — populated
@@ -283,6 +660,8 @@ function McqLivePage() {
   const [explanations, setExplanations] = useState<Record<number, ExplanationState>>({});
   // Active question number currently selected / being viewed
   const [activeQuestion, setActiveQuestion] = useState<number>(1);
+  const activeQuestionRef = useRef(activeQuestion);
+  activeQuestionRef.current = activeQuestion;
   // Map of question number -> PDF page number (1-indexed)
   const [questionPages, setQuestionPages] = useState<Record<number, number>>({});
   // Mobile bottom sheets
@@ -302,14 +681,23 @@ function McqLivePage() {
       setActiveQuestion(number);
       setHighlightNumber(number);
 
-      // 1. Scroll PDF paper directly to the page containing this question
+      // 1. Scroll PDF paper directly to the page containing this question.
+      // Auto-scrolling the paper is designed for phone view where the viewport is narrow.
+      // On laptop/desktop (screen width >= 1024px), NEVER scroll the paper if the target page
+      // is already visible, or if skipScrollPaper is requested, preventing disruptive "scroll-up" jumps.
       if (!options?.skipScrollPaper) {
+        const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
         const targetPage =
           questionPages[number] ??
           Math.min(pages.length, Math.max(1, Math.ceil(number / 2) + 1));
-        const pageEl = document.getElementById(`mcq-page-${targetPage}`);
-        if (pageEl) {
-          pageEl.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        const shouldScrollPaper = !isDesktop || targetPage !== visiblePage;
+
+        if (shouldScrollPaper) {
+          const pageEl = document.getElementById(`mcq-page-${targetPage}`);
+          if (pageEl) {
+            pageEl.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
         }
       }
 
@@ -319,22 +707,27 @@ function McqLivePage() {
 
       window.setTimeout(() => setHighlightNumber((cur) => (cur === number ? null : cur)), 2000);
     },
-    [pages.length, questionPages],
+    [pages.length, questionPages, visiblePage],
   );
 
-  // ---- Server-Authoritative Timer & Synchronization ----
-  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
-  const [examEndsAtMs, setExamEndsAtMs] = useState<number | null>(null);
-  const [clockOffsetMs, setClockOffsetMs] = useState<number>(0);
+  // ---- timer ----
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const timeLeftRef = useRef(timeLeft);
+  timeLeftRef.current = timeLeft;
   const [timeUp, setTimeUp] = useState(false);
-  const [timerEnabled, setTimerEnabled] = useState(true);
-  const [screenReaderAnnouncement, setScreenReaderAnnouncement] = useState<string>("");
-  const announcedThresholds = useRef<Set<number>>(new Set());
+  const [timerEnabled, setTimerEnabled] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem("marginal_candidate_prefs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.timedModeDefault === "boolean") return parsed.timedModeDefault;
+      }
+    } catch {
+      // fallback
+    }
+    return true;
+  });
   const autoSubmittedRef = useRef(false);
-
-  const startMcqAttemptFn = useServerFn(startMcqAttempt);
-  const getServerTimeFn = useServerFn(getServerTime);
 
   // ---- annotate ----
   const [annotateMode, setAnnotateMode] = useState(false);
@@ -355,6 +748,7 @@ function McqLivePage() {
       const ctx = canvas.getContext("2d");
       ctx?.clearRect(0, 0, canvas.width, canvas.height);
     });
+    setAnnotationClearSeq((n) => n + 1);
   }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -362,18 +756,49 @@ function McqLivePage() {
   const listPapersFn = useServerFn(listMcqPapers);
   const papersQuery = useQuery({ queryKey: ["mcq-papers"], queryFn: () => listPapersFn() });
 
+  const [draftRefreshKey, setDraftRefreshKey] = useState(0);
+
+  // Proactively clean up any abandoned drafts older than 12 hours
+  useEffect(() => {
+    cleanupExpiredMcqDrafts(effectiveUserId);
+  }, [effectiveUserId]);
+
+  const activeDraftSummary = useMemo(() => {
+    if (stage !== "library") return null;
+    const allPapers = [
+      ...TOPICAL_MCQ_PAPERS.map(toMcqPaperSummaryFromTopical),
+      ...(papersQuery.data?.papers ?? []),
+    ];
+    return getActiveDraftSummary(effectiveUserId, allPapers);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, effectiveUserId, papersQuery.data?.papers, draftRefreshKey]);
+
+  // Tick every 15 seconds while on library stage to update time left and auto-purge if expired
+  useEffect(() => {
+    if (stage !== "library" || !activeDraftSummary) return;
+    const interval = window.setInterval(() => {
+      setDraftRefreshKey((k) => k + 1);
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [stage, !activeDraftSummary]);
+
   const classifyTopicsFn = useServerFn(classifyMcqTopics);
   const submitAttemptFn = useServerFn(submitPdfMcqAttempt);
   const explainFn = useServerFn(explainMcqAnswer);
   const fetchPaperPdfFn = useServerFn(fetchPaperPdf);
+  const getAnswerKeyFn = useServerFn(getMcqPaperAnswerKey);
 
-  /** Fetches a short written explanation for one question, on demand — only
-   *  ever called from the post-attempt review list, never during the attempt. */
-  async function handleExplain(number: number) {
+  /** Fetches a structured Cambridge IGCSE 0455 examiner explanation for one question,
+   *  on demand — called in post-attempt review OR immediately after checking a
+   *  question in Question-by-Question Tutor Mode. */
+  async function handleExplain(
+    number: number,
+    overrideMistakeType?: McqMistakeType | null,
+  ) {
     if (explanations[number] === "loading") return;
     setExplanations((prev) => ({ ...prev, [number]: "loading" }));
     const q = reviewQuestions.find((r) => r.number === number);
-    const correctAnswer = q?.correct_answer;
+    const correctAnswer = q?.correct_answer ?? answerKey[number] ?? null;
     if (!correctAnswer) {
       setExplanations((prev) => ({
         ...prev,
@@ -382,14 +807,31 @@ function McqLivePage() {
       return;
     }
     try {
-      const stem = stemBlobs.find((s) => s.number === number)?.text ?? "";
+      const stem =
+        stemBlobs.find((s) => s.number === number)?.text ??
+        q?.stem_text ??
+        "";
+      const inferred = classifyMcqQuestion({
+        level: level === "a2" ? "A2" : "AS",
+        number,
+        text: stem,
+        existingTopic: q?.topic,
+        existingSubtopic: q?.subtopic,
+      });
+      const resolvedMistakeType =
+        overrideMistakeType !== undefined
+          ? overrideMistakeType
+          : (mistakeTypesRef.current[number] ?? q?.mistake_type ?? null);
       const { explanation } = await explainFn({
         data: {
           level,
           number,
           stemText: stem,
           correctAnswer,
-          userAnswer: q?.user_answer ?? null,
+          userAnswer: q?.user_answer ?? answersRef.current[number] ?? null,
+          topic: q?.topic ?? inferred.topic,
+          subtopic: q?.subtopic ?? inferred.subtopic,
+          mistakeType: resolvedMistakeType,
         },
       });
       setExplanations((prev) => ({
@@ -457,9 +899,11 @@ function McqLivePage() {
         data: {
           level: historyAttempt.data.level,
           number,
-          stemText: "",
+          stemText: q?.stem_text ?? "",
           correctAnswer,
           userAnswer: q?.user_answer ?? null,
+          topic: q?.topic,
+          subtopic: q?.subtopic,
         },
       });
       setHistoryExplanations((prev) => ({
@@ -484,7 +928,8 @@ function McqLivePage() {
 
 /**
  * Interpolates or estimates PDF page locations for any questions not cleanly
- * captured by OCR text-layer parsing, guaranteeing every question maps to a real page.
+ * captured by OCR text-layer parsing, guaranteeing every question maps to a real page
+ * and questions follow a strictly non-decreasing page sequence (monotonic).
  */
 function fillMissingQuestionPages(
   map: Record<number, number>,
@@ -492,6 +937,21 @@ function fillMissingQuestionPages(
   numPages: number,
 ): Record<number, number> {
   const result: Record<number, number> = { ...map };
+
+  // Step 1: Discard any impossible outliers that violate non-decreasing order
+  // (e.g. false positives where variant codes like 12 or 30 matched on page 1).
+  let runningMax = 1;
+  for (let q = 1; q <= totalQuestions; q++) {
+    if (result[q] !== undefined) {
+      if (result[q] < runningMax) {
+        delete result[q];
+      } else {
+        runningMax = result[q];
+      }
+    }
+  }
+
+  // Step 2: Interpolate missing questions between known surrounding questions
   for (let q = 1; q <= totalQuestions; q++) {
     if (result[q]) continue;
     let prevQ = -1;
@@ -512,17 +972,25 @@ function fillMissingQuestionPages(
     if (prevQ !== -1 && nextQ !== -1) {
       const fraction = (q - prevQ) / (nextQ - prevQ);
       const estPage = Math.round(result[prevQ] + fraction * (result[nextQ] - result[prevQ]));
-      result[q] = Math.max(1, Math.min(numPages, estPage));
+      result[q] = Math.max(result[prevQ], Math.min(result[nextQ], estPage));
     } else if (prevQ !== -1) {
       const estPage = Math.min(numPages, result[prevQ] + Math.floor((q - prevQ) / 2));
-      result[q] = estPage;
+      result[q] = Math.max(result[prevQ], estPage);
     } else if (nextQ !== -1) {
       const estPage = Math.max(1, result[nextQ] - Math.ceil((nextQ - q) / 2));
-      result[q] = estPage;
+      result[q] = Math.min(result[nextQ], estPage);
     } else {
       result[q] = Math.min(numPages, Math.max(1, Math.ceil(q / 2) + 1));
     }
   }
+
+  // Step 3: Absolute final guarantee: result[q] >= result[q - 1]
+  for (let q = 2; q <= totalQuestions; q++) {
+    if (result[q] < result[q - 1]) {
+      result[q] = result[q - 1];
+    }
+  }
+
   return result;
 }
 
@@ -541,14 +1009,53 @@ function fillMissingQuestionPages(
       total: number;
       questions: GradedQuestion[];
     },
+    overrideMode?: PracticeMode,
   ) {
-    setSelectedPaperId(paper.id);
-    setPaperTitle(paper.title);
-    setLevel(paper.level);
-    setQCount(paper.questionCount);
-    setAnswerKey(paper.answerKey as Record<number, Letter>);
     const draft =
-      !completedAttempt && me.data?.userId ? readMcqDraft(me.data.userId, paper.id) : null;
+      !completedAttempt ? readMcqDraft(effectiveUserId, paper.id) : null;
+    const resolvedMode: PracticeMode =
+      overrideMode ?? draft?.practiceMode ?? practiceModeRef.current ?? "full_paper";
+    setPracticeMode(resolvedMode);
+    practiceModeRef.current = resolvedMode;
+
+    if (startInExamMode && !completedAttempt && resolvedMode === "full_paper") {
+      void handleEnableExamMode();
+    }
+    setExamViolations([]);
+    setActiveViolation(null);
+    if (!completedAttempt && (!startInExamMode || resolvedMode !== "full_paper")) {
+      hadExamModeRef.current = false;
+    }
+    setSelectedPaperId(paper.id);
+    selectedPaperIdRef.current = paper.id;
+    setPaperTitle(paper.title);
+    paperTitleRef.current = paper.title;
+    setLevel((paper.level === "a2" ? "a2" : "as") as Level);
+    levelRef.current = (paper.level === "a2" ? "a2" : "as") as Level;
+    setQCount(paper.questionCount || 30);
+    const resolvedInitialKey =
+      paper.answerKey && Object.keys(paper.answerKey).length > 0
+        ? paper.answerKey
+        : (paper as any).answer_key && Object.keys((paper as any).answer_key).length > 0
+          ? (paper as any).answer_key
+          : papersQuery.data?.papers.find((p) => p.id === paper.id)?.answerKey ??
+            getTopicalPaperById(paper.id)?.answerKey ??
+            {};
+    setAnswerKey(resolvedInitialKey as Record<number, Letter>);
+
+    // If answer key is still empty, fetch it immediately in the background
+    if (Object.keys(resolvedInitialKey).length === 0 && paper.id) {
+      void getAnswerKeyFn({ data: { paperId: paper.id } })
+        .then((res) => {
+          if (res?.answerKey && Object.keys(res.answerKey).length > 0) {
+            setAnswerKey(res.answerKey as Record<number, Letter>);
+            if (res.questionCount) setQCount(res.questionCount);
+          }
+        })
+        .catch((err) => {
+          console.warn("Async answer key lookup failed:", err);
+        });
+    }
     const completedAnswers = completedAttempt
       ? Object.fromEntries(
           completedAttempt.questions.flatMap((question) =>
@@ -556,150 +1063,272 @@ function fillMissingQuestionPages(
           ),
         )
       : null;
-    setAnswers(completedAnswers ?? draft?.answers ?? {});
-    setFlagged(new Set(draft?.flagged ?? []));
+    const completedMistakes = completedAttempt
+      ? Object.fromEntries(
+          completedAttempt.questions.flatMap((question) =>
+            question.mistake_type ? [[question.number, question.mistake_type]] : [],
+          ),
+        )
+      : null;
+    const initialAnswers = completedAnswers ?? draft?.answers ?? {};
+    const initialFlagged = new Set(draft?.flagged ?? []);
+    const initialChecked = completedAttempt
+      ? new Set(completedAttempt.questions.map((q) => q.number))
+      : new Set(draft?.checkedQuestions ?? []);
+    const initialMistakes: Record<number, McqMistakeType> =
+      (completedMistakes as Record<number, McqMistakeType> | null) ?? draft?.mistakeTypes ?? {};
+    const initialEliminated: Record<number, Letter[]> = draft?.eliminatedOptions ?? {};
+    const initialTimes: Record<number, number> = draft?.questionTimes ?? {};
+
+    setAnswers(initialAnswers);
+    answersRef.current = initialAnswers;
+    setFlagged(initialFlagged);
+    flaggedRef.current = initialFlagged;
+    setCheckedQuestions(initialChecked);
+    checkedQuestionsRef.current = initialChecked;
+    setMistakeTypes(initialMistakes);
+    mistakeTypesRef.current = initialMistakes;
+    setEliminatedOptions(initialEliminated);
+    eliminatedOptionsRef.current = initialEliminated;
+    setQuestionTimes(initialTimes);
+    questionTimesRef.current = initialTimes;
     setGraded(!!completedAttempt);
     setResult(
       completedAttempt && completedAttempt.score !== null
         ? { score: completedAttempt.score, total: completedAttempt.total }
         : null,
     );
-    setReviewQuestions(completedAttempt?.questions ?? []);
     if (completedAttempt) {
-      const byTopic = new Map<string, { attempted: number; correct: number }>();
-      for (const question of completedAttempt.questions) {
-        const entry = byTopic.get(question.topic) ?? { attempted: 0, correct: 0 };
-        entry.attempted += 1;
-        if (question.correct) entry.correct += 1;
-        byTopic.set(question.topic, entry);
-      }
-      setAttemptTopics(
-        [...byTopic.entries()].map(([savedTopic, value]) => ({
-          topic: savedTopic,
-          attempted: value.attempted,
-          correct: value.correct,
-          accuracyPct: Math.round((value.correct / value.attempted) * 100),
-        })),
-      );
+      const levelUpper = paper.level === "a2" ? "A2" : "AS";
+      const normalizedCompleted = completedAttempt.questions.map((question) => {
+        const c = classifyMcqQuestion({
+          level: levelUpper,
+          number: question.number,
+          text: question.stem_text,
+          existingTopic: question.topic,
+          existingSubtopic: question.subtopic,
+          existingSkill: question.skill,
+        });
+        return {
+          ...question,
+          topic: c.topic,
+          subtopic: question.subtopic || c.subtopic,
+          unit: c.unit,
+          domain: c.domain,
+          skill: c.skill,
+        };
+      });
+      setReviewQuestions(normalizedCompleted);
+      setAttemptTopics(buildTopicStatsFromQuestions(normalizedCompleted, levelUpper));
       setAttemptDomains(
         aggregateMcqDomains(
-          completedAttempt.questions.map((question) => ({
+          normalizedCompleted.map((question) => ({
             topic: question.topic,
             correct: !!question.correct,
+            number: question.number,
+            level: levelUpper,
           })),
         ),
       );
     } else {
+      setReviewQuestions([]);
       setAttemptTopics([]);
       setAttemptDomains([]);
     }
     setExplanations({});
 
-    // Server-authoritative timer setup
+    // Reset the clock and scratch marks for this fresh attempt — real
+    // Cambridge IGCSE 0455 timings: Paper 1 (AS) is 1 hour, Paper 1 (IGCSE 0455) is
+    // 1 hour 15, and Topical Papers use their configured duration (2 min/question).
+    const matchedTopical = getTopicalPaperById(paper.id);
+    const fullDurationSeconds = matchedTopical
+      ? matchedTopical.durationSeconds
+      : (PAPER_DURATION_SECONDS[paper.level as Level] ?? 45 * 60);
+    const initialTimeLeft = completedAttempt
+      ? null
+      : draft?.timeLeft == null
+        ? fullDurationSeconds
+        : Math.min(draft.timeLeft, fullDurationSeconds);
+    setTimeLeft(initialTimeLeft);
+    timeLeftRef.current = initialTimeLeft;
     setTimeUp(false);
     autoSubmittedRef.current = false;
     setAnnotateMode(false);
     annotationCanvases.current.clear();
-    announcedThresholds.current.clear();
 
-    if (completedAttempt) {
-      setTimeLeft(null);
-      setExamEndsAtMs(null);
-      setCurrentAttemptId(null);
-    } else if (draft?.examEndsAtMs) {
-      const offset = draft.clockOffsetMs ?? 0;
-      setClockOffsetMs(offset);
-      setExamEndsAtMs(draft.examEndsAtMs);
-      if (draft.attemptId) setCurrentAttemptId(draft.attemptId);
-      const rem = calculateRemainingSeconds(draft.examEndsAtMs, Date.now(), offset);
-      setTimeLeft(rem);
-      if (shouldAutoSubmit(rem)) {
-        setTimeUp(true);
-      }
-    } else {
+    const downloadPdfBuffer = async (targetUrl: string): Promise<ArrayBuffer> => {
       try {
-        const attemptRes = await startMcqAttemptFn({ data: { paperId: paper.id } });
-        const offset = calculateClockOffset(attemptRes.serverNow, Date.now());
-        setCurrentAttemptId(attemptRes.attemptId);
-        setExamEndsAtMs(attemptRes.examEndsAt);
-        setClockOffsetMs(offset);
-        const rem = calculateRemainingSeconds(attemptRes.examEndsAt, Date.now(), offset);
-        setTimeLeft(rem);
-      } catch (startErr) {
-        console.warn("Could not start server-authoritative attempt session:", startErr);
-        const dur = getPaperDurationSeconds(paper);
-        const endsAt = Date.now() + dur * 1000;
-        setExamEndsAtMs(endsAt);
-        setTimeLeft(dur);
-      }
-    }
-
-    setBusyLabel("Fetching the paper…");
-    try {
-      const pdfjs = await loadPdfjs();
-      let buf: ArrayBuffer;
-      try {
-        const res = await fetch(paper.qpUrl);
+        const res = await fetch(targetUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        buf = await res.arrayBuffer();
-      } catch (directErr) {
-        // Fallback to server-side proxy download (handles CORS, ISP/network blocks, missing headers)
+        return await res.arrayBuffer();
+      } catch {
         try {
-          const { base64 } = await fetchPaperPdfFn({ data: { qpUrl: paper.qpUrl } });
-          buf = base64ToArrayBuffer(base64);
-        } catch (proxyErr) {
+          const { base64 } = await fetchPaperPdfFn({ data: { qpUrl: targetUrl } });
+          return base64ToArrayBuffer(base64);
+        } catch {
           throw new Error("Could not download the question paper file.");
         }
       }
+    };
 
-      const doc = await pdfjs.getDocument({
-        data: new Uint8Array(buf),
-      }).promise;
+    setBusyLabel(
+      matchedTopical ? "Slicing real Cambridge exam diagrams & tables…" : "Fetching the paper…",
+    );
+    try {
+      if (matchedTopical) {
+        const topicalBuilt = await renderTopicalPaperPages({
+          topicalPaper: matchedTopical,
+          scale: RENDER_SCALE,
+          fetchPdfBuffer: downloadPdfBuffer,
+          onProgress: (label) => setBusyLabel(label),
+        });
+        setQuestionPages(topicalBuilt.questionPages);
+        setQuestionSlices(topicalBuilt.questionSlices);
+        setPages(topicalBuilt.pages);
+        setStemBlobs(topicalBuilt.stems);
+      } else {
+        const pdfjs = await loadPdfjs();
+        const buf = await downloadPdfBuffer(paper.qpUrl);
 
-      const built: PageImage[] = [];
-      const stems: StemBlob[] = [];
-      const rawPageMap: Record<number, number> = {};
-      for (let p = 1; p <= doc.numPages; p++) {
-        const page = await doc.getPage(p);
-        const viewport = page.getViewport({ scale: RENDER_SCALE });
+        const doc = await pdfjs.getDocument({
+          data: new Uint8Array(buf),
+        }).promise;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-        await (page.render({ canvasContext: ctx, viewport, canvas } as any)).promise;
-        built.push({ pageNumber: p, canvas });
+        const built: PageImage[] = [];
+        const stems: StemBlob[] = [];
+        const candidatePageMap: Record<number, number[]> = {};
+        const pageMetaByNum = new Map<
+          number,
+          { canvas: HTMLCanvasElement; heightPt: number; spans: QuestionPageSpan[] }
+        >();
+        for (let p = 1; p <= doc.numPages; p++) {
+          const page = await doc.getPage(p);
+          const unscaledViewport = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: RENDER_SCALE });
 
-        try {
-          const content = await page.getTextContent();
-          const pageStems = extractQuestionStems(content.items as PdfTextItem[]);
-          stems.push(...pageStems);
-          for (const s of pageStems) {
-            if (s.number >= 1 && s.number <= paper.questionCount && !rawPageMap[s.number]) {
-              rawPageMap[s.number] = p;
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          await (page.render({ canvasContext: ctx, viewport } as any) as any).promise;
+          built.push({ pageNumber: p, canvas });
+
+          let pageSpans: QuestionPageSpan[] = [];
+          try {
+            const content = await page.getTextContent();
+            pageSpans = extractQuestionSpans(
+              content.items as PdfTextItem[],
+              unscaledViewport.height,
+            );
+            stems.push(...pageSpans.map(({ number, text }) => ({ number, text })));
+            for (const s of pageSpans) {
+              if (s.number >= 1 && s.number <= paper.questionCount) {
+                if (!candidatePageMap[s.number]) {
+                  candidatePageMap[s.number] = [];
+                }
+                candidatePageMap[s.number].push(p);
+              }
+            }
+          } catch (textErr) {
+            console.warn(`Text extraction skipped for page ${p}:`, textErr);
+          }
+
+          pageMetaByNum.set(p, {
+            canvas,
+            heightPt: unscaledViewport.height,
+            spans: pageSpans,
+          });
+        }
+
+        // Resolve candidate sightings into a strictly monotonic question -> page map.
+        // An exam paper is always sequentially ordered: page(q) >= page(q - 1).
+        const rawPageMap: Record<number, number> = {};
+        let lastPage = 1;
+        for (let q = 1; q <= paper.questionCount; q++) {
+          const sightings = candidatePageMap[q];
+          if (!sightings || sightings.length === 0) continue;
+
+          // Discard page 1 if total pages > 1 and q > 1 (multi-page exam cover page false positive)
+          const validSightings = sightings.filter((p) => doc.numPages <= 1 || q === 1 || p > 1);
+          if (validSightings.length === 0) continue;
+
+          // Pick candidate page that respects monotonicity (p >= lastPage)
+          const monotonicMatch = validSightings.find((p) => p >= lastPage);
+          if (monotonicMatch !== undefined) {
+            rawPageMap[q] = monotonicMatch;
+            lastPage = monotonicMatch;
+          } else {
+            const highest = validSightings[validSightings.length - 1];
+            if (highest >= lastPage) {
+              rawPageMap[q] = highest;
+              lastPage = highest;
             }
           }
-        } catch (textErr) {
-          console.warn(`Text extraction skipped for page ${p}:`, textErr);
         }
-      }
 
-      const completedPageMap = fillMissingQuestionPages(
-        rawPageMap,
-        paper.questionCount,
-        doc.numPages,
-      );
-      setQuestionPages(completedPageMap);
-      setPages(built);
-      setStemBlobs(stems);
-      setActiveQuestion(1);
-      setStage("practice");
-      if (me.data?.userId && !completedAttempt) {
-        window.localStorage.setItem(
-          mcqActiveKey(me.data.userId),
-          JSON.stringify({ version: MCQ_ACTIVE_VERSION, paperId: paper.id }),
+        // Crop isolated single-question PDF slices for Question-by-Question Mode
+        const builtSlices: Record<number, HTMLCanvasElement> = {};
+        for (let q = 1; q <= paper.questionCount; q++) {
+          const resolvedPage = rawPageMap[q];
+          if (!resolvedPage) continue;
+          const pageMeta = pageMetaByNum.get(resolvedPage);
+          const span = pageMeta?.spans.find((s) => s.number === q);
+          if (pageMeta && span) {
+            builtSlices[q] = cropQuestionSliceCanvas({
+              pageCanvas: pageMeta.canvas,
+              pageHeightPt: pageMeta.heightPt,
+              yTop: span.yTop,
+              yBottom: span.yBottom,
+              scale: RENDER_SCALE,
+            });
+          }
+        }
+
+        const completedPageMap = fillMissingQuestionPages(
+          rawPageMap,
+          paper.questionCount,
+          doc.numPages,
         );
+        // Deduplicate stems by question number (1..questionCount), preferring the longest extracted stem
+        const bestStemByNum = new Map<number, string>();
+        for (const s of stems) {
+          if (s.number >= 1 && s.number <= paper.questionCount) {
+            const prev = bestStemByNum.get(s.number) ?? "";
+            if (s.text.length >= prev.length) {
+              bestStemByNum.set(s.number, s.text);
+            }
+          }
+        }
+        const dedupedStems: StemBlob[] = [...bestStemByNum.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([number, text]) => ({ number, text }));
+
+        setQuestionPages(completedPageMap);
+        setQuestionSlices(builtSlices);
+        setPages(built);
+        setStemBlobs(dedupedStems);
+      }
+      const restoredActive =
+        draft?.activeQuestion && draft.activeQuestion >= 1 && draft.activeQuestion <= (paper.questionCount || 30)
+          ? draft.activeQuestion
+          : 1;
+      setActiveQuestion(restoredActive);
+      activeQuestionRef.current = restoredActive;
+      setStage("practice");
+      if (!completedAttempt) {
+        saveDraftToStorage(
+          initialAnswers,
+          initialFlagged,
+          initialTimeLeft,
+          paper.id,
+        );
+        navigate({
+          search: (prev) => ({ ...prev, paperId: paper.id }),
+          replace: true,
+        });
       }
       if (draft && Object.keys(draft.answers).length > 0) {
         toast.success(
@@ -723,15 +1352,48 @@ function fillMissingQuestionPages(
   const autoStartedRef = useRef(false);
   useEffect(() => {
     if (autoStartedRef.current) return;
-    if (stage !== "library" || !me.data?.userId) return;
-    const paperId = search.paperId ?? readActiveMcqPaper(me.data.userId);
-    if (!paperId) return;
-    const paper = papersQuery.data?.papers.find((p) => p.id === paperId);
+    if (stage !== "library") return;
+    if (!search.paperId) return; // Only auto-start on explicit link search parameter
+    const matchedTopical = getTopicalPaperById(search.paperId);
+    if (matchedTopical) {
+      autoStartedRef.current = true;
+      beginPractice(toMcqPaperSummaryFromTopical(matchedTopical));
+      return;
+    }
+    const paper = papersQuery.data?.papers.find((p) => p.id === search.paperId);
     if (!paper) return;
     autoStartedRef.current = true;
     beginPractice(paper);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.paperId, papersQuery.data, stage, me.data?.userId]);
+  }, [search.paperId, papersQuery.data, stage]);
+
+  // Synchronize answerKey and questionCount if papersQuery finishes loading or updates while in practice mode
+  useEffect(() => {
+    if (stage !== "practice" || !selectedPaperId) return;
+    if (Object.keys(answerKey).length > 0) return;
+    const dbMatch = papersQuery.data?.papers.find((p) => p.id === selectedPaperId);
+    if (dbMatch?.answerKey && Object.keys(dbMatch.answerKey).length > 0) {
+      setAnswerKey(dbMatch.answerKey as Record<number, Letter>);
+      if (dbMatch.questionCount && dbMatch.questionCount > 0) {
+        setQCount(dbMatch.questionCount);
+      }
+    } else {
+      const topMatch = getTopicalPaperById(selectedPaperId);
+      if (topMatch?.answerKey && Object.keys(topMatch.answerKey).length > 0) {
+        setAnswerKey(topMatch.answerKey as Record<number, Letter>);
+        if (topMatch.questionCount && topMatch.questionCount > 0) {
+          setQCount(topMatch.questionCount);
+        }
+      } else {
+        void getAnswerKeyFn({ data: { paperId: selectedPaperId } }).then((res) => {
+          if (res?.answerKey && Object.keys(res.answerKey).length > 0) {
+            setAnswerKey(res.answerKey as Record<number, Letter>);
+            if (res.questionCount) setQCount(res.questionCount);
+          }
+        });
+      }
+    }
+  }, [stage, selectedPaperId, answerKey, papersQuery.data, getAnswerKeyFn]);
 
   // Track currently visible page during scrolling so questions on the viewed page are known
   useEffect(() => {
@@ -778,129 +1440,276 @@ function fillMissingQuestionPages(
   }, [visiblePage, questionPages, stage]);
 
 
-  /* ---------------- Server-Authoritative Timer & Visibility Sync ----------------
+  /* ---------------- countdown timer ----------------
    *
-   * Recomputes remaining seconds from absolute deadline on every second
-   * and instantly when tab visibility returns. Automatically announces 10m,
-   * 5m, and 1m warnings to screen readers.
+   * One interval per practice attempt (restarted only when `stage` or
+   * `graded` changes, not on every tick) counting down from the paper's
+   * real exam duration. Auto-submits once, exactly like a real exam
+   * running out of time, via the effect below.
    */
   useEffect(() => {
-    if (stage !== "practice" || graded || !timerEnabled || !examEndsAtMs) return;
-
-    const checkAndSyncTimer = () => {
-      const rem = calculateRemainingSeconds(examEndsAtMs, Date.now(), clockOffsetMs);
-      setTimeLeft(rem);
-
-      if (shouldAutoSubmit(rem)) {
-        if (!autoSubmittedRef.current) {
-          autoSubmittedRef.current = true;
-          setTimeUp(true);
-          toast.warning("Time's up — submitting your answers automatically.");
-          gradeAndSave();
+    if (
+      stage !== "practice" ||
+      graded ||
+      !timerEnabled ||
+      practiceMode === "question_by_question"
+    )
+      return;
+    const id = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null) return prev;
+        if (prev <= 1) {
+          clearInterval(id);
+          return 0;
         }
-        return;
-      }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [stage, graded, timerEnabled, practiceMode]);
 
-      const announcement = getTimerAnnouncement(rem, announcedThresholds.current);
-      if (announcement) {
-        announcedThresholds.current.add(announcement.threshold);
-        setScreenReaderAnnouncement(announcement.message);
-      }
-    };
-
-    checkAndSyncTimer();
-    const intervalId = window.setInterval(checkAndSyncTimer, 1000);
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkAndSyncTimer();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, graded, timerEnabled, examEndsAtMs, clockOffsetMs]);
-
-  // Keep an account-scoped draft for the active paper. A refresh, closed tab,
-  // or temporary connection loss no longer discards the student's choices.
   useEffect(() => {
-    if (stage !== "practice" || graded || !selectedPaperId || !me.data?.userId) return;
-    const id = window.setTimeout(() => {
-      const draft: McqDraft = {
-        version: MCQ_DRAFT_VERSION,
-        paperId: selectedPaperId,
-        attemptId: currentAttemptId,
-        examEndsAtMs,
-        clockOffsetMs,
-        answers,
-        flagged: Array.from(flagged),
-        timeLeft,
-        savedAt: Date.now(),
-      };
-      window.localStorage.setItem(
-        mcqDraftKey(me.data.userId, selectedPaperId),
-        JSON.stringify(draft),
-      );
-      window.localStorage.setItem(
-        mcqActiveKey(me.data.userId),
-        JSON.stringify({ version: MCQ_ACTIVE_VERSION, paperId: selectedPaperId }),
-      );
-    }, 300);
-    return () => window.clearTimeout(id);
-  }, [answers, flagged, graded, me.data?.userId, selectedPaperId, stage, timeLeft, currentAttemptId, examEndsAtMs, clockOffsetMs]);
+    if (
+      timeLeft !== 0 ||
+      stage !== "practice" ||
+      graded ||
+      !timerEnabled ||
+      practiceMode === "question_by_question" ||
+      autoSubmittedRef.current
+    )
+      return;
+    autoSubmittedRef.current = true;
+    setTimeUp(true);
+    toast.warning("Time's up — submitting your answers automatically.");
+    gradeAndSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, stage, graded, timerEnabled, practiceMode]);
 
-  /* ---------------- answering ---------------- */
+  /* ---------------- resilient autosave engine ---------------- */
+
+  const saveDraftToStorage = useCallback(
+    (
+      currentAnswers: Record<number, Letter>,
+      currentFlagged: Set<number>,
+      currentTimeLeft: number | null,
+      overridePaperId?: string,
+    ) => {
+      const targetPaperId = overridePaperId || selectedPaperIdRef.current;
+      if (!targetPaperId || graded) return;
+      try {
+        const draft: McqDraft = {
+          version: MCQ_DRAFT_VERSION,
+          paperId: targetPaperId,
+          paperTitle: paperTitleRef.current,
+          level: levelRef.current,
+          practiceMode: practiceModeRef.current,
+          answers: currentAnswers,
+          flagged: Array.from(currentFlagged),
+          checkedQuestions: Array.from(checkedQuestionsRef.current),
+          mistakeTypes: mistakeTypesRef.current,
+          eliminatedOptions: eliminatedOptionsRef.current,
+          questionTimes: questionTimesRef.current,
+          activeQuestion: activeQuestionRef.current,
+          timeLeft: currentTimeLeft,
+          savedAt: Date.now(),
+        };
+        window.localStorage.setItem(
+          mcqDraftKey(effectiveUserId, targetPaperId),
+          JSON.stringify(draft),
+        );
+        window.localStorage.setItem(
+          mcqActiveKey(effectiveUserId),
+          JSON.stringify({ version: MCQ_ACTIVE_VERSION, paperId: targetPaperId, savedAt: Date.now() }),
+        );
+        setSaveStatus("saved");
+      } catch (err) {
+        console.warn("MCQ autosave error:", err);
+      }
+    },
+    [effectiveUserId, graded],
+  );
+
+  const toggleFlag = useCallback(
+    (number: number) => {
+      setSaveStatus("saving");
+      setFlagged((prev) => {
+        const next = new Set(prev);
+        if (next.has(number)) next.delete(number);
+        else next.add(number);
+        saveDraftToStorage(answersRef.current, next, timeLeftRef.current);
+        return next;
+      });
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveStatus("saved"), 400);
+    },
+    [saveDraftToStorage],
+  );
 
   const pick = useCallback(
     (number: number, letter: Letter) => {
-      if (timeUp || (timeLeft !== null && timeLeft <= 0)) return;
-      setAnswers((prev) => ({ ...prev, [number]: letter }));
+      if (timeUp) return;
+      setSaveStatus("saving");
+      setAnswers((prev) => {
+        const next = { ...prev, [number]: letter };
+        saveDraftToStorage(next, flaggedRef.current, timeLeftRef.current);
+        return next;
+      });
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveStatus("saved"), 400);
     },
-    [timeUp, timeLeft],
+    [timeUp, saveDraftToStorage],
   );
+
+  const handleTutorCheckAnswer = useCallback(
+    (number: number, elapsedSeconds: number) => {
+      setSaveStatus("saving");
+      setCheckedQuestions((prev) => {
+        const next = new Set(prev);
+        next.add(number);
+        checkedQuestionsRef.current = next;
+        return next;
+      });
+      setQuestionTimes((prev) => {
+        const next = { ...prev, [number]: elapsedSeconds };
+        questionTimesRef.current = next;
+        return next;
+      });
+      saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveStatus("saved"), 400);
+    },
+    [saveDraftToStorage],
+  );
+
+  const handleSetMistakeType = useCallback(
+    (number: number, type: McqMistakeType) => {
+      setSaveStatus("saving");
+      setMistakeTypes((prev) => {
+        const next = { ...prev, [number]: type };
+        mistakeTypesRef.current = next;
+        return next;
+      });
+      saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveStatus("saved"), 400);
+    },
+    [saveDraftToStorage],
+  );
+
+  const handleToggleEliminate = useCallback(
+    (number: number, letter: Letter) => {
+      setEliminatedOptions((prev) => {
+        const cur = prev[number] ?? [];
+        const exists = cur.includes(letter);
+        const nextArr = exists ? cur.filter((l) => l !== letter) : [...cur, letter];
+        const next = { ...prev, [number]: nextArr };
+        eliminatedOptionsRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Periodic background draft sync (saves timer countdown progress every 5 seconds)
+  useEffect(() => {
+    if (stage !== "practice" || graded || !selectedPaperId) return;
+    const interval = window.setInterval(() => {
+      saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [stage, graded, selectedPaperId, saveDraftToStorage]);
+
+  // Immediately flush draft state on tab close, page refresh, or navigation
+  useEffect(() => {
+    const handleFlush = () => {
+      if (stage === "practice" && !graded && selectedPaperIdRef.current) {
+        saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+      }
+    };
+    window.addEventListener("beforeunload", handleFlush);
+    window.addEventListener("pagehide", handleFlush);
+    return () => {
+      window.removeEventListener("beforeunload", handleFlush);
+      window.removeEventListener("pagehide", handleFlush);
+    };
+  }, [stage, graded, saveDraftToStorage]);
 
   /* ---------------- grading + feedback ---------------- */
 
   async function gradeAndSave() {
-    if (Object.keys(answerKey).length === 0) {
-      toast.error("No mark scheme loaded yet — upload one, or the answers can't be checked.");
+    let effectiveKey = answerKey;
+    if (Object.keys(effectiveKey).length === 0 && selectedPaperId) {
+      const dbMatch = papersQuery.data?.papers.find((p) => p.id === selectedPaperId);
+      if (dbMatch?.answerKey && Object.keys(dbMatch.answerKey).length > 0) {
+        effectiveKey = dbMatch.answerKey as Record<number, Letter>;
+        setAnswerKey(effectiveKey);
+      } else {
+        const topMatch = getTopicalPaperById(selectedPaperId);
+        if (topMatch?.answerKey && Object.keys(topMatch.answerKey).length > 0) {
+          effectiveKey = topMatch.answerKey as Record<number, Letter>;
+          setAnswerKey(effectiveKey);
+        } else {
+          try {
+            const res = await getAnswerKeyFn({ data: { paperId: selectedPaperId } });
+            if (res?.answerKey && Object.keys(res.answerKey).length > 0) {
+              effectiveKey = res.answerKey as Record<number, Letter>;
+              setAnswerKey(effectiveKey);
+            }
+          } catch (err) {
+            console.warn("Failed to fetch answer key before grading:", err);
+          }
+        }
+      }
+    }
+
+    if (Object.keys(effectiveKey).length === 0) {
+      toast.error("No mark scheme loaded yet — please wait or reload the paper.");
       return;
     }
     setBusyLabel("Marking…");
     try {
-      let tags: Record<number, { topic: string; skill: "knowledge" | "application" | "analysis" }> =
-        {};
-      if (stemBlobs.length > 0) {
-        try {
-          const { tags: rows } = await classifyTopicsFn({ data: { level, items: stemBlobs } });
-          tags = Object.fromEntries(
-            rows.map((t) => [t.number, { topic: t.topic, skill: t.skill }]),
-          );
-        } catch {
-          // Grading still works without topic tags — feedback just won't be broken down.
-        }
-      }
+      const matchedTopical = getTopicalPaperById(selectedPaperId);
+      const stemByNumber = new Map<number, string>(
+        stemBlobs.map((s) => [s.number, s.text]),
+      );
+      const levelUpper = level === "a2" ? "A2" : "AS";
 
       const allNumbers = new Set<number>([
-        ...Object.keys(answerKey).map(Number),
+        ...Object.keys(effectiveKey).map(Number),
         ...Object.keys(answers).map(Number),
+        ...Array.from({ length: qCount || 30 }, (_, i) => i + 1),
       ]);
       const graded_ = [...allNumbers]
+        .filter((n) => n >= 1)
         .sort((a, b) => a - b)
         .map((number) => {
-          const correctAnswer = answerKey[number] ?? null;
+          const correctAnswer = effectiveKey[number] ?? null;
           const userAnswer = answers[number] ?? null;
+          const topicalQ = matchedTopical?.questions.find((q) => q.number === number);
+          const stemText =
+            stemByNumber.get(number) ??
+            (topicalQ?.stemText ?? "");
+          const classified = classifyMcqQuestion({
+            level: levelUpper,
+            number,
+            text: stemText,
+            existingTopic: matchedTopical?.shortTitle,
+            existingSubtopic: topicalQ?.subtopic,
+            existingSkill: topicalQ?.skill,
+          });
+          const isCorrect = correctAnswer ? correctAnswer === userAnswer : null;
           return {
             number,
-            topic: tags[number]?.topic ?? "Untagged",
-            skill: tags[number]?.skill ?? "knowledge",
+            topic: classified.topic,
+            subtopic: topicalQ?.subtopic || classified.subtopic,
+            unit: classified.unit,
+            domain: classified.domain,
+            skill: classified.skill,
+            stem_text: stemText ? stemText.slice(0, 1400) : undefined,
             correct_answer: correctAnswer,
             user_answer: userAnswer,
-            correct: correctAnswer ? correctAnswer === userAnswer : null,
+            correct: isCorrect,
+            mistake_type: isCorrect === false ? (mistakeTypesRef.current[number] ?? null) : null,
           };
         });
 
@@ -908,119 +1717,137 @@ function fillMissingQuestionPages(
       const score = scored.filter((q) => q.correct).length;
       setResult({ score, total: scored.length });
       setGraded(true);
-      setReviewQuestions(
-        graded_.map((q) => ({
-          number: q.number,
-          topic: q.topic,
-          correct_answer: q.correct_answer,
-          user_answer: q.user_answer,
-          correct: q.correct,
-        })),
-      );
-
-      const byTopic = new Map<string, { attempted: number; correct: number }>();
-      for (const q of scored) {
-        const entry = byTopic.get(q.topic) ?? { attempted: 0, correct: 0 };
-        entry.attempted += 1;
-        if (q.correct) entry.correct += 1;
-        byTopic.set(q.topic, entry);
-      }
-      setAttemptTopics(
-        [...byTopic.entries()].map(([topic, v]) => ({
-          topic,
-          attempted: v.attempted,
-          correct: v.correct,
-          accuracyPct: Math.round((v.correct / v.attempted) * 100),
-        })),
-      );
+      setReviewQuestions(graded_);
+      setAttemptTopics(buildTopicStatsFromQuestions(scored, levelUpper));
       setAttemptDomains(
-        aggregateMcqDomains(scored.map((q) => ({ topic: q.topic, correct: !!q.correct }))),
+        aggregateMcqDomains(
+          scored.map((q) => ({
+            topic: q.topic,
+            correct: !!q.correct,
+            number: q.number,
+            level: levelUpper,
+          })),
+        ),
       );
 
-      await submitWithOfflineRetry({
-        attemptId: currentAttemptId ?? undefined,
-        title: paperTitle,
-        filename: paperTitle,
-        level,
-        paperId: selectedPaperId!,
-        questions: graded_,
+      await submitAttemptFn({
+        data: {
+          title: paperTitle,
+          filename: paperTitle,
+          level,
+          paperId: selectedPaperId!,
+          questions: graded_.map((q) => ({
+            number: q.number,
+            topic: q.topic,
+            subtopic: q.subtopic,
+            stem_text: q.stem_text,
+            skill: q.skill,
+            correct_answer: q.correct_answer,
+            user_answer: q.user_answer,
+            correct: q.correct,
+            mistake_type: q.mistake_type,
+          })),
+        },
       });
-      if (me.data?.userId && selectedPaperId) {
-        window.localStorage.removeItem(mcqDraftKey(me.data.userId, selectedPaperId));
-        window.localStorage.removeItem(mcqActiveKey(me.data.userId));
+      if (selectedPaperId) {
+        window.localStorage.removeItem(mcqDraftKey(effectiveUserId, selectedPaperId));
+        window.localStorage.removeItem(mcqActiveKey(effectiveUserId));
+        window.localStorage.removeItem(mcqDraftKey("guest", selectedPaperId));
+        window.localStorage.removeItem(mcqActiveKey("guest"));
       }
+      setDraftRefreshKey((k) => k + 1);
+      navigate({
+        search: (prev) => {
+          const next = { ...prev };
+          delete next.paperId;
+          return next;
+        },
+        replace: true,
+      });
       topicPerformance.refetch();
       queryClient.invalidateQueries({ queryKey: ["mcq-paper-history"] });
+      queryClient.invalidateQueries({ queryKey: ["review-mcq-history"] });
+      queryClient.invalidateQueries({ queryKey: ["review-mcq-topics"] });
+      queryClient.invalidateQueries({ queryKey: ["review-panel"] });
       toast.success(`Marked — ${score}/${scored.length}.`);
     } catch (err) {
-      toast.error("Marking failed — your answers are saved locally, try again.");
+      toast.error("Marking failed — your answers are still on screen, try again.");
     } finally {
       setBusyLabel(null);
-    }
-  }
-
-  async function submitWithOfflineRetry(payload: {
-    attemptId?: string;
-    paperId: string;
-    title: string;
-    filename?: string;
-    level: string;
-    questions: any[];
-  }) {
-    const pendingKey = payload.attemptId
-      ? `marginalite.mcq.pending_submit.${payload.attemptId}`
-      : `marginalite.mcq.pending_submit.paper_${payload.paperId}`;
-
-    try {
-      window.localStorage.setItem(pendingKey, JSON.stringify({ ...payload, savedAt: Date.now() }));
-    } catch {}
-
-    let retries = 0;
-    const maxRetries = 3;
-    let delayMs = 1000;
-
-    while (retries < maxRetries) {
-      try {
-        const res = await submitAttemptFn({ data: payload });
-        try {
-          window.localStorage.removeItem(pendingKey);
-        } catch {}
-        return res;
-      } catch (submitErr) {
-        retries++;
-        if (retries >= maxRetries) {
-          throw submitErr;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, delayMs));
-        delayMs *= 2;
-      }
     }
   }
 
   /* ---------------- render ---------------- */
 
   const answeredCount = Object.keys(answers).length;
-  // Full ordered list of question numbers, straight off the mark scheme —
-  // this is what the answer side panel renders, one row per question,
-  // regardless of where (or how reliably) that question landed on the
-  // page image.
-  const questionNumbers = useMemo(
-    () =>
-      Object.keys(answerKey)
-        .map(Number)
-        .sort((a, b) => a - b),
-    [answerKey],
-  );
+  // Full ordered list of question numbers — renders one row per question.
+  // Guaranteed fallback ensures questions 1..qCount (default 30) ALWAYS render, so students can
+  // answer questions immediately even if the mark scheme is still resolving.
+  const questionNumbers = useMemo(() => {
+    const fromAnswerKey = Object.keys(answerKey)
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n >= 1)
+      .sort((a, b) => a - b);
+    if (fromAnswerKey.length > 0) return fromAnswerKey;
+
+    const fromAnswers = Object.keys(answers)
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n >= 1)
+      .sort((a, b) => a - b);
+
+    const fromStems = stemBlobs
+      .map((s) => s.number)
+      .filter((n) => Number.isFinite(n) && n >= 1)
+      .sort((a, b) => a - b);
+
+    const fromPages = Object.keys(questionPages)
+      .map(Number)
+      .filter((n) => Number.isFinite(n) && n >= 1)
+      .sort((a, b) => a - b);
+
+    const count = Math.max(
+      qCount,
+      fromAnswers.length > 0 ? Math.max(...fromAnswers) : 0,
+      fromStems.length > 0 ? Math.max(...fromStems) : 0,
+      fromPages.length > 0 ? Math.max(...fromPages) : 0,
+      30,
+    );
+
+    return Array.from({ length: count }, (_, i) => i + 1);
+  }, [answerKey, answers, stemBlobs, questionPages, qCount]);
 
   function leavePractice() {
+    if (isExamFullscreenActive() || examModeActive) {
+      isLeavingExamModeRef.current = true;
+      setExamModeActive(false);
+      setActiveViolation(null);
+      void exitExamFullscreen();
+      setTimeout(() => {
+        isLeavingExamModeRef.current = false;
+      }, 500);
+    }
     setStage("library");
-    if (me.data?.userId) window.localStorage.removeItem(mcqActiveKey(me.data.userId));
+    setDraftRefreshKey((k) => k + 1);
+    navigate({
+      search: (prev) => {
+        const next = { ...prev };
+        delete next.paperId;
+        return next;
+      },
+      replace: true,
+    });
   }
 
   async function openFullPastPaper() {
     const attempt = historyAttempt.data;
     if (!attempt) return;
-    const paper = papersQuery.data?.papers.find((entry) => entry.id === attempt.paperId);
+    const matchedTopical =
+      getTopicalPaperById(attempt.paperId) ??
+      TOPICAL_MCQ_PAPERS.find((t) => t.title === attempt.title) ??
+      null;
+    const paper = matchedTopical
+      ? toMcqPaperSummaryFromTopical(matchedTopical)
+      : papersQuery.data?.papers.find((entry) => entry.id === attempt.paperId);
     if (!paper) {
       toast.error("That paper is no longer available in the library.");
       return;
@@ -1032,86 +1859,297 @@ function fillMissingQuestionPages(
 
   return (
     <div>
-      {/* Accessible screen-reader live announcement region for time warnings */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only">
-        {screenReaderAnnouncement}
-      </div>
-
       {stage === "library" ? (
         <PageHeader
           title="MCQ Live"
-          description="Practice straight off an official Cambridge IGCSE Economics (0455) past paper — answer from the button panel beside it."
+          description="Practice straight off a real past paper — answer from the button panel beside it."
+          action={
+            <Button
+              size="sm"
+              variant={calcOpen ? "default" : "outline"}
+              onClick={() => setCalcOpen((v) => !v)}
+              className="h-9 gap-1.5 rounded-xl border-border font-medium shadow-2xs hover:bg-muted"
+              title="Open Cambridge Economics Calculator & Solvers (Alt+C)"
+            >
+              <CalculatorIcon className="h-4 w-4 text-primary" />
+              <span>Cambridge Calculator</span>
+            </Button>
+          }
         />
       ) : null}
 
       {stage === "library" ? (
-        <div className="mx-auto grid max-w-5xl gap-8 px-5 py-10 md:px-8 lg:grid-cols-[1fr_20rem]">
-          <div className="min-w-0 max-w-2xl">
-            <div className="mb-5 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-medium">Pick a paper to practice</p>
-              </div>
-              <a
-                href="/mcq-papers-admin"
-                className="text-xs text-muted-foreground underline underline-offset-2"
+        <div className="mx-auto max-w-5xl px-5 py-6 md:px-8">
+          {/* Top-level Mode Switcher: separates Full Past Papers, Topical Past Papers, and Analytics */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-muted/40 p-1">
+              <button
+                type="button"
+                onClick={() => setLibraryTab("past_papers")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all",
+                  libraryTab === "past_papers"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                Admin? Manage the library
-              </a>
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>Full Past Papers</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLibraryTab("topical")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all",
+                  libraryTab === "topical"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>Topical Past Papers</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold",
+                    libraryTab === "topical"
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-primary/15 text-primary",
+                  )}
+                >
+                  {TOPICAL_MCQ_PAPERS.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLibraryTab("analytics")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all",
+                  libraryTab === "analytics"
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span>Topic Feedback &amp; History</span>
+              </button>
             </div>
 
-            {topicPerformance.data && topicPerformance.data.topics.length > 0 ? (
-              <div className="mb-6 space-y-4">
-                <McqDomainBreakdown
-                  domains={aggregateMcqDomainsFromTopicStats(
-                    topicPerformance.data.topics.map((t) => ({
-                      topic: t.topic,
-                      attempted: t.attempted,
-                      correct: t.correct,
-                    })),
-                  )}
-                  title="Overall Performance: micro vs macro"
-                />
-                <McqReviewPanel topics={topicPerformance.data.topics} />
-              </div>
-            ) : null}
-
-            {papersQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading the library…</p>
-            ) : (papersQuery.data?.papers.length ?? 0) === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                  No papers are published in the library yet.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                <PastPaperSelector
-                  papers={papersQuery.data!.papers}
-                  busy={!!busyLabel}
-                  busyPaperId={selectedPaperId}
-                  onStart={beginPractice}
-                />
-              </div>
-            )}
-
-            <p className="mt-5 flex items-start gap-1.5 text-xs text-muted-foreground">
-              <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />
-              Read each question off the real paper, then answer from the button panel next to it —
-              nothing is placed on a guess, and AI never writes, changes, or places any question.
-            </p>
+            <a
+              href="/mcq-papers-admin"
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Admin? Manage library
+            </a>
           </div>
 
-          <div className="lg:sticky lg:top-10 lg:self-start">
-            <PaperHistorySidebar
-              entries={paperHistory.data?.papers ?? []}
-              isLoading={paperHistory.isLoading}
-              onReview={(attemptId) => setHistoryAttemptId(attemptId)}
+          <CompactProgressBar
+            active={!!busyLabel}
+            stages={[
+              { label: "Loading past-paper document & pages", weight: 3 },
+              { label: "Preparing interactive MCQ answer workspace", weight: 4 },
+            ] satisfies ProgressStage[]}
+            totalMs={12_000}
+            title={busyLabel || "Loading MCQ paper…"}
+            statusBadge="Preparing"
+            className="mb-6"
+          />
+
+          {/* Active Draft Banner (shown compactly at top if an exam is in progress) */}
+          {activeDraftSummary ? (
+            <div className="mb-6 rounded-xl border border-primary/40 bg-primary/[0.04] px-4 py-3.5 shadow-2xs">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[11px] font-bold tracking-wider uppercase text-primary">
+                      {activeDraftSummary.draft.practiceMode === "question_by_question"
+                        ? "In-Progress 1-by-1 Tutor"
+                        : "In-Progress Exam"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                      <Clock className="h-3 w-3" />
+                      Expires in {formatRemainingTime(activeDraftSummary.remainingMs)}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground truncate">
+                    {activeDraftSummary.paper.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    <strong className="text-foreground">
+                      {Object.keys(activeDraftSummary.draft.answers).length}
+                    </strong>{" "}
+                    of {activeDraftSummary.paper.questionCount} answered
+                    {activeDraftSummary.draft.timeLeft !== null ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <strong className="text-foreground">
+                          {formatTime(activeDraftSummary.draft.timeLeft)}
+                        </strong>{" "}
+                        left
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Discard your in-progress exam? All unsaved answers will be deleted.",
+                        )
+                      ) {
+                        window.localStorage.removeItem(
+                          mcqDraftKey(effectiveUserId, activeDraftSummary.paper.id),
+                        );
+                        window.localStorage.removeItem(mcqActiveKey(effectiveUserId));
+                        window.localStorage.removeItem(
+                          mcqDraftKey("guest", activeDraftSummary.paper.id),
+                        );
+                        window.localStorage.removeItem(mcqActiveKey("guest"));
+                        setDraftRefreshKey((k) => k + 1);
+                        toast.success("Exam draft discarded.");
+                      }
+                    }}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    Discard
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs font-semibold"
+                    onClick={() => beginPractice(activeDraftSummary.paper)}
+                  >
+                    <Play className="mr-1 h-3.5 w-3.5 fill-current" />
+                    Resume
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* TAB 1: FULL PAST PAPERS */}
+          {libraryTab === "past_papers" ? (
+            <div className="grid gap-6 lg:grid-cols-[1fr_19rem]">
+              <div className="min-w-0">
+                {papersQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading the library…</p>
+                ) : (papersQuery.data?.papers.length ?? 0) === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                      No papers are published in the library yet.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <PastPaperSelector
+                    papers={papersQuery.data!.papers}
+                    busy={!!busyLabel}
+                    busyPaperId={selectedPaperId}
+                    onStart={(paper) => beginPractice(paper, undefined, practiceMode)}
+                    activeDraftPaperId={activeDraftSummary?.paper.id}
+                    activeDraftAnswersCount={
+                      activeDraftSummary ? Object.keys(activeDraftSummary.draft.answers).length : 0
+                    }
+                    startInExamMode={startInExamMode}
+                    onToggleExamMode={setStartInExamMode}
+                    practiceMode={practiceMode}
+                    onChangePracticeMode={setPracticeMode}
+                  />
+                )}
+              </div>
+
+              <div className="lg:sticky lg:top-6 lg:self-start">
+                <PaperHistorySidebar
+                  entries={paperHistory.data?.papers ?? []}
+                  isLoading={paperHistory.isLoading}
+                  onReview={(attemptId) => setHistoryAttemptId(attemptId)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* TAB 2: TOPICAL PAST PAPERS (ALL 16 SYLLABUS TOPICS) */}
+          {libraryTab === "topical" ? (
+            <TopicalPaperShowcase
+              topicalPapers={TOPICAL_MCQ_PAPERS}
+              busy={!!busyLabel}
+              busyPaperId={selectedPaperId}
+              onStart={(topical) =>
+                beginPractice(toMcqPaperSummaryFromTopical(topical), undefined, practiceMode)
+              }
+              activeDraftPaperId={activeDraftSummary?.paper.id}
+              activeDraftAnswersCount={
+                activeDraftSummary ? Object.keys(activeDraftSummary.draft.answers).length : 0
+              }
+              startInExamMode={startInExamMode}
+              onToggleExamMode={setStartInExamMode}
+              practiceMode={practiceMode}
+              onChangePracticeMode={setPracticeMode}
             />
-          </div>
+          ) : null}
+
+          {/* TAB 3: PERFORMANCE & ANALYTICS */}
+          {libraryTab === "analytics" ? (
+            <div className="grid gap-6 lg:grid-cols-[1fr_19rem]">
+              <div className="min-w-0 space-y-4">
+                {topicPerformance.data && topicPerformance.data.topics.length > 0 ? (
+                  <>
+                    {topicPerformance.data.totalTaggedMistakes &&
+                    topicPerformance.data.totalTaggedMistakes > 0 &&
+                    topicPerformance.data.mistakeCounts ? (
+                      <McqMistakeLedger
+                        countsOverride={topicPerformance.data.mistakeCounts}
+                        title="Lifetime Mistake Pathology — Why You Lose Marks"
+                      />
+                    ) : null}
+                    <McqDomainBreakdown
+                      domains={aggregateMcqDomainsFromTopicStats(
+                        topicPerformance.data.topics.map((t) => ({
+                          topic: t.topic,
+                          attempted: t.attempted,
+                          correct: t.correct,
+                        })),
+                      )}
+                      title="Overall Performance: Microeconomics vs Macroeconomics"
+                    />
+                    <McqReviewPanel topics={topicPerformance.data.topics} />
+                  </>
+                ) : (
+                  <Card className="border-border/80">
+                    <CardContent className="py-10 text-center space-y-2">
+                      <TrendingUp className="h-7 w-7 text-muted-foreground mx-auto" />
+                      <p className="text-sm font-semibold text-foreground">
+                        No completed MCQ analytics yet
+                      </p>
+                      <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                        Complete a Full Past Paper or Topical Past Paper to unlock your
+                        Microeconomics vs Macroeconomics split and topic-by-topic diagnostic report.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              <div className="lg:sticky lg:top-6 lg:self-start">
+                <PaperHistorySidebar
+                  entries={paperHistory.data?.papers ?? []}
+                  isLoading={paperHistory.isLoading}
+                  onReview={(attemptId) => setHistoryAttemptId(attemptId)}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
-        <div className="flex flex-col h-[calc(100dvh-3.5rem)] md:h-[100dvh] overflow-hidden bg-background">
+        <div
+          className={cn(
+            "flex flex-col h-[calc(100dvh-3.5rem)] lg:h-[100dvh] overflow-hidden bg-background",
+            examModeActive && "fixed inset-0 z-[100] h-screen w-screen",
+          )}
+        >
           <div className="shrink-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2.5 backdrop-blur md:px-6">
             <div className="flex items-center gap-2 min-w-0">
               <Button size="sm" variant="ghost" onClick={leavePractice} className="h-8 px-2 text-xs gap-1 shrink-0">
@@ -1119,19 +2157,64 @@ function fillMissingQuestionPages(
                 <span className="hidden sm:inline">Papers</span>
               </Button>
               <div className="min-w-0">
-                <h2 className="text-xs sm:text-sm font-semibold truncate text-foreground max-w-[130px] sm:max-w-xs md:max-w-md" title={paperTitle}>
+                <h2 className="text-xs sm:text-sm font-semibold truncate text-foreground max-w-[100px] min-[380px]:max-w-[140px] sm:max-w-xs md:max-w-md" title={paperTitle}>
                   {paperTitle}
                 </h2>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {timeLeft !== null ? (
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {!examModeActive ? (
+                <div
+                  className="inline-flex items-center rounded-lg border border-border/80 bg-muted/40 p-0.5 text-[11px]"
+                  role="group"
+                  aria-label="Practice mode"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPracticeMode("full_paper");
+                      practiceModeRef.current = "full_paper";
+                      saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold transition-all",
+                      practiceMode === "full_paper"
+                        ? "bg-background text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    title="View the full scrollable PDF paper with side answer sheet"
+                  >
+                    <BookOpen className="h-3 w-3" />
+                    <span className="hidden md:inline">Full Paper</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPracticeMode("question_by_question");
+                      practiceModeRef.current = "question_by_question";
+                      saveDraftToStorage(answersRef.current, flaggedRef.current, timeLeftRef.current);
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold transition-all",
+                      practiceMode === "question_by_question"
+                        ? "bg-primary text-primary-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    title="One real PDF question at a time with instant correction & mistake diagnosis"
+                  >
+                    <Target className="h-3 w-3" />
+                    <span className="hidden sm:inline">1-by-1</span>
+                  </button>
+                </div>
+              ) : null}
+
+              {timeLeft !== null && practiceMode === "full_paper" ? (
                 <div className="flex items-center gap-1.5">
                   <Button
                     size="sm"
                     variant={timerEnabled ? "default" : "outline"}
-                    onClick={() => setTimerEnabled((v) => !v)}
+                    onClick={() => setTimerEnabled((v: boolean) => !v)}
                     className="h-8 px-2 text-xs gap-1 hidden sm:inline-flex"
                     title={
                       timerEnabled
@@ -1153,10 +2236,12 @@ function fillMissingQuestionPages(
                             ? "animate-pulse border-destructive/40 bg-destructive/10 text-destructive"
                             : "border-border bg-muted/60 text-foreground"
                       )}
-                      title={`${level === "2027" ? "Paper 1 (2027 Syllabus · 1 Hour)" : "Paper 1 (Legacy Format · 45 Mins)"}`}
+                      title={`${level === "a2" ? "Paper 1 (IGCSE 0455)" : "Paper 1 (AS)"} — ${
+                        PAPER_DURATION_SECONDS[level] / 60
+                      } minutes`}
                     >
                       <TimerIcon className="h-3 w-3 sm:hidden" />
-                      {formatTimer(timeLeft)}
+                      {formatTime(timeLeft)}
                     </div>
                   ) : null}
                 </div>
@@ -1173,14 +2258,40 @@ function fillMissingQuestionPages(
                 <span className="hidden sm:inline">Annotate</span>
               </Button>
 
-              <div className="hidden md:flex items-center gap-2 min-w-[7rem]">
-                <Progress value={(answeredCount / Math.max(qCount, 1)) * 100} className="h-2" />
-                <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                  {answeredCount}/{qCount}
-                </span>
-              </div>
+              <Button
+                size="sm"
+                variant={calcOpen ? "default" : "outline"}
+                onClick={() => setCalcOpen((v) => !v)}
+                className={cn(
+                  "h-8 px-2 text-xs gap-1.5 transition-all",
+                  calcOpen && "bg-primary text-primary-foreground shadow-xs font-semibold"
+                )}
+                title="Cambridge Economics Calculator & Formula Solvers (Alt+C)"
+              >
+                <CalculatorIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Calculator</span>
+              </Button>
 
-              {flagged.size > 0 ? (
+              {practiceMode === "full_paper" ? (
+                <ExamToolbarControl
+                  isActive={examModeActive}
+                  onOpenPrompt={() => setExamPromptOpen(true)}
+                  onExitExamMode={handleDisableExamMode}
+                />
+              ) : null}
+
+              <ThemeToggle className="size-8" />
+
+              {practiceMode === "full_paper" ? (
+                <div className="hidden md:flex items-center gap-2 min-w-[7rem]">
+                  <Progress value={(answeredCount / Math.max(qCount, 1)) * 100} className="h-2" />
+                  <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                    {answeredCount}/{qCount}
+                  </span>
+                </div>
+              ) : null}
+
+              {flagged.size > 0 && practiceMode === "full_paper" ? (
                 <UiBadge
                   variant="outline"
                   className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-xs px-2 py-0.5 hidden xs:inline-flex"
@@ -1190,17 +2301,53 @@ function fillMissingQuestionPages(
                 </UiBadge>
               ) : null}
 
-              <Button
-                size="sm"
-                onClick={gradeAndSave}
-                disabled={!!busyLabel}
-                className="h-8 px-3 text-xs font-semibold gap-1.5 shadow-sm"
-              >
-                {busyLabel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                <span>Submit</span>
-              </Button>
+              {!graded ? (
+                <div
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 font-mono text-[11px] text-muted-foreground select-none"
+                  title="Autosave is active — all answers and progress are saved locally in your browser."
+                >
+                  {saveStatus === "saving" ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
+                      <span className="hidden xs:inline">Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <span className="hidden xs:inline">Saved</span>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {practiceMode === "full_paper" ? (
+                <Button
+                  size="sm"
+                  onClick={gradeAndSave}
+                  disabled={!!busyLabel}
+                  className="h-8 px-3 text-xs font-semibold gap-1.5 shadow-sm"
+                >
+                  {busyLabel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  <span>Submit</span>
+                </Button>
+              ) : null}
             </div>
           </div>
+
+          {busyLabel ? (
+            <div className="shrink-0 border-b border-border bg-muted/20 px-4 py-2.5 md:px-6">
+              <CompactProgressBar
+                active={!!busyLabel}
+                stages={[
+                  { label: "Checking all selected answers against mark scheme", weight: 3 },
+                  { label: "Saving score & updating topic diagnostics", weight: 3 },
+                ] satisfies ProgressStage[]}
+                totalMs={8_000}
+                title={busyLabel}
+                statusBadge="MCQ Engine"
+              />
+            </div>
+          ) : null}
 
           {annotateMode ? (
             <div className="shrink-0 z-20 flex flex-wrap items-center gap-3 border-b border-border bg-card/95 px-3 py-2 backdrop-blur md:px-6">
@@ -1243,112 +2390,198 @@ function fillMissingQuestionPages(
             </div>
           ) : null}
 
-          {timeUp ? (
+          {timeUp && practiceMode === "full_paper" ? (
             <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-5 py-2 text-center text-xs text-destructive md:px-8">
               Time's up — this attempt has been submitted automatically.
             </div>
           ) : null}
 
-          {result
-            ? (() => {
-                const pct = Math.round((result.score / Math.max(result.total, 1)) * 100);
-                const tier = resultTier(pct);
-                return (
-                  <div
-                    className={[
-                      "shrink-0 animate-in fade-in slide-in-from-top-2 zoom-in-95 flex flex-col items-center justify-center gap-1.5 border-b px-5 py-5 text-center duration-300",
-                      tier.className,
-                    ].join(" ")}
-                  >
-                    <tier.Icon className="h-8 w-8" />
-                    <span className="text-3xl font-bold tracking-tight">
-                      {result.score} / {result.total}
-                    </span>
-                    <span className="text-base font-semibold">{tier.label}</span>
-                    <span className="text-sm opacity-80">{pct}% correct</span>
-                  </div>
-                );
-              })()
-            : null}
+          {practiceMode === "question_by_question" ? (
+            <McqTutorMode
+              paperTitle={paperTitle}
+              level={level}
+              questionNumbers={questionNumbers}
+              pages={pages}
+              questionPages={questionPages}
+              questionSlices={questionSlices}
+              stemBlobs={stemBlobs}
+              answerKey={answerKey}
+              answers={answers}
+              checkedQuestions={checkedQuestions}
+              mistakeTypes={mistakeTypes}
+              eliminatedOptions={eliminatedOptions}
+              questionTimes={questionTimes}
+              flagged={flagged}
+              activeQuestion={activeQuestion}
+              explanations={explanations}
+              graded={graded}
+              busyLabel={busyLabel}
+              result={result}
+              attemptTopics={attemptTopics}
+              attemptDomains={attemptDomains}
+              reviewQuestions={reviewQuestions}
+              annotateMode={annotateMode}
+              annotateTool={annotateTool}
+              annotateColor={annotateColor}
+              annotationClearSeq={annotationClearSeq}
+              calcOpen={calcOpen}
+              onSelectActiveQuestion={(num) => {
+                setActiveQuestion(num);
+                activeQuestionRef.current = num;
+              }}
+              onPickAnswer={pick}
+              onCheckAnswer={handleTutorCheckAnswer}
+              onSetMistakeType={handleSetMistakeType}
+              onToggleEliminate={handleToggleEliminate}
+              onToggleFlag={toggleFlag}
+              onExplainQuestion={handleExplain}
+              onFinishSession={gradeAndSave}
+            />
+          ) : (
+            <>
+              {result
+                ? (() => {
+                    const pct = Math.round((result.score / Math.max(result.total, 1)) * 100);
+                    const tier = resultTier(pct);
+                    return (
+                      <div
+                        className={cn(
+                          "shrink-0 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5 md:px-6",
+                          tier.className,
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <tier.Icon className="h-5 w-5 shrink-0" />
+                          <span className="text-lg font-extrabold tracking-tight tabular-nums">
+                            {result.score} / {result.total}
+                          </span>
+                          <span className="rounded-full border border-current/25 bg-background/50 px-2 py-0.5 font-mono text-xs font-bold">
+                            {pct}%
+                          </span>
+                          <span className="text-xs sm:text-sm font-semibold">{tier.label}</span>
+                          <ExamIntegrityReport
+                            wasExamModeActive={hadExamModeRef.current || examModeActive}
+                            violations={examViolations}
+                          />
+                        </div>
 
-          <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
-            {/* Paper Column: Independently scrollable, only the paper scrolls */}
-            <div
-              ref={scrollRef}
-              className="flex-1 min-w-0 h-full overflow-y-auto px-2 sm:px-4 py-4 scroll-smooth"
-            >
-              <div className="w-full max-w-[820px] mx-auto flex flex-col items-center gap-8 pb-36 lg:pb-16">
-                {graded && attemptTopics.length > 0 ? (
-                  <div className="w-full max-w-2xl space-y-4 pt-2 pb-6 border-b border-border/80">
-                    <McqDomainBreakdown domains={attemptDomains} title="This paper: micro vs macro" />
-                    <McqReviewPanel
-                      topics={attemptTopics}
-                      title="This paper, in short"
-                      emptyLabel="No topics tagged."
-                    />
-                  </div>
-                ) : null}
+                        {attemptTopics.length > 0 ? (
+                          <Button
+                            size="sm"
+                            variant={showAttemptDiagnostics ? "default" : "outline"}
+                            onClick={() => setShowAttemptDiagnostics((v) => !v)}
+                            className="h-7 gap-1.5 px-2.5 text-xs font-semibold bg-background/90 text-foreground hover:bg-background"
+                          >
+                            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                            <span>
+                              {showAttemptDiagnostics
+                                ? "Hide Topic Breakdown"
+                                : "View Topic Breakdown"}
+                            </span>
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  })()
+                : null}
 
-                {pages.map((page) => (
-                  <PageCanvas
-                    key={page.pageNumber}
-                    page={page}
-                    totalPages={pages.length}
-                    pageQuestions={Object.entries(questionPages)
-                      .filter(([, p]) => p === page.pageNumber)
-                      .map(([q]) => Number(q))
-                      .sort((a, b) => a - b)}
-                    answers={answers}
-                    activeQuestion={activeQuestion}
-                    onSelectQuestion={goToQuestion}
-                    annotateMode={annotateMode}
-                    annotateTool={annotateTool}
-                    annotateColor={annotateColor}
-                    onRegisterAnnotationCanvas={registerAnnotationCanvas}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Desktop Side Panel: Permanently FIXED right beside the paper, NEVER disappears */}
-            <aside
-              className={cn(
-                "hidden lg:flex flex-col shrink-0 h-full border-l border-border/80 bg-card/40 backdrop-blur-xs z-10",
-                graded ? "w-80 xl:w-96" : "w-72 xl:w-84"
-              )}
-            >
-              <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
-                {graded ? (
-                  <McqQuestionReviewList
-                    questions={reviewQuestions}
-                    onSelect={goToQuestion}
-                    onExplain={handleExplain}
-                    explanations={explanations}
-                    title="Review & explain"
-                  />
-                ) : (
-                  <AnswerSidePanel
-                    numbers={questionNumbers}
-                    answers={answers}
-                    answerKey={answerKey}
-                    graded={graded}
-                    disabled={timeUp || (timeLeft !== null && timeLeft <= 0) || graded}
-                    onPick={pick}
-                    flagged={flagged}
-                    onToggleFlag={toggleFlag}
-                    highlightNumber={highlightNumber}
-                    rowRefs={answerRowRefs}
-                    onJumpToQuestion={goToQuestion}
-                    activeQuestion={activeQuestion}
-                    questionPages={questionPages}
-                  />
+              <div
+                className={cn(
+                  "flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative transition-all duration-150",
+                  activeViolation && "blur-xl opacity-0 pointer-events-none select-none",
                 )}
-              </div>
-            </aside>
-          </div>
+              >
+                {/* Paper Column: Independently scrollable, only the paper scrolls */}
+                <div
+                  ref={scrollRef}
+                  className="flex-1 min-w-0 h-full overflow-y-auto px-2 sm:px-4 py-4 scroll-smooth"
+                >
+                  <div className="w-full max-w-[820px] mx-auto flex flex-col items-center gap-8 pb-36 lg:pb-16">
+                    {graded && showAttemptDiagnostics && attemptTopics.length > 0 ? (
+                      <div className="w-full max-w-2xl space-y-3 pt-1 pb-4 border-b border-border/80 animate-in fade-in slide-in-from-top-2 duration-200">
+                        {Object.keys(mistakeTypes).length > 0 ? (
+                          <McqMistakeLedger
+                            mistakeTypes={mistakeTypes}
+                            wrongNumbers={reviewQuestions
+                              .filter((q) => q.correct === false)
+                              .map((q) => q.number)}
+                            onSelectQuestion={goToQuestion}
+                          />
+                        ) : null}
+                        <McqDomainBreakdown
+                          domains={attemptDomains}
+                          title="This Paper: Microeconomics vs Macroeconomics"
+                        />
+                        <McqReviewPanel
+                          topics={attemptTopics}
+                          questions={reviewQuestions}
+                          onSelectQuestion={goToQuestion}
+                          title="Topic Diagnostic (This Paper)"
+                          emptyLabel="No topics tagged."
+                        />
+                      </div>
+                    ) : null}
 
-          {/* Mobile floating bottom answering dock */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    {pages.map((page) => (
+                      <PageCanvas
+                        key={page.pageNumber}
+                        page={page}
+                        totalPages={pages.length}
+                        pageQuestions={Object.entries(questionPages)
+                          .filter(([, p]) => p === page.pageNumber)
+                          .map(([q]) => Number(q))
+                          .sort((a, b) => a - b)}
+                        answers={answers}
+                        activeQuestion={activeQuestion}
+                        onSelectQuestion={goToQuestion}
+                        annotateMode={annotateMode}
+                        annotateTool={annotateTool}
+                        annotateColor={annotateColor}
+                        onRegisterAnnotationCanvas={registerAnnotationCanvas}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Desktop Side Panel: Permanently FIXED right beside the paper, NEVER disappears */}
+                <aside
+                  className={cn(
+                    "hidden lg:flex flex-col shrink-0 h-full border-l border-border/80 bg-card/40 backdrop-blur-xs z-10",
+                    graded ? "w-80 xl:w-96" : "w-72 xl:w-84"
+                  )}
+                >
+                  <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pb-28">
+                    {graded ? (
+                      <McqQuestionReviewList
+                        questions={reviewQuestions}
+                        onSelect={goToQuestion}
+                        onExplain={handleExplain}
+                        explanations={explanations}
+                        title="Review & explain"
+                      />
+                    ) : (
+                      <AnswerSidePanel
+                        numbers={questionNumbers}
+                        answers={answers}
+                        answerKey={answerKey}
+                        graded={graded}
+                        onPick={pick}
+                        flagged={flagged}
+                        onToggleFlag={toggleFlag}
+                        highlightNumber={highlightNumber}
+                        rowRefs={answerRowRefs}
+                        onJumpToQuestion={goToQuestion}
+                        activeQuestion={activeQuestion}
+                        questionPages={questionPages}
+                        saveStatus={saveStatus}
+                      />
+                    )}
+                  </div>
+                </aside>
+              </div>
+
+              {/* Mobile floating bottom answering dock */}
+              <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {graded ? (
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -1487,21 +2720,22 @@ function fillMissingQuestionPages(
                   </span>
                 </SheetTitle>
               </SheetHeader>
-              <div className="py-4">
+              <div className="py-4 pb-24">
                 <AnswerSidePanel
                   numbers={questionNumbers}
                   answers={answers}
                   answerKey={answerKey}
                   graded={graded}
-                  disabled={timeUp || (timeLeft !== null && timeLeft <= 0) || graded}
                   onPick={pick}
                   flagged={flagged}
                   onToggleFlag={toggleFlag}
                   highlightNumber={highlightNumber}
                   rowRefs={answerRowRefs}
-                  onJumpToQuestion={(q) => {
-                    goToQuestion(q);
-                    setMobileSheetOpen(false);
+                  onJumpToQuestion={(q, opts) => {
+                    goToQuestion(q, opts);
+                    if (!opts?.skipScrollPaper) {
+                      setMobileSheetOpen(false);
+                    }
                   }}
                   activeQuestion={activeQuestion}
                   questionPages={questionPages}
@@ -1536,13 +2770,23 @@ function fillMissingQuestionPages(
                 />
                 {attemptTopics.length > 0 ? (
                   <div className="space-y-4 pt-4 border-t">
-                    <McqDomainBreakdown domains={attemptDomains} title="Micro vs Macro" />
-                    <McqReviewPanel topics={attemptTopics} title="Topic Breakdown" />
+                    <McqDomainBreakdown domains={attemptDomains} title="Microeconomics vs Macroeconomics" />
+                    <McqReviewPanel
+                      topics={attemptTopics}
+                      questions={reviewQuestions}
+                      onSelectQuestion={(q) => {
+                        goToQuestion(q);
+                        setMobileReviewOpen(false);
+                      }}
+                      title="Topic-Wise Diagnostic & Lagging Areas"
+                    />
                   </div>
                 ) : null}
               </div>
             </SheetContent>
           </Sheet>
+            </>
+          )}
         </div>
       )}
 
@@ -1559,6 +2803,20 @@ function fillMissingQuestionPages(
             setHistoryExplanations({});
           }
         }}
+      />
+      <McqCalculator isOpen={calcOpen} onClose={() => setCalcOpen(false)} />
+
+      <ExamLockdownPromptDialog
+        open={examPromptOpen}
+        onOpenChange={setExamPromptOpen}
+        onConfirm={handleEnableExamMode}
+      />
+
+      <ExamViolationOverlay
+        violation={activeViolation}
+        totalViolations={examViolations}
+        onResume={handleResumeFullscreen}
+        onDisableExamMode={handleDisableExamMode}
       />
     </div>
   );
@@ -1683,6 +2941,7 @@ function PastAttemptSheet({
   attemptId: string | null;
   attempt: {
     title: string;
+    level?: "as" | "a2";
     paperId: string;
     score: number | null;
     total: number;
@@ -1696,10 +2955,29 @@ function PastAttemptSheet({
 }) {
   const pct = attempt ? scorePct(attempt.score, attempt.total) : null;
   const tier = pct !== null ? resultTier(pct) : null;
+  const levelUpper = attempt?.level === "a2" ? "A2" : "AS";
+  const sheetTopics = useMemo(
+    () => (attempt ? buildTopicStatsFromQuestions(attempt.questions, levelUpper) : []),
+    [attempt, levelUpper],
+  );
+  const sheetDomains = useMemo(
+    () =>
+      attempt
+        ? aggregateMcqDomains(
+            attempt.questions.map((q) => ({
+              topic: q.topic,
+              correct: !!q.correct,
+              number: q.number,
+              level: levelUpper,
+            })),
+          )
+        : [],
+    [attempt, levelUpper],
+  );
 
   return (
     <Sheet open={!!attemptId} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{attempt?.title ?? "Past attempt"}</SheetTitle>
         </SheetHeader>
@@ -1730,12 +3008,39 @@ function PastAttemptSheet({
                 <BookOpen className="size-4" /> Open full paper and questions
               </Button>
 
+              {attempt.questions.some((q) => !!q.mistake_type) ? (
+                <McqMistakeLedger
+                  mistakeTypes={Object.fromEntries(
+                    attempt.questions.flatMap((q) =>
+                      q.mistake_type ? [[q.number, q.mistake_type]] : [],
+                    ),
+                  )}
+                  wrongNumbers={attempt.questions
+                    .filter((q) => q.correct === false)
+                    .map((q) => q.number)}
+                />
+              ) : null}
+
+              {sheetTopics.length > 0 ? (
+                <>
+                  <McqDomainBreakdown
+                    domains={sheetDomains}
+                    title="Microeconomics vs Macroeconomics"
+                  />
+                  <McqReviewPanel
+                    topics={sheetTopics}
+                    questions={attempt.questions}
+                    title="Topic-Wise Diagnostic & Lagging Areas"
+                  />
+                </>
+              ) : null}
+
               <McqQuestionReviewList
                 questions={attempt.questions}
                 onSelect={() => {}}
                 onExplain={onExplain}
                 explanations={explanations}
-                title="Review & explain"
+                title="Question-by-Question Review & Explanations"
               />
             </>
           )}
@@ -1931,35 +3236,36 @@ function AnswerSidePanel({
   onJumpToQuestion,
   activeQuestion,
   questionPages,
-  disabled,
+  saveStatus,
 }: {
   numbers: number[];
   answers: Record<number, Letter>;
   answerKey: Record<number, Letter>;
   graded: boolean;
-  disabled?: boolean;
   onPick: (number: number, letter: Letter) => void;
   flagged?: Set<number>;
   onToggleFlag?: (number: number) => void;
   /** Question number to visually pulse right now (from clicking a review-list row), or null. */
   highlightNumber?: number | null;
   rowRefs: React.MutableRefObject<Map<number, HTMLDivElement>>;
-  onJumpToQuestion?: (number: number) => void;
+  onJumpToQuestion?: (number: number, options?: { skipScrollPaper?: boolean }) => void;
   activeQuestion?: number;
   questionPages?: Record<number, number>;
+  saveStatus?: "saved" | "saving";
 }) {
   const [filter, setFilter] = useState<"all" | "flagged" | "unanswered">("all");
   const [showGrid, setShowGrid] = useState(false);
 
-  if (numbers.length === 0) {
-    return <p className="text-xs text-muted-foreground">No questions loaded.</p>;
-  }
+  const effectiveNumbers = useMemo(() => {
+    if (numbers && numbers.length > 0) return numbers;
+    return Array.from({ length: 30 }, (_, i) => i + 1);
+  }, [numbers]);
 
-  const answeredCount = numbers.filter((n) => !!answers[n]).length;
-  const flaggedCount = numbers.filter((n) => flagged.has(n)).length;
-  const unansweredCount = numbers.length - answeredCount;
+  const answeredCount = effectiveNumbers.filter((n) => !!answers[n]).length;
+  const flaggedCount = effectiveNumbers.filter((n) => flagged.has(n)).length;
+  const unansweredCount = effectiveNumbers.length - answeredCount;
 
-  const filteredNumbers = numbers.filter((n) => {
+  const filteredNumbers = effectiveNumbers.filter((n) => {
     if (filter === "flagged") return flagged.has(n);
     if (filter === "unanswered") return !answers[n];
     return true;
@@ -1971,19 +3277,39 @@ function AnswerSidePanel({
       <div className="space-y-2 pb-2 border-b border-border/60">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold tracking-tight text-foreground">
-            Questions ({answeredCount}/{numbers.length})
+            Questions ({answeredCount}/{effectiveNumbers.length})
           </span>
-          <Button
-            type="button"
-            variant={showGrid ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowGrid((v) => !v)}
-            className="h-7 px-2 text-xs gap-1"
-            title={showGrid ? "Hide question matrix" : "Show quick jump matrix"}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:inline-block">Matrix</span>
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {!graded && saveStatus ? (
+              <span
+                className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground select-none"
+                title="Autosave is active — all answers and timer progress are saved locally in your browser."
+              >
+                {saveStatus === "saving" ? (
+                  <>
+                    <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-500" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
+                    <span>Saved</span>
+                  </>
+                )}
+              </span>
+            ) : null}
+            <Button
+              type="button"
+              variant={showGrid ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowGrid((v) => !v)}
+              className="h-7 px-2 text-xs gap-1"
+              title={showGrid ? "Hide question matrix" : "Show quick jump matrix"}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:inline-block">Matrix</span>
+            </Button>
+          </div>
         </div>
 
         {/* Quick jump matrix */}
@@ -1997,7 +3323,7 @@ function AnswerSidePanel({
               </span>
             </div>
             <div className="grid grid-cols-6 gap-1">
-              {numbers.map((n) => {
+              {effectiveNumbers.map((n) => {
                 const isAnswered = !!answers[n];
                 const isFlagged = flagged.has(n);
                 const isCurrent = activeQuestion === n || highlightNumber === n;
@@ -2046,7 +3372,7 @@ function AnswerSidePanel({
                 : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
-            All ({numbers.length})
+            All ({effectiveNumbers.length})
           </button>
           <button
             type="button"
@@ -2089,14 +3415,14 @@ function AnswerSidePanel({
           ) : filter === "unanswered" ? (
             <div className="space-y-1">
               <p className="font-medium text-foreground">All answered!</p>
-              <p>You have answered all {numbers.length} questions in this paper.</p>
+              <p>You have answered all {effectiveNumbers.length} questions in this paper.</p>
             </div>
           ) : (
             <p>No questions found.</p>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-1.5">
+        <div className="grid grid-cols-1 gap-1.5 pb-24">
           {filteredNumbers.map((number) => {
             const isFlagged = flagged.has(number);
             const isCurrent = activeQuestion === number || highlightNumber === number;
@@ -2161,10 +3487,10 @@ function AnswerSidePanel({
                       picked={answers[number] === l}
                       correct={graded && answerKey[number] === l}
                       wrong={graded && answers[number] === l && answerKey[number] !== l}
-                      disabled={disabled || graded}
                       onClick={() => {
                         onPick(number, l);
-                        onJumpToQuestion?.(number);
+                        // On laptop/desktop side panel, picking an answer should NOT auto-scroll the paper!
+                        onJumpToQuestion?.(number, { skipScrollPaper: true });
                       }}
                     />
                   ))}
@@ -2183,24 +3509,21 @@ function AnswerOptionButton({
   picked,
   correct,
   wrong,
-  disabled,
   onClick,
 }: {
   letter: Letter;
   picked: boolean;
   correct: boolean;
   wrong: boolean;
-  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
       className={cn(
         "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold transition-all duration-150 active:scale-95",
-        "hover:scale-105 disabled:opacity-50 disabled:pointer-events-none",
+        "hover:scale-105",
         picked
           ? "border-primary bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/40 font-extrabold"
           : "border-border/80 bg-background/90 text-foreground hover:bg-muted",
@@ -2225,11 +3548,22 @@ type McqPaperSummary = Awaited<ReturnType<typeof listMcqPapers>>["papers"][numbe
 const SERIES_DISPLAY_ORDER = ["Oct/Nov", "May/June", "Feb/March"] as const;
 
 function paperCode(paper: McqPaperSummary): string {
-  const syllabusVariant = paper.title.match(/\b0455[\s/_-]*(?:s|w|m)?[\s/_-]*(\d{2})\b/i)?.[1];
+  // 1. Look for explicit "Paper XX"
   const namedPaper = paper.title.match(/\bpaper\s*(\d{1,2})\b/i)?.[1];
-  const compactVariant = paper.title.match(/\b(?:s|w|m)\d{2}[\s/_-]*(\d{2})\b/i)?.[1];
-  const code = syllabusVariant ?? namedPaper ?? compactVariant;
-  return code ? `Paper ${code.padStart(2, "0")}` : paper.title;
+  if (namedPaper) return `Paper ${namedPaper.padStart(2, "0")}`;
+
+  // 2. Look for Cambridge code e.g. 9708_w24_qp_13 or 0455-m23-12
+  const codeMatch =
+    paper.title.match(/0455[_\s-]+[msw]\d{2}[_\s-]+(?:qp|ms|paper)?[_\s-]*(\d{2})/i)?.[1] ??
+    paper.title.match(/(?:qp|ms)[_\s-]*(\d{2})\b/i)?.[1] ??
+    paper.title.match(/\b9708[\s/_-]+(\d{2})\b/i)?.[1];
+  if (codeMatch) return `Paper ${codeMatch.padStart(2, "0")}`;
+
+  // 3. Fallback: match any two-digit paper code like 11, 12, 13, 31, 32, 33
+  const variantMatch = paper.title.match(/\b([13][1-3])\b/)?.[1];
+  if (variantMatch) return `Paper ${variantMatch}`;
+
+  return paper.title;
 }
 
 function hasCompleteAnswerKey(paper: McqPaperSummary): boolean {
@@ -2243,100 +3577,233 @@ function uniqueSorted<T>(values: T[], compare: (a: T, b: T) => number): T[] {
   return Array.from(new Set(values)).sort(compare);
 }
 
+function PracticeModePicker({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: PracticeMode;
+  onChange: (mode: PracticeMode) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Practice Mode
+        </span>
+        {value === "question_by_question" ? (
+          <span className="text-[10px] font-semibold text-primary">
+            Instant correction + mistake diagnosis
+          </span>
+        ) : null}
+      </div>
+      <div className={cn("grid gap-2", compact ? "grid-cols-2" : "sm:grid-cols-2")}>
+        <button
+          type="button"
+          onClick={() => onChange("full_paper")}
+          className={cn(
+            "flex flex-col gap-0.5 rounded-xl border p-2.5 text-left transition-all",
+            value === "full_paper"
+              ? "border-2 border-primary bg-primary/[0.06] shadow-2xs"
+              : "border-border/80 bg-background hover:border-foreground/40",
+          )}
+        >
+          <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+            <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Full Exam Paper</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Whole PDF scrollable paper, exam timer, marked at the end.
+          </p>
+        </button>
 
+        <button
+          type="button"
+          onClick={() => onChange("question_by_question")}
+          className={cn(
+            "flex flex-col gap-0.5 rounded-xl border p-2.5 text-left transition-all",
+            value === "question_by_question"
+              ? "border-2 border-primary bg-primary/[0.06] shadow-2xs"
+              : "border-border/80 bg-background hover:border-foreground/40",
+          )}
+        >
+          <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+            <Target className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Question-by-Question</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            1 real PDF question at a time · corrects mistakes immediately.
+          </p>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function PastPaperSelector({
   papers,
   busy,
   busyPaperId,
   onStart,
+  activeDraftPaperId,
+  activeDraftAnswersCount = 0,
+  startInExamMode = false,
+  onToggleExamMode,
+  practiceMode = "full_paper",
+  onChangePracticeMode,
 }: {
   papers: McqPaperSummary[];
   busy: boolean;
   busyPaperId: string | null;
   onStart: (paper: McqPaperSummary) => void;
+  activeDraftPaperId?: string | null;
+  activeDraftAnswersCount?: number;
+  startInExamMode?: boolean;
+  onToggleExamMode?: (enabled: boolean) => void;
+  practiceMode?: PracticeMode;
+  onChangePracticeMode?: (mode: PracticeMode) => void;
 }) {
-  const years = uniqueSorted(
-    papers.map((paper) => (paper.examYear ? String(paper.examYear) : "Unsorted")),
-    (a, b) => {
-      if (a === "Unsorted") return 1;
-      if (b === "Unsorted") return -1;
-      return Number(b) - Number(a);
-    },
-  );
-  const [year, setYear] = useState(years[0]);
+  const years = useMemo(() => {
+    return uniqueSorted(
+      papers.map((paper) => (paper.examYear ? String(paper.examYear) : "Unsorted")),
+      (a, b) => {
+        if (a === "Unsorted") return 1;
+        if (b === "Unsorted") return -1;
+        return Number(b) - Number(a);
+      },
+    );
+  }, [papers]);
 
-  useEffect(() => {
-    if (years.length > 0 && !years.includes(year)) {
-      setYear(years[0]);
+  const [selectedYear, setSelectedYear] = useState<string>("");
+  const activeYear = years.includes(selectedYear) ? selectedYear : (years[0] ?? "");
+
+  const yearPapers = useMemo(() => {
+    return papers.filter(
+      (paper) => (paper.examYear ? String(paper.examYear) : "Unsorted") === activeYear,
+    );
+  }, [papers, activeYear]);
+
+  const seriesOptions = useMemo(() => {
+    return uniqueSorted(
+      yearPapers.map((paper) => paper.examSeries ?? "Unsorted"),
+      (a, b) => {
+        if (a === "Unsorted") return 1;
+        if (b === "Unsorted") return -1;
+        const ai = SERIES_DISPLAY_ORDER.indexOf(a as (typeof SERIES_DISPLAY_ORDER)[number]);
+        const bi = SERIES_DISPLAY_ORDER.indexOf(b as (typeof SERIES_DISPLAY_ORDER)[number]);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      },
+    );
+  }, [yearPapers]);
+
+  const [selectedSeries, setSelectedSeries] = useState<string>("");
+  const activeSeries = seriesOptions.includes(selectedSeries)
+    ? selectedSeries
+    : (seriesOptions[0] ?? "");
+
+  const seriesPapers = useMemo(() => {
+    return yearPapers.filter((paper) => (paper.examSeries ?? "Unsorted") === activeSeries);
+  }, [yearPapers, activeSeries]);
+
+  const levels = useMemo(() => {
+    return uniqueSorted(
+      seriesPapers.map((paper) => paper.level),
+      (a, b) => a.localeCompare(b),
+    );
+  }, [seriesPapers]);
+
+  const [preferredLevel, setPreferredLevel] = useState<Level>(() => {
+    try {
+      const saved = window.localStorage.getItem("marginal_candidate_prefs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.targetLevel === "a2_level") return "a2";
+        if (parsed.targetLevel === "as_level") return "as";
+      }
+    } catch {
+      // fallback
     }
-  }, [years, year]);
+    return "as";
+  });
 
-  const yearPapers = papers.filter(
-    (paper) => (paper.examYear ? String(paper.examYear) : "Unsorted") === year,
-  );
-  const seriesOptions = uniqueSorted(
-    yearPapers.map((paper) => paper.examSeries ?? "Unsorted"),
-    (a, b) => {
-      if (a === "Unsorted") return 1;
-      if (b === "Unsorted") return -1;
-      const ai = SERIES_DISPLAY_ORDER.indexOf(a as (typeof SERIES_DISPLAY_ORDER)[number]);
-      const bi = SERIES_DISPLAY_ORDER.indexOf(b as (typeof SERIES_DISPLAY_ORDER)[number]);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    },
-  );
-  const [series, setSeries] = useState(seriesOptions[0]);
+  const activeLevel = levels.includes(preferredLevel) ? preferredLevel : (levels[0] ?? "as");
 
-  useEffect(() => {
-    if (seriesOptions.length > 0 && !seriesOptions.includes(series)) {
-      setSeries(seriesOptions[0]);
-    }
-  }, [seriesOptions, series]);
-  const seriesPapers = yearPapers.filter((paper) => (paper.examSeries ?? "Unsorted") === series);
-  const levels = uniqueSorted(
-    seriesPapers.map((paper) => paper.level),
-    (a, b) => a.localeCompare(b),
-  );
-  const [selectedLevel, setSelectedLevel] = useState<string>(levels[0] ?? "legacy");
-  const matchingPapers = seriesPapers.filter((paper) => paper.level === selectedLevel);
-  const [paperId, setPaperId] = useState(matchingPapers[0]?.id ?? "");
+  const matchingPapers = useMemo(() => {
+    return seriesPapers
+      .filter((paper) => paper.level === activeLevel)
+      .sort((a, b) => paperCode(a).localeCompare(paperCode(b)));
+  }, [seriesPapers, activeLevel]);
 
-  const selectedPaper =
-    matchingPapers.find((paper) => paper.id === paperId) ?? matchingPapers[0] ?? null;
+  const [selectedPaperId, setSelectedPaperId] = useState<string>("");
+  const selectedPaper = useMemo(() => {
+    return matchingPapers.find((paper) => paper.id === selectedPaperId) ?? matchingPapers[0] ?? null;
+  }, [matchingPapers, selectedPaperId]);
 
   function chooseYear(nextYear: string) {
+    setSelectedYear(nextYear);
     const nextYearPapers = papers.filter(
       (paper) => (paper.examYear ? String(paper.examYear) : "Unsorted") === nextYear,
     );
-    const nextSeries = uniqueSorted(
+    const nextSeriesOptions = uniqueSorted(
       nextYearPapers.map((paper) => paper.examSeries ?? "Unsorted"),
-      (a, b) =>
-        SERIES_DISPLAY_ORDER.indexOf(a as (typeof SERIES_DISPLAY_ORDER)[number]) -
-        SERIES_DISPLAY_ORDER.indexOf(b as (typeof SERIES_DISPLAY_ORDER)[number]),
-    )[0];
-    const nextPapers = nextYearPapers.filter(
+      (a, b) => {
+        if (a === "Unsorted") return 1;
+        if (b === "Unsorted") return -1;
+        const ai = SERIES_DISPLAY_ORDER.indexOf(a as (typeof SERIES_DISPLAY_ORDER)[number]);
+        const bi = SERIES_DISPLAY_ORDER.indexOf(b as (typeof SERIES_DISPLAY_ORDER)[number]);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      },
+    );
+    const nextSeries = nextSeriesOptions.includes(activeSeries)
+      ? activeSeries
+      : (nextSeriesOptions[0] ?? "");
+    setSelectedSeries(nextSeries);
+
+    const nextSeriesPapers = nextYearPapers.filter(
       (paper) => (paper.examSeries ?? "Unsorted") === nextSeries,
     );
-    const nextLevel = nextPapers[0]?.level ?? "legacy";
-    setYear(nextYear);
-    setSeries(nextSeries);
-    setSelectedLevel(nextLevel);
-    setPaperId(nextPapers.find((paper) => paper.level === nextLevel)?.id ?? "");
+    const nextLevels = uniqueSorted(
+      nextSeriesPapers.map((paper) => paper.level),
+      (a, b) => a.localeCompare(b),
+    );
+    const nextLevel = (nextLevels.includes(activeLevel) ? activeLevel : (nextLevels[0] ?? "as")) as Level;
+    setPreferredLevel(nextLevel);
+
+    const nextMatching = nextSeriesPapers
+      .filter((paper) => paper.level === nextLevel)
+      .sort((a, b) => paperCode(a).localeCompare(paperCode(b)));
+    setSelectedPaperId(nextMatching[0]?.id ?? "");
   }
 
   function chooseSeries(nextSeries: string) {
-    const nextPapers = yearPapers.filter(
+    setSelectedSeries(nextSeries);
+    const nextSeriesPapers = yearPapers.filter(
       (paper) => (paper.examSeries ?? "Unsorted") === nextSeries,
     );
-    const nextLevel = nextPapers[0]?.level ?? "legacy";
-    setSeries(nextSeries);
-    setSelectedLevel(nextLevel);
-    setPaperId(nextPapers.find((paper) => paper.level === nextLevel)?.id ?? "");
+    const nextLevels = uniqueSorted(
+      nextSeriesPapers.map((paper) => paper.level),
+      (a, b) => a.localeCompare(b),
+    );
+    const nextLevel = (nextLevels.includes(activeLevel) ? activeLevel : (nextLevels[0] ?? "as")) as Level;
+    setPreferredLevel(nextLevel);
+
+    const nextMatching = nextSeriesPapers
+      .filter((paper) => paper.level === nextLevel)
+      .sort((a, b) => paperCode(a).localeCompare(paperCode(b)));
+    setSelectedPaperId(nextMatching[0]?.id ?? "");
   }
 
-  function chooseLevel(nextLevel: string) {
-    setSelectedLevel(nextLevel);
-    setPaperId(seriesPapers.find((paper) => paper.level === nextLevel)?.id ?? "");
+  function chooseLevel(nextLevel: Level) {
+    setPreferredLevel(nextLevel);
+    const nextMatching = seriesPapers
+      .filter((paper) => paper.level === nextLevel)
+      .sort((a, b) => paperCode(a).localeCompare(paperCode(b)));
+    setSelectedPaperId(nextMatching[0]?.id ?? "");
+  }
+
+  function choosePaperId(nextId: string) {
+    setSelectedPaperId(nextId);
   }
 
   return (
@@ -2351,23 +3818,23 @@ function PastPaperSelector({
 
         <div className="rounded-xl border bg-muted/25 px-4 py-3">
           <p className="text-xs font-medium text-muted-foreground">Board and subject</p>
-          <p className="mt-1 font-semibold">Cambridge IGCSE · Economics (0455)</p>
+          <p className="mt-1 font-semibold">Cambridge International · Economics (0455)</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <PaperSelect label="Year" value={year} options={years} onChange={chooseYear} />
+          <PaperSelect label="Year" value={activeYear} options={years} onChange={chooseYear} />
           <PaperSelect
             label="Exam session"
-            value={series}
+            value={activeSeries}
             options={seriesOptions}
             onChange={chooseSeries}
           />
           <PaperSelect
-            label="Era / Format"
-            value={selectedLevel}
+            label="Level"
+            value={activeLevel}
             options={levels}
-            format={(value) => (value === "2027" ? "2027 Syllabus (40 Qs)" : "Legacy Era (30 Qs)")}
-            onChange={(value) => chooseLevel(value)}
+            format={(value) => (value === "as" ? "IGCSE 0455" : "IGCSE 0455")}
+            onChange={(value) => chooseLevel(value as Level)}
           />
           <PaperSelect
             label="Paper code"
@@ -2377,33 +3844,75 @@ function PastPaperSelector({
               const paper = matchingPapers.find((entry) => entry.id === id);
               return paper ? paperCode(paper) : "Select a paper";
             }}
-            onChange={setPaperId}
+            onChange={choosePaperId}
           />
         </div>
 
         {selectedPaper ? (
-          <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold">{selectedPaper.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {selectedPaper.questionCount} questions
-                {hasCompleteAnswerKey(selectedPaper)
-                  ? " · Complete mark scheme included"
-                  : " · Incomplete mark scheme — ask an administrator to re-upload it"}
-              </p>
+          <div className="space-y-4 border-t pt-5">
+            {onChangePracticeMode ? (
+              <PracticeModePicker value={practiceMode} onChange={onChangePracticeMode} />
+            ) : null}
+
+            {onToggleExamMode && practiceMode === "full_paper" ? (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/[0.03] p-3 text-xs">
+                <div className="flex items-start gap-2.5">
+                  <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-foreground">Full Screen Proctored Test Mode</p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Launches in full-screen exam mode with instant window minimize and tab switch detection.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={startInExamMode}
+                  onCheckedChange={onToggleExamMode}
+                  aria-label="Toggle Full Screen Proctored Test Mode on start"
+                />
+              </div>
+            ) : null}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold">{selectedPaper.title}</p>
+                  {activeDraftPaperId === selectedPaper.id ? (
+                    <UiBadge variant="secondary" className="border-primary/40 text-primary text-[10px] uppercase font-bold tracking-wider">
+                      In-Progress ({activeDraftAnswersCount} answered)
+                    </UiBadge>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selectedPaper.questionCount} questions
+                  {hasCompleteAnswerKey(selectedPaper)
+                    ? " · Complete mark scheme included"
+                    : " · Incomplete mark scheme — ask an administrator to re-upload it"}
+                </p>
+              </div>
+              <Button
+                size="lg"
+                disabled={busy || !hasCompleteAnswerKey(selectedPaper)}
+                onClick={() => onStart(selectedPaper)}
+                className="min-w-44"
+              >
+                {busy && busyPaperId === selectedPaper.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : activeDraftPaperId === selectedPaper.id ? (
+                  <>
+                    <Play className="mr-1.5 h-4 w-4 fill-current" />
+                    Resume in-progress exam
+                  </>
+                ) : practiceMode === "question_by_question" ? (
+                  <>
+                    <Target className="mr-1.5 h-4 w-4" />
+                    Start 1-by-1 Tutor
+                  </>
+                ) : (
+                  "Load question paper"
+                )}
+              </Button>
             </div>
-            <Button
-              size="lg"
-              disabled={busy || !hasCompleteAnswerKey(selectedPaper)}
-              onClick={() => onStart(selectedPaper)}
-              className="min-w-44"
-            >
-              {busy && busyPaperId === selectedPaper.id ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Load question paper"
-              )}
-            </Button>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -2512,4 +4021,293 @@ function parseAnswerKeyFromText(text: string): Record<number, Letter> {
     }
   }
   return out;
+}
+
+function TopicalPaperShowcase({
+  topicalPapers,
+  busy,
+  busyPaperId,
+  onStart,
+  activeDraftPaperId,
+  activeDraftAnswersCount = 0,
+  startInExamMode = false,
+  onToggleExamMode,
+  practiceMode = "full_paper",
+  onChangePracticeMode,
+}: {
+  topicalPapers: TopicalMcqPaper[];
+  busy: boolean;
+  busyPaperId: string | null;
+  onStart: (paper: TopicalMcqPaper) => void;
+  activeDraftPaperId?: string | null;
+  activeDraftAnswersCount?: number;
+  startInExamMode?: boolean;
+  onToggleExamMode?: (enabled: boolean) => void;
+  practiceMode?: PracticeMode;
+  onChangePracticeMode?: (mode: PracticeMode) => void;
+}) {
+  const [selectedLevel, setSelectedLevel] = useState<"as" | "a2">("as");
+  const [selectedDomain, setSelectedDomain] = useState<"all" | "micro" | "macro">("all");
+  const [selectedId, setSelectedId] = useState<string>(
+    topicalPapers[0]?.id ?? "topical-0455-as-price-system-micro",
+  );
+
+  const filteredPapers = useMemo(() => {
+    return topicalPapers.filter((p) => {
+      if (p.level !== selectedLevel) return false;
+      if (selectedDomain !== "all" && p.domain !== selectedDomain) return false;
+      return true;
+    });
+  }, [topicalPapers, selectedLevel, selectedDomain]);
+
+  const activeTopic = useMemo(() => {
+    return (
+      filteredPapers.find((p) => p.id === selectedId) ??
+      filteredPapers[0] ??
+      topicalPapers[0] ??
+      null
+    );
+  }, [filteredPapers, selectedId, topicalPapers]);
+
+  if (topicalPapers.length === 0 || !activeTopic) return null;
+
+  const isBusyActive = busy && busyPaperId === activeTopic.id;
+  const isDraftActive = activeDraftPaperId === activeTopic.id;
+  const uniqueSourcePapers = Array.from(
+    new Set(activeTopic.questions.map((q) => q.sourcePaperCode)),
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Top Filter Bar: AS vs A2 Level + Micro vs Macro */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-2xs">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedLevel("as");
+              const firstAs = topicalPapers.find(
+                (p) =>
+                  p.level === "as" && (selectedDomain === "all" || p.domain === selectedDomain),
+              );
+              if (firstAs) setSelectedId(firstAs.id);
+            }}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-bold transition-all",
+              selectedLevel === "as"
+                ? "bg-primary text-primary-foreground shadow-2xs"
+                : "bg-muted/60 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            IGCSE 0455 (Units 1–6 · 8 Topics)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedLevel("a2");
+              const firstA2 = topicalPapers.find(
+                (p) =>
+                  p.level === "a2" && (selectedDomain === "all" || p.domain === selectedDomain),
+              );
+              if (firstA2) setSelectedId(firstA2.id);
+            }}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-bold transition-all",
+              selectedLevel === "a2"
+                ? "bg-primary text-primary-foreground shadow-2xs"
+                : "bg-muted/60 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            IGCSE 0455 / A2 (Units 7–11 · 8 Topics)
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-muted/30 p-0.5 text-xs">
+          {(
+            [
+              { id: "all", label: "All Units" },
+              { id: "micro", label: "Microeconomics" },
+              { id: "macro", label: "Macroeconomics" },
+            ] as const
+          ).map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setSelectedDomain(d.id)}
+              className={cn(
+                "rounded-md px-2.5 py-1 font-medium transition-colors",
+                selectedDomain === d.id
+                  ? "bg-background text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main 2-Column Workspace: Topic Grid on Left, Selected Topic Details & Launch Card on Right */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+        {/* Left: Compact Scannable Topic Selector Grid */}
+        <div className="grid gap-2.5 sm:grid-cols-2 content-start">
+          {filteredPapers.map((paper) => {
+            const isSelected = paper.id === activeTopic.id;
+            const isDraft = activeDraftPaperId === paper.id;
+            return (
+              <button
+                key={paper.id}
+                type="button"
+                onClick={() => setSelectedId(paper.id)}
+                className={cn(
+                  "group relative flex flex-col justify-between gap-2 rounded-xl border p-3.5 text-left transition-all",
+                  isSelected
+                    ? "border-2 border-primary bg-primary/[0.05] shadow-xs"
+                    : "border-border/80 bg-card hover:border-primary/40 hover:bg-muted/20",
+                )}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+                      {paper.topicNumber} · {paper.domain === "micro" ? "Micro" : "Macro"}
+                    </span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
+                      {paper.questionCount} Qs
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-foreground leading-snug line-clamp-2">
+                    {paper.shortTitle}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-border/50 text-[10px] text-muted-foreground">
+                  <span className="font-medium text-foreground/80">{paper.visualSummaryLabel}</span>
+                  {isDraft ? (
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      In Progress ({activeDraftAnswersCount}/{paper.questionCount})
+                    </span>
+                  ) : (
+                    <span>{Math.round(paper.durationSeconds / 60)} min</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: Sticky Selected Topic Launch Card */}
+        <div className="lg:sticky lg:top-6 lg:self-start">
+          <Card className="overflow-hidden border-2 border-foreground/80 shadow-[5px_5px_0_hsl(var(--foreground))]">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
+                  <Layers className="h-3 w-3" />
+                  {activeTopic.topicNumber}
+                </span>
+                <UiBadge variant="outline" className="text-[10px] font-semibold uppercase">
+                  {activeTopic.level === "as" ? "IGCSE 0455 (Paper 1)" : "IGCSE 0455 (Paper 1)"}
+                </UiBadge>
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold leading-snug text-foreground">
+                  {activeTopic.shortTitle}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {activeTopic.subtitle}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/25 p-2.5 text-xs">
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                    Questions &amp; Time
+                  </span>
+                  <p className="font-bold text-foreground">
+                    {activeTopic.questionCount} Qs · {Math.round(activeTopic.durationSeconds / 60)}{" "}
+                    min
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                    Real Visuals
+                  </span>
+                  <p className="font-bold text-primary">{activeTopic.visualSummaryLabel}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Sliced From Official Papers
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {uniqueSourcePapers.map((code) => (
+                    <span
+                      key={code}
+                      className="rounded border border-border/80 bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground"
+                    >
+                      {code}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {onChangePracticeMode ? (
+                <PracticeModePicker
+                  value={practiceMode}
+                  onChange={onChangePracticeMode}
+                  compact
+                />
+              ) : null}
+
+              {onToggleExamMode && practiceMode === "full_paper" ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="font-semibold text-foreground text-[11px]">
+                      Full Screen Proctored Mode
+                    </span>
+                  </div>
+                  <Switch
+                    checked={startInExamMode}
+                    onCheckedChange={onToggleExamMode}
+                    aria-label="Toggle Full Screen Proctored Test Mode"
+                  />
+                </div>
+              ) : null}
+
+              <Button
+                size="lg"
+                disabled={busy}
+                onClick={() => onStart(activeTopic)}
+                className="w-full font-semibold shadow-sm"
+              >
+                {isBusyActive ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    Building exam slices…
+                  </>
+                ) : isDraftActive ? (
+                  <>
+                    <Play className="mr-1.5 h-4 w-4 fill-current" />
+                    Resume Topic ({activeDraftAnswersCount}/{activeTopic.questionCount})
+                  </>
+                ) : practiceMode === "question_by_question" ? (
+                  <>
+                    <Target className="mr-1.5 h-4 w-4" />
+                    Start 1-by-1 Topical Tutor
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-1.5 h-4 w-4 fill-current" />
+                    Start Topical Paper
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
 }

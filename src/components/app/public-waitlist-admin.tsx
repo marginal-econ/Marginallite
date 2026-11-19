@@ -256,25 +256,25 @@ export function PublicWaitlistPanel() {
           </DialogHeader>
           <div className="bg-[#f7f4ff] p-5 sm:p-8">
             <div className="overflow-hidden rounded-3xl border-2 border-[#21172d] bg-white shadow-[7px_7px_0_#21172d]">
-              <div className="h-2.5 bg-[#ec4899]" />
+              <div className="h-2.5 bg-[#7c4edb]" />
               <div className="space-y-5 p-7 sm:p-9">
                 <div className="flex items-center gap-3">
-                  <span className="grid size-11 place-items-center rounded-xl border-2 border-[#21172d] bg-[#ec4899] text-xl font-bold text-white">
+                  <span className="grid size-11 place-items-center rounded-xl border-2 border-[#21172d] bg-[#7c4edb] text-xl font-bold text-white">
                     m
                   </span>
                   <span className="text-xl font-bold text-[#181323]">Marginalite</span>
                 </div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#ec4899]">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#7c4edb]">
                   Your access is ready
                 </p>
                 <h3 className="text-3xl font-bold leading-tight text-[#181323]">
                   Welcome to Marginalite, Student.
                 </h3>
                 <p className="text-base leading-7 text-[#625d6c]">
-                  You’ve been invited to use Marginalite for Cambridge IGCSE Economics (0455). Choose a
+                  You’ve been invited to use Marginalite for AS and IGCSE 0455 Economics (0455). Choose a
                   password to open your student account.
                 </p>
-                <span className="inline-flex rounded-xl border-2 border-[#21172d] bg-[#ec4899] px-5 py-3 font-bold text-white shadow-[4px_4px_0_#21172d]">
+                <span className="inline-flex rounded-xl border-2 border-[#21172d] bg-[#7c4edb] px-5 py-3 font-bold text-white shadow-[4px_4px_0_#21172d]">
                   Set up my account →
                 </span>
                 <p className="text-xs leading-5 text-[#777180]">
@@ -284,7 +284,7 @@ export function PublicWaitlistPanel() {
               </div>
             </div>
             <p className="mt-5 text-center text-xs text-[#777180]">
-              Marginalite · Built for Cambridge IGCSE Economics 0455
+              Marginalite · Built for Cambridge Economics 0455
             </p>
           </div>
         </DialogContent>

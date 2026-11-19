@@ -89,6 +89,8 @@ export function isAdmin(
 // Backwards-compatible aliases
 export const isMarginalAdmin = isAdmin;
 export const isMarginaliteAdmin = isAdmin;
+export const MARGINAL_ADMIN_USER_ID = "";
+export const MARGINAL_ADMIN_EMAIL = "marginal.econ.ai@gmail.com";
 export const isUserAdmin = (userId?: string | null) => isAdmin({ userId });
 
 export function assertAdmin(context: {

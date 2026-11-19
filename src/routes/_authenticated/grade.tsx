@@ -801,8 +801,8 @@ function GradePage() {
             disabled={
               mutation.isPending ||
               checkMutation.isPending ||
-              question.trim().length < 10 ||
-              words < 20
+              question.trim().length < 8 ||
+              (Number(maxMark) <= 2 ? words < 4 : words < 15)
             }
             onClick={handleMarkClick}
           >
@@ -812,7 +812,7 @@ function GradePage() {
               </>
             ) : mutation.isPending ? (
               <>
-                <Loader2 className="size-4 animate-spin" /> Marking — this takes up to a minute
+                <Loader2 className="size-4 animate-spin" /> Marking — dual-pass IGCSE 0455 examiner active
               </>
             ) : readyToMark ? (
               <>
@@ -831,17 +831,17 @@ function GradePage() {
             <GradingProgress
               active
               stages={[
-                { label: "Referring Cambridge 0455 Knowledge Base & Mark Schemes", weight: 3 },
-                { label: "Checking Assessment Objectives: AO1 Knowledge · AO2 Analysis · AO3 Evaluation", weight: 4 },
-                { label: "Evaluating point-marking and Level 1–3 band descriptors", weight: 3 },
-                ...(auditPass ? [{ label: "Independent moderation & multi-key verification", weight: 2 }] : []),
-                { label: "Synthesizing diagnostic examiner report & actionable feedback", weight: 2 },
+                { label: "Retrieving Cambridge IGCSE 0455 Mark Schemes & Knowledge Base", weight: 2 },
+                { label: "Pass 1 (Temp 0.0): Rigorous mark-scheme & mechanism verification", weight: 4 },
+                { label: "Pass 2 (Temp 0.2): Holistic Cambridge 0455 assessment & evaluation", weight: 4 },
+                ...(auditPass ? [{ label: "Principal Examiner reconciliation & Pass 3 report refinement", weight: 3 }] : []),
+                { label: "Finalising AO1/AO2/AO3 breakdown & actionable improvement plan", weight: 2 },
               ]}
-              totalMs={auditPass ? 35_000 : 25_000}
+              totalMs={auditPass ? 28_000 : 18_000}
             />
           ) : result ? (
             <div className="space-y-4">
-              <MarkBreakdown grading={result.grading} />
+              <MarkBreakdown grading={result.grading} question={question} />
               {result.essayId ? (
                 <Button
                   variant="outline"

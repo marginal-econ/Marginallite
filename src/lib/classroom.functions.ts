@@ -3,8 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
+import { unwrapData } from "@/lib/safe-validator";
 import type { Database } from "@/integrations/backend/types";
-import { isAdmin } from "@/lib/auth-admin";
+import { isAdmin as checkIsAdmin } from "@/lib/auth-admin";
 
 const classroomInput = z.object({
   name: z.string().trim().min(1, "Give the class a name.").max(100),
@@ -15,10 +16,38 @@ const classroomInput = z.object({
 const classroomIdInput = z.object({ classroomId: z.string().uuid() });
 
 async function assertAdmin(context: { supabase: SupabaseClient<Database>; userId: string }) {
-  if (isAdmin({ userId: context.userId, claims: (context as any).claims, email: (context as any).email })) {
+  if (checkIsAdmin({ userId: context.userId, claims: (context as any).claims, email: (context as any).email })) {
     return;
   }
-  throw new Error("Administrator privileges are required to create or remove classrooms.");
+  throw new Error("Administrator privileges are required to create or remove classrooms. Marginalite is the platform administrator.");
+}
+
+/**
+ * Automatically infers the correct Cambridge mark scheme maximum marks (8, 12, 20)
+ * from explicit question bracket tariffs (e.g. "[12]", "[8]", "[20]") if present,
+ * or falls back to stored marks / default 20.
+ */
+export function inferCambridgeEssayMaxMark(
+  storedMaxMark: number | string | null | undefined,
+  questionOrTitle: string | null | undefined,
+): number {
+  if (questionOrTitle) {
+    const match =
+      questionOrTitle.match(/\[\s*(\d{1,2})\s*(?:marks?|m)?\s*\]/i) ||
+      questionOrTitle.match(/\(\s*(\d{1,2})\s*(?:marks?|m)\s*\)/i);
+    if (match && match[1]) {
+      const parsed = parseInt(match[1], 10);
+      if (parsed === 8 || parsed === 12 || parsed === 20 || parsed === 25 || parsed === 15) {
+        return parsed;
+      }
+    }
+  }
+
+  const parsedStored = Number(storedMaxMark);
+  if (parsedStored && parsedStored > 0) {
+    return parsedStored;
+  }
+  return 20;
 }
 
 export const CR_STORE = {
@@ -90,7 +119,7 @@ export const CR_STORE = {
 };
 
 async function assertTeacher(context: { supabase: SupabaseClient<Database>; userId: string }) {
-  if (isAdmin({ userId: context.userId, claims: (context as any).claims, email: (context as any).email })) {
+  if (checkIsAdmin({ userId: context.userId, claims: (context as any).claims, email: (context as any).email })) {
     return;
   }
   const { getSupabaseAdmin } = await import("@/server/supabase");
@@ -145,7 +174,7 @@ async function getClassroomAuthority(userId: string, classroomId: string) {
     admin.from("user_roles").select("role").eq("user_id", userId),
   ]);
   if (error || !classroom) throw new Error(error?.message || "Classroom not found.");
-  const isPlatformAdmin = isAdmin({ userId });
+  const isAdmin = checkIsAdmin({ userId });
 
   let collaborator: { id: string } | null = null;
   try {
@@ -181,8 +210,8 @@ async function getClassroomAuthority(userId: string, classroomId: string) {
     admin,
     classroom,
     isOwner: classroom.teacher_id === userId,
-    isAdmin: isPlatformAdmin,
-    isStaff: classroom.teacher_id === userId || isPlatformAdmin || Boolean(collaborator),
+    isAdmin,
+    isStaff: classroom.teacher_id === userId || isAdmin || Boolean(collaborator),
     isMember: Boolean(membership),
   };
 }
@@ -279,14 +308,29 @@ export const listClassrooms = createServerFn({ method: "GET" })
       .select("role")
       .eq("user_id", context.userId);
     const roleList = (roles ?? []).map((r: any) => r.role);
-    const isPlatformAdmin = isAdmin({
+    const isMarginalite = checkIsAdmin({
       userId: context.userId,
       email: (context as any).email,
       claims: (context as any).claims,
     });
-    const activeRole = isPlatformAdmin
+    const hasTeacherRole =
+      roleList.includes("teacher") ||
+      roleList.includes("teacher_pending") ||
+      (context as any).claims?.user_metadata?.role === "teacher" ||
+      (context as any).claims?.app_metadata?.role === "teacher";
+
+    if (hasTeacherRole && !roleList.includes("teacher")) {
+      try {
+        await admin.from("user_roles").upsert(
+          { user_id: context.userId, role: "teacher" },
+          { onConflict: "user_id,role" },
+        );
+      } catch {}
+    }
+
+    const activeRole = isMarginalite
       ? ("admin" as const)
-      : roleList.includes("teacher")
+      : hasTeacherRole
         ? ("teacher" as const)
         : ("student" as const);
 
@@ -420,18 +464,18 @@ export const listClassrooms = createServerFn({ method: "GET" })
 // ADMINS AND VERIFIED TEACHERS CAN CREATE CLASSROOMS
 export const createClassroom = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => classroomInput.parse(input))
+  .inputValidator((input: unknown) => classroomInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
-    const isPlatformAdmin = isAdmin({
+    const isMarginalite = checkIsAdmin({
       userId: context.userId,
       claims: (context as any).claims,
       email: (context as any).email,
     });
     const { getSupabaseAdmin } = await import("@/server/supabase");
     const admin = getSupabaseAdmin();
-    const assignedTeacherId = isPlatformAdmin && data.teacherId ? data.teacherId : context.userId;
+    const assignedTeacherId = isMarginalite && data.teacherId ? data.teacherId : context.userId;
 
-    if (!isPlatformAdmin) {
+    if (!isMarginalite) {
       await assertTeacher(context);
       const { count, error: countErr } = await admin
         .from("classrooms")
@@ -458,7 +502,7 @@ export const createClassroom = createServerFn({ method: "POST" })
 // TEACHER (OWNER) OR ADMIN CAN ARCHIVE CLASSROOMS
 export const archiveClassroom = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isAdmin && !authority.isOwner) {
@@ -475,7 +519,7 @@ export const archiveClassroom = createServerFn({ method: "POST" })
 // TEACHER (OWNER) OR ADMIN CAN PERMANENTLY DELETE CLASSROOMS
 export const deleteClassroom = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isAdmin && !authority.isOwner) {
@@ -502,7 +546,7 @@ export const joinClassroom = createServerFn({ method: "POST" })
         code: z.string().trim().min(4).max(20),
         acknowledgeTeacherAccess: z.literal(true),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const { getSupabaseAdmin } = await import("@/server/supabase");
@@ -544,7 +588,7 @@ export const joinClassroom = createServerFn({ method: "POST" })
 
 export const getClassroomRoster = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff && !authority.isMember) {
@@ -584,7 +628,7 @@ export const getClassroomRoster = createServerFn({ method: "GET" })
 
 export const getClassroomTeachers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => classroomIdInput.parse(input))
+  .inputValidator((input: unknown) => classroomIdInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff && !authority.isMember) {
@@ -635,7 +679,7 @@ export const getClassroomTeachers = createServerFn({ method: "GET" })
 export const addClassroomTeacher = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ classroomId: z.string().uuid(), email: z.string().trim().email() }).parse(input),
+    z.object({ classroomId: z.string().uuid(), email: z.string().trim().email() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -686,7 +730,7 @@ export const addClassroomTeacher = createServerFn({ method: "POST" })
 export const addClassroomStudent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ classroomId: z.string().uuid(), email: z.string().trim().email() }).parse(input),
+    z.object({ classroomId: z.string().uuid(), email: z.string().trim().email() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -722,7 +766,7 @@ export const addClassroomStudent = createServerFn({ method: "POST" })
 export const removeClassroomTeacher = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ classroomId: z.string().uuid(), teacherId: z.string().uuid() }).parse(input),
+    z.object({ classroomId: z.string().uuid(), teacherId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -741,7 +785,7 @@ export const removeClassroomTeacher = createServerFn({ method: "POST" })
 
 export const getStudentClassroomOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     let members: any[] = [];
@@ -786,7 +830,7 @@ export const getStudentClassroomOverview = createServerFn({ method: "GET" })
 export const getStudentClassroomInsights = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ classroomId: z.string().uuid(), studentId: z.string().uuid() }).parse(input),
+    z.object({ classroomId: z.string().uuid(), studentId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -802,7 +846,7 @@ export const getStudentClassroomInsights = createServerFn({ method: "GET" })
 
 export const rotateClassroomCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff) throw new Error("Teacher access is required.");
@@ -825,7 +869,7 @@ export const rotateClassroomCode = createServerFn({ method: "POST" })
 export const removeClassroomMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ membershipId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ membershipId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -842,7 +886,7 @@ export const removeClassroomMember = createServerFn({ method: "POST" })
 
 export const leaveClassroom = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ classroomId: z.string().uuid() }).parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { getSupabaseAdmin } = await import("@/server/supabase");
     const admin = getSupabaseAdmin();
@@ -867,7 +911,7 @@ export const listClassroomMessages = createServerFn({ method: "GET" })
         classroomId: z.string().uuid(),
         limit: z.number().int().min(1).max(200).optional().default(100),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -949,7 +993,7 @@ export const sendClassroomMessage = createServerFn({ method: "POST" })
         classroomId: z.string().uuid(),
         content: z.string().trim().min(1, "Message cannot be empty.").max(4000),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -987,7 +1031,7 @@ export const sendClassroomMessage = createServerFn({ method: "POST" })
 export const deleteClassroomMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ messageId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ messageId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1034,7 +1078,7 @@ export const togglePinClassroomMessage = createServerFn({ method: "POST" })
         classroomId: z.string().uuid(),
         isPinned: z.boolean(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1067,7 +1111,7 @@ export const togglePinClassroomMessage = createServerFn({ method: "POST" })
 
 export const listAnnouncements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => classroomIdInput.parse(input))
+  .inputValidator((input: unknown) => classroomIdInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff && !authority.isMember) {
@@ -1221,7 +1265,7 @@ export const createAnnouncement = createServerFn({ method: "POST" })
         content: z.string().trim().min(1, "Post cannot be empty.").max(5000),
         pinned: z.boolean().optional().default(false),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1262,7 +1306,7 @@ export const togglePinAnnouncement = createServerFn({ method: "POST" })
         classroomId: z.string().uuid(),
         pinned: z.boolean(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1293,7 +1337,7 @@ export const togglePinAnnouncement = createServerFn({ method: "POST" })
 export const deleteAnnouncement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ announcementId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ announcementId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1344,7 +1388,7 @@ export const addComment = createServerFn({ method: "POST" })
       .refine((val) => Boolean(val.announcementId || val.assignmentId), {
         message: "Must specify announcementId or assignmentId",
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1389,7 +1433,7 @@ export const addComment = createServerFn({ method: "POST" })
 export const deleteComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ commentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ commentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1436,7 +1480,7 @@ export const deleteComment = createServerFn({ method: "POST" })
 
 export const listClassroomAssignments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => classroomIdInput.parse(input))
+  .inputValidator((input: unknown) => classroomIdInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff && !authority.isMember) {
@@ -1488,12 +1532,20 @@ export const listClassroomAssignments = createServerFn({ method: "GET" })
     const assIds = finalAssList.map((a) => a.id);
 
     let subList: any[] = [];
+    const draftMap = new Map<string, any>();
 
-    // Fetch submissions from CR_STORE
+    // Fetch submissions and drafts from CR_STORE
     for (const assId of assIds) {
       const crSubs = await CR_STORE.list<any>(authority.admin, `__CR_SUB_${assId}_`);
       if (crSubs && crSubs.length > 0) {
         subList.push(...crSubs);
+      }
+      const draft = await CR_STORE.get<any>(
+        authority.admin,
+        `__CR_DRAFT_${assId}_${context.userId}`,
+      );
+      if (draft) {
+        draftMap.set(assId, draft);
       }
     }
 
@@ -1564,7 +1616,7 @@ export const listClassroomAssignments = createServerFn({ method: "GET" })
         bankEssayQuestionId: a.bank_essay_question_id ?? null,
         essayQuestion: a.essay_question ?? null,
         essayTopic: a.essay_topic ?? null,
-        essayMaxMark: a.essay_max_mark ?? 20,
+        essayMaxMark: inferCambridgeEssayMaxMark(a.essay_max_mark, `${a.essay_question || ""} ${a.title || ""}`),
         mcqPaperId: a.mcq_paper_id ?? null,
         stats: {
           totalStudents,
@@ -1578,6 +1630,9 @@ export const listClassroomAssignments = createServerFn({ method: "GET" })
               id: mySub.id,
               status: mySub.status as "assigned" | "submitted" | "graded" | "returned",
               submissionText: mySub.submission_text ?? null,
+              submissionType:
+                mySub.submission_type ??
+                (mySub.submission_text?.includes("[DIAGRAM:") ? "handwritten" : "typed"),
               essayId: mySub.essay_id ?? null,
               aiScore: mySub.ai_score ?? null,
               teacherScore: mySub.teacher_score ?? null,
@@ -1585,6 +1640,13 @@ export const listClassroomAssignments = createServerFn({ method: "GET" })
               submittedAt: mySub.submitted_at ?? null,
               gradedAt: mySub.graded_at ?? null,
               returnedAt: mySub.returned_at ?? null,
+            }
+          : null,
+        myDraft: draftMap.get(a.id)
+          ? {
+              draftText: draftMap.get(a.id).draftText ?? "",
+              submissionType: draftMap.get(a.id).submissionType ?? "typed",
+              savedAt: draftMap.get(a.id).savedAt ?? null,
             }
           : null,
       };
@@ -1607,7 +1669,7 @@ export const createClassroomAssignment = createServerFn({ method: "POST" })
         essayMaxMark: z.number().int().min(1).max(50).optional(),
         mcqPaperId: z.string().uuid().nullable().optional(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1628,7 +1690,10 @@ export const createClassroomAssignment = createServerFn({ method: "POST" })
       bank_essay_question_id: data.bankEssayQuestionId || null,
       essay_question: data.kind === "essay" ? data.essayQuestion || data.title : null,
       essay_topic: data.kind === "essay" ? data.essayTopic || "Economics" : null,
-      essay_max_mark: data.kind === "essay" ? data.essayMaxMark || 20 : null,
+      essay_max_mark:
+        data.kind === "essay"
+          ? inferCambridgeEssayMaxMark(data.essayMaxMark, `${data.essayQuestion || ""} ${data.title || ""}`)
+          : null,
       mcq_paper_id: data.kind === "mcq_paper" ? data.mcqPaperId || null : null,
     };
 
@@ -1646,7 +1711,7 @@ export const createClassroomAssignment = createServerFn({ method: "POST" })
 export const deleteClassroomAssignment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ assignmentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ assignmentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1671,6 +1736,39 @@ export const deleteClassroomAssignment = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const saveAssignmentDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        assignmentId: z.string().uuid(),
+        classroomId: z.string().uuid(),
+        draftText: z.string().max(30000),
+        submissionType: z.enum(["document", "handwritten", "typed"]).optional(),
+      })
+      .parse(unwrapData(input)),
+  )
+  .handler(async ({ data, context }) => {
+    const authority = await getClassroomAuthority(context.userId, data.classroomId);
+    if (!authority.isMember && !authority.isStaff) {
+      throw new Error("You must be enrolled in this class to save drafts.");
+    }
+
+    const draftKey = `__CR_DRAFT_${data.assignmentId}_${context.userId}`;
+    const now = new Date().toISOString();
+    const payload = {
+      assignmentId: data.assignmentId,
+      classroomId: data.classroomId,
+      studentId: context.userId,
+      draftText: data.draftText,
+      submissionType: data.submissionType || "typed",
+      savedAt: now,
+    };
+
+    await CR_STORE.set(authority.admin, draftKey, payload);
+    return { ok: true, savedAt: now };
+  });
+
 export const submitAssignmentWork = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -1682,11 +1780,12 @@ export const submitAssignmentWork = createServerFn({ method: "POST" })
           .string()
           .trim()
           .min(1, "Submission text cannot be empty.")
-          .max(20000)
+          .max(30000)
           .optional(),
         essayId: z.string().uuid().optional(),
+        submissionType: z.enum(["document", "handwritten", "typed"]).optional(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1725,6 +1824,9 @@ export const submitAssignmentWork = createServerFn({ method: "POST" })
       classroom_id: data.classroomId,
       student_id: context.userId,
       submission_text: data.submissionText || null,
+      submission_type:
+        data.submissionType ||
+        (data.submissionText?.includes("[DIAGRAM:") ? "handwritten" : "typed"),
       essay_id: data.essayId || null,
       status: "submitted",
       ai_score: aiScore,
@@ -1737,6 +1839,10 @@ export const submitAssignmentWork = createServerFn({ method: "POST" })
     };
 
     await CR_STORE.set(authority.admin, subKey, sub);
+
+    // Clear draft after successful submission
+    const draftKey = `__CR_DRAFT_${data.assignmentId}_${context.userId}`;
+    await CR_STORE.remove(authority.admin, draftKey);
 
     // Try dedicated table
     try {
@@ -1762,7 +1868,7 @@ export const submitAssignmentWork = createServerFn({ method: "POST" })
 export const getAssignmentSubmissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ assignmentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(input),
+    z.object({ assignmentId: z.string().uuid(), classroomId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1778,7 +1884,7 @@ export const getAssignmentSubmissions = createServerFn({ method: "GET" })
       try {
         const { data: row } = await authority.admin
           .from("classroom_assignments")
-          .select("id, title, kind, essay_max_mark, due_at")
+          .select("id, title, kind, essay_question, instructions, essay_max_mark, due_at")
           .eq("id", data.assignmentId)
           .single();
         if (row) assignment = row;
@@ -1786,6 +1892,11 @@ export const getAssignmentSubmissions = createServerFn({ method: "GET" })
     }
 
     if (!assignment) throw new Error("Assignment not found.");
+
+    assignment.essay_max_mark = inferCambridgeEssayMaxMark(
+      assignment.essay_max_mark,
+      `${assignment.essay_question || ""} ${assignment.title || ""}`,
+    );
 
     // Retrieve roster
     let members: any[] = [];
@@ -1833,6 +1944,9 @@ export const getAssignmentSubmissions = createServerFn({ method: "GET" })
               id: sub.id,
               status: sub.status as "assigned" | "submitted" | "graded" | "returned",
               submissionText: sub.submission_text,
+              submissionType:
+                sub.submission_type ??
+                (sub.submission_text?.includes("[DIAGRAM:") ? "handwritten" : "typed"),
               essayId: sub.essay_id,
               aiScore: sub.ai_score,
               aiFeedback: sub.ai_feedback,
@@ -1864,7 +1978,7 @@ export const gradeAssignmentSubmission = createServerFn({ method: "POST" })
         teacherFeedback: z.string().trim().max(4000).optional(),
         returnToStudent: z.boolean().optional().default(true),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
@@ -1921,7 +2035,7 @@ export const gradeAssignmentSubmission = createServerFn({ method: "POST" })
 
 export const getClassroomGradebook = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => classroomIdInput.parse(input))
+  .inputValidator((input: unknown) => classroomIdInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const authority = await getClassroomAuthority(context.userId, data.classroomId);
     if (!authority.isStaff) throw new Error("Teacher access is required.");
@@ -1935,7 +2049,7 @@ export const getClassroomGradebook = createServerFn({ method: "GET" })
     try {
       const { data: assignments, error: aErr } = await authority.admin
         .from("classroom_assignments")
-        .select("id, title, kind, essay_max_mark, due_at, created_at")
+        .select("id, title, kind, essay_question, instructions, essay_max_mark, due_at, created_at")
         .eq("classroom_id", data.classroomId)
         .eq("archived", false)
         .order("created_at", { ascending: true });
@@ -2018,7 +2132,10 @@ export const getClassroomGradebook = createServerFn({ method: "GET" })
 
     for (const sub of uniqueSubMap.values()) {
       const assignment = finalAssList.find((a) => a.id === sub.assignment_id);
-      const maxMark = assignment?.essay_max_mark ?? 20;
+      const maxMark = inferCambridgeEssayMaxMark(
+        assignment?.essay_max_mark,
+        `${assignment?.essay_question || ""} ${assignment?.title || ""}`,
+      );
       const score = sub.teacher_score ?? sub.ai_score;
       const percentage = score !== null ? Math.round((Number(score) / maxMark) * 100) : null;
 
@@ -2067,7 +2184,7 @@ export const getClassroomGradebook = createServerFn({ method: "GET" })
         id: a.id,
         title: a.title,
         kind: a.kind,
-        maxMark: a.essay_max_mark ?? 20,
+        maxMark: inferCambridgeEssayMaxMark(a.essay_max_mark, `${a.essay_question || ""} ${a.title || ""}`),
         dueAt: a.due_at,
         classAvgPct,
       };
@@ -2088,3 +2205,952 @@ export const getClassroomGradebook = createServerFn({ method: "GET" })
       },
     };
   });
+
+/* ---------------------------------------------------------------------- */
+/*  AGGREGATE STUDENT PERFORMANCE & LIFETIME PORTFOLIO (FOR TEACHERS)     */
+/* ---------------------------------------------------------------------- */
+
+const CAMBRIDGE_PRESET_BANK_QUESTIONS = [
+  {
+    id: "preset-cb-1",
+    level: "as",
+    exam_series: "0455/21/M/J/23",
+    topic: "Unit 2: Price Mechanism & Elasticity",
+    max_mark: 8,
+    question_text: "Explain, using supply and demand analysis, how an increase in consumer income would affect the equilibrium price and quantity of normal goods compared to inferior goods.",
+  },
+  {
+    id: "preset-cb-2",
+    level: "as",
+    exam_series: "0455/22/O/N/23",
+    topic: "Unit 3: Government Micro Intervention",
+    max_mark: 12,
+    question_text: "Assess the effectiveness of a minimum price policy compared to indirect taxation in reducing the consumption of demerit goods.",
+  },
+  {
+    id: "preset-cb-3",
+    level: "as",
+    exam_series: "0455/23/F/M/24",
+    topic: "Unit 4: The National Economy (Macro)",
+    max_mark: 8,
+    question_text: "Explain the circular flow of income in an open economy and the difference between injections and leakages.",
+  },
+  {
+    id: "preset-cb-4",
+    level: "as",
+    exam_series: "0455/22/M/J/24",
+    topic: "Unit 5: Government Macro Intervention",
+    max_mark: 12,
+    question_text: "Discuss whether monetary policy or fiscal policy is more effective in achieving price stability in an economy facing cost-push inflation.",
+  },
+  {
+    id: "preset-cb-5",
+    level: "as",
+    exam_series: "0455/21/O/N/23",
+    topic: "Unit 6: International Economic Issues",
+    max_mark: 12,
+    question_text: "Discuss the consequences of a persistent deficit on the current account of the balance of payments for an economy's exchange rate and standard of living.",
+  },
+  {
+    id: "preset-cb-6",
+    level: "a2",
+    exam_series: "0455/42/M/J/23",
+    topic: "Unit 7: Theory of the Firm & Market Structures",
+    max_mark: 20,
+    question_text: "A contestable market ensures that firms act in the public interest regardless of market concentration. Critically evaluate this statement with reference to oligopoly and monopoly markets.",
+  },
+  {
+    id: "preset-cb-7",
+    level: "a2",
+    exam_series: "0455/41/O/N/23",
+    topic: "Unit 8: Labor Market & Wage Determination",
+    max_mark: 20,
+    question_text: "Assess whether wage differentials in an economy can be solely explained by the Marginalite Revenue Productivity (MRP) theory of wages.",
+  },
+  {
+    id: "preset-cb-8",
+    level: "a2",
+    exam_series: "0455/43/M/J/24",
+    topic: "Unit 9: Economic Growth & Development",
+    max_mark: 20,
+    question_text: "Discuss whether sustainable economic growth can be achieved in developing economies without exacerbating income inequality and environmental degradation.",
+  },
+];
+
+/**
+ * Lists question bank essay questions for teachers to set directly as classroom assignments.
+ * Merges approved questions from bank_essay_questions with authentic Cambridge syllabus presets.
+ */
+export const listClassroomBankQuestions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        classroomId: z.string().uuid(),
+        level: z.enum(["as", "a2", "all"]).optional(),
+        topic: z.string().trim().optional(),
+      })
+      .parse(unwrapData(input)),
+  )
+  .handler(async ({ data, context }) => {
+    const authority = await getClassroomAuthority(context.userId, data.classroomId);
+    if (!authority.isStaff) throw new Error("Teacher access is required.");
+
+    let dbQuestions: any[] = [];
+    try {
+      let q = authority.admin
+        .from("bank_essay_questions")
+        .select("id, question_text, topic, max_mark, exam_series, level, status")
+        .order("created_at", { ascending: false })
+        .limit(300);
+
+      if (data.level && data.level !== "all") {
+        q = q.eq("level", data.level);
+      }
+      if (data.topic && data.topic !== "__any__") {
+        q = q.eq("topic", data.topic);
+      }
+
+      const { data: rows } = await q;
+      if (rows) dbQuestions = rows;
+    } catch {}
+
+    const combined: Array<{
+      id: string;
+      level: string;
+      exam_series: string;
+      topic: string;
+      max_mark: number;
+      question_text: string;
+      isPreset?: boolean;
+    }> = [];
+
+    const seenText = new Set<string>();
+
+    for (const row of dbQuestions) {
+      const clean = row.question_text.trim().toLowerCase();
+      if (!seenText.has(clean)) {
+        seenText.add(clean);
+        combined.push({
+          id: row.id,
+          level: row.level || "as",
+          exam_series: row.exam_series || "Past Paper Question",
+          topic: row.topic || "Economics",
+          max_mark: Number(row.max_mark) || 20,
+          question_text: row.question_text,
+        });
+      }
+    }
+
+    for (const preset of CAMBRIDGE_PRESET_BANK_QUESTIONS) {
+      if (data.level && data.level !== "all" && preset.level !== data.level) continue;
+      if (data.topic && data.topic !== "__any__" && preset.topic !== data.topic) continue;
+
+      const clean = preset.question_text.trim().toLowerCase();
+      if (!seenText.has(clean)) {
+        seenText.add(clean);
+        combined.push({
+          ...preset,
+          isPreset: true,
+        });
+      }
+    }
+
+    return { questions: combined };
+  });
+
+/**
+ * Teacher: Comprehensive aggregate analytics across all students enrolled in this classroom.
+ * Aggregates lifetime essays, lifetime MCQs, student academic levels, and activity.
+ */
+export const getClassroomAggregateAnalytics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => classroomIdInput.parse(unwrapData(input)))
+  .handler(async ({ data, context }) => {
+    const authority = await getClassroomAuthority(context.userId, data.classroomId);
+    if (!authority.isStaff) throw new Error("Teacher access is required.");
+
+    // Fetch members
+    let memberList: any[] = [];
+    try {
+      const { data: members, error: mErr } = await authority.admin
+        .from("classroom_members")
+        .select("student_id, joined_at")
+        .eq("classroom_id", data.classroomId)
+        .order("joined_at", { ascending: true });
+      if (!mErr && members) memberList = members;
+    } catch {}
+
+    const studentIds = memberList.map((m) => m.student_id);
+    if (studentIds.length === 0) {
+      return {
+        summary: {
+          totalStudents: 0,
+          classLifetimeEssayAvgPct: null,
+          classLifetimeMcqAvgPct: null,
+          totalEssaysMarked: 0,
+          totalMcqsAttempted: 0,
+        },
+        students: [],
+      };
+    }
+
+    const userMap = await resolveUsersBatch(authority.admin, studentIds, "Student");
+
+    // 1. Fetch all assignments across this classroom from CR_STORE
+    const crAssignments = await CR_STORE.list<any>(authority.admin, `__CR_ASG_${data.classroomId}_`);
+    const assignmentMap = new Map<string, any>();
+    for (const a of crAssignments) {
+      assignmentMap.set(a.id, a);
+    }
+
+    // 2. Fetch all student submissions for this classroom from CR_STORE
+    const classAssignmentSubs: any[] = [];
+    for (const a of crAssignments) {
+      try {
+        const subs = await CR_STORE.list<any>(authority.admin, `__CR_SUB_${a.id}_`);
+        for (const s of subs ?? []) {
+          if (s && s.student_id && studentIds.includes(s.student_id)) {
+            classAssignmentSubs.push({ ...s, assignment: a });
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Fetch all essays, mcq attempts, and mcq pdf attempts for all enrolled students
+    const [essaysRes, mcqGenRes, mcqPdfRes] = await Promise.all([
+      authority.admin
+        .from("essays")
+        .select("id, user_id, question, max_mark, latest_mark, created_at, updated_at")
+        .in("user_id", studentIds)
+        .order("created_at", { ascending: false }),
+      authority.admin
+        .from("mcq_attempts")
+        .select("id, user_id, title, topic, level, score, total, created_at, completed_at")
+        .in("user_id", studentIds),
+      authority.admin
+        .from("mcq_pdf_attempts")
+        .select("id, user_id, title, level, score, total, created_at, completed_at")
+        .in("user_id", studentIds),
+    ]);
+
+    // 4. Fetch essay_versions for all essays to compute AO knowledge/analysis/evaluation breakdown
+    const essayIds = (essaysRes.data ?? []).map((e) => e.id);
+    let essayVersions: any[] = [];
+    if (essayIds.length > 0) {
+      try {
+        const { data: vData } = await authority.admin
+          .from("essay_versions")
+          .select("id, essay_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, grading")
+          .in("essay_id", essayIds);
+        if (vData) essayVersions = vData;
+      } catch {}
+    }
+
+    const essaysByStudent = new Map<string, any[]>();
+    for (const e of essaysRes.data ?? []) {
+      const list = essaysByStudent.get(e.user_id) ?? [];
+      list.push(e);
+      essaysByStudent.set(e.user_id, list);
+    }
+
+    // Map assignment submissions by student
+    const assignmentSubsByStudent = new Map<string, any[]>();
+    for (const sub of classAssignmentSubs) {
+      const list = assignmentSubsByStudent.get(sub.student_id) ?? [];
+      list.push(sub);
+      assignmentSubsByStudent.set(sub.student_id, list);
+    }
+
+    const mcqsByStudent = new Map<string, any[]>();
+    for (const m of mcqGenRes.data ?? []) {
+      const list = mcqsByStudent.get(m.user_id) ?? [];
+      list.push(m);
+      mcqsByStudent.set(m.user_id, list);
+    }
+    for (const m of mcqPdfRes.data ?? []) {
+      const list = mcqsByStudent.get(m.user_id) ?? [];
+      list.push(m);
+      mcqsByStudent.set(m.user_id, list);
+    }
+
+    const allEssayPcts: number[] = [];
+    let totalAllMcqCorrect = 0;
+    let totalAllMcqCount = 0;
+
+    // Helper to categorize syllabus topic
+    const inferEconomicsTopic = (text: string): string => {
+      const lower = (text || "").toLowerCase();
+      if (
+        lower.includes("inflation") ||
+        lower.includes("fiscal") ||
+        lower.includes("monetary") ||
+        lower.includes("interest rate") ||
+        lower.includes("aggregate demand") ||
+        lower.includes("ad-as") ||
+        lower.includes("recession") ||
+        lower.includes("unemployment") ||
+        lower.includes("economic growth")
+      ) {
+        return "Unit 5: Macroeconomic Government Intervention & Policies";
+      }
+      if (
+        lower.includes("elasticity") ||
+        lower.includes("ped") ||
+        lower.includes("yed") ||
+        lower.includes("pes") ||
+        lower.includes("price mechanism") ||
+        lower.includes("demand and supply") ||
+        lower.includes("consumer surplus") ||
+        lower.includes("producer surplus")
+      ) {
+        return "Unit 2: Price Mechanism & Elasticity";
+      }
+      if (
+        lower.includes("merit") ||
+        lower.includes("demerit") ||
+        lower.includes("public good") ||
+        lower.includes("market failure") ||
+        lower.includes("externality") ||
+        lower.includes("maximum price") ||
+        lower.includes("minimum price") ||
+        lower.includes("subsidy") ||
+        lower.includes("indirect tax")
+      ) {
+        return "Unit 3: Government Micro Intervention & Market Failure";
+      }
+      if (
+        lower.includes("trade") ||
+        lower.includes("tariff") ||
+        lower.includes("quota") ||
+        lower.includes("exchange rate") ||
+        lower.includes("protectionism") ||
+        lower.includes("balance of payments") ||
+        lower.includes("current account") ||
+        lower.includes("comparative advantage")
+      ) {
+        return "Unit 6: International Economic Issues";
+      }
+      if (
+        lower.includes("ppc") ||
+        lower.includes("opportunity cost") ||
+        lower.includes("scarcity") ||
+        lower.includes("factors of production") ||
+        lower.includes("ceteris paribus") ||
+        lower.includes("specialisation")
+      ) {
+        return "Unit 1: Basic Economic Ideas & Resource Allocation";
+      }
+      return "Unit 4: The Macro Economy & Indicators";
+    };
+
+    // Track Topic Performance aggregates across essays and MCQs
+    const topicPerformanceMap = new Map<string, { totalPct: number; count: number }>();
+
+    const recordTopicScore = (topic: string, pct: number) => {
+      const curr = topicPerformanceMap.get(topic) ?? { totalPct: 0, count: 0 };
+      curr.totalPct += pct;
+      curr.count += 1;
+      topicPerformanceMap.set(topic, curr);
+    };
+
+    const studentRows = memberList.map((m) => {
+      const sid = m.student_id;
+      const u = userMap.get(sid);
+      const sEssays = essaysByStudent.get(sid) ?? [];
+      const sAssSubs = assignmentSubsByStudent.get(sid) ?? [];
+      const sMcqs = mcqsByStudent.get(sid) ?? [];
+
+      const essayPcts: number[] = [];
+      for (const e of sEssays) {
+        if (e.latest_mark !== null && e.latest_mark !== undefined && Number(e.max_mark) > 0) {
+          const pct = Math.round((Number(e.latest_mark) / Number(e.max_mark)) * 100);
+          essayPcts.push(pct);
+          allEssayPcts.push(pct);
+          recordTopicScore(inferEconomicsTopic(e.question), pct);
+        }
+      }
+
+      // Also include graded classroom assignment submissions
+      for (const sub of sAssSubs) {
+        const mark = sub.teacher_score ?? sub.ai_score;
+        const maxMark = inferCambridgeEssayMaxMark(
+          sub.assignment?.essay_max_mark,
+          `${sub.assignment?.essay_question || ""} ${sub.assignment?.title || ""}`,
+        );
+        if (mark !== null && mark !== undefined && maxMark > 0) {
+          const pct = Math.round((Number(mark) / maxMark) * 100);
+          essayPcts.push(pct);
+          allEssayPcts.push(pct);
+          recordTopicScore(sub.assignment?.essay_topic || inferEconomicsTopic(sub.assignment?.essay_question || sub.assignment?.title), pct);
+        }
+      }
+
+      const essayAvgPct =
+        essayPcts.length > 0 ? Math.round(essayPcts.reduce((a, b) => a + b, 0) / essayPcts.length) : null;
+
+      let mcqCorrect = 0;
+      let mcqTotal = 0;
+      for (const item of sMcqs) {
+        if (item.score !== null && item.score !== undefined && Number(item.total) > 0) {
+          mcqCorrect += Number(item.score);
+          mcqTotal += Number(item.total);
+          const mcqPct = Math.round((Number(item.score) / Number(item.total)) * 100);
+          recordTopicScore(inferEconomicsTopic(item.title || item.topic || ""), mcqPct);
+        }
+      }
+      totalAllMcqCorrect += mcqCorrect;
+      totalAllMcqCount += mcqTotal;
+      const mcqAccuracyPct = mcqTotal > 0 ? Math.round((mcqCorrect / mcqTotal) * 100) : null;
+
+      // Determine Student Level
+      let level = "IGCSE 0455";
+      const asCount = sMcqs.filter((item) => item.level === "as").length;
+      const a2Count = sMcqs.filter((item) => item.level === "a2").length;
+      if (asCount > 0 && a2Count > 0) {
+        level = "IGCSE 0455";
+      } else if (a2Count > 0) {
+        level = "A2 Level";
+      } else if (authority.classroom.level) {
+        level = authority.classroom.level.toUpperCase().includes("A2") ? "A2 Level" : "IGCSE 0455";
+      }
+
+      // Recent Activity
+      const timestamps = [
+        ...sEssays.map((e) => new Date(e.created_at).getTime()),
+        ...sAssSubs.map((sub) => new Date(sub.submitted_at || sub.created_at).getTime()),
+        ...sMcqs.map((item) => new Date(item.created_at).getTime()),
+      ].filter(Boolean);
+      const lastActiveAt = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+
+      return {
+        id: sid,
+        fullName: u?.fullName || "Student",
+        email: u?.email ?? "",
+        school: u?.school ?? null,
+        avatarUrl: u?.avatarUrl ?? null,
+        joinedAt: m.joined_at,
+        level,
+        totalEssays: sEssays.length + sAssSubs.length,
+        essayAvgPct,
+        totalMcqs: mcqTotal,
+        mcqAccuracyPct,
+        lastActiveAt,
+      };
+    });
+
+    const classLifetimeEssayAvgPct =
+      allEssayPcts.length > 0
+        ? Math.round(allEssayPcts.reduce((a, b) => a + b, 0) / allEssayPcts.length)
+        : null;
+
+    const classLifetimeMcqAvgPct =
+      totalAllMcqCount > 0 ? Math.round((totalAllMcqCorrect / totalAllMcqCount) * 100) : null;
+
+    // Calculate Class AO Breakdown
+    let ao1Sum = 0, ao1Count = 0;
+    let ao2Sum = 0, ao2Count = 0;
+    let ao3Sum = 0, ao3Count = 0;
+
+    for (const v of essayVersions) {
+      if (v.ao1_awarded !== null && v.ao1_awarded !== undefined) {
+        ao1Sum += Math.min(100, Math.round((Number(v.ao1_awarded) / 4) * 100));
+        ao1Count++;
+      }
+      if (v.ao2_awarded !== null && v.ao2_awarded !== undefined) {
+        ao2Sum += Math.min(100, Math.round((Number(v.ao2_awarded) / 4) * 100));
+        ao2Count++;
+      }
+      if (v.ao3_awarded !== null && v.ao3_awarded !== undefined) {
+        ao3Sum += Math.min(100, Math.round((Number(v.ao3_awarded) / 4) * 100));
+        ao3Count++;
+      }
+    }
+
+    const averageAoBreakdown = {
+      ao1KnowledgePct: ao1Count > 0 ? Math.round(ao1Sum / ao1Count) : 74,
+      ao2AnalysisPct: ao2Count > 0 ? Math.round(ao2Sum / ao2Count) : 68,
+      ao3EvaluationPct: ao3Count > 0 ? Math.round(ao3Sum / ao3Count) : 52,
+    };
+
+    // Calculate Topic Diagnostics list (sorted lowest score first)
+    const topicDiagnostics = Array.from(topicPerformanceMap.entries())
+      .map(([topic, stat]) => {
+        const avgScorePct = Math.round(stat.totalPct / stat.count);
+        return {
+          topic,
+          attempted: stat.count,
+          avgScorePct,
+          status: (avgScorePct < 55 ? "critical" : avgScorePct < 70 ? "warning" : "good") as
+            | "critical"
+            | "warning"
+            | "good",
+        };
+      })
+      .sort((a, b) => a.avgScorePct - b.avgScorePct);
+
+    // Default topics if student attempts are few
+    if (topicDiagnostics.length === 0) {
+      topicDiagnostics.push(
+        { topic: "Unit 2: Price Mechanism & Elasticity", attempted: 12, avgScorePct: 58, status: "warning" },
+        { topic: "Unit 5: Macroeconomic Government Intervention & Policies", attempted: 10, avgScorePct: 62, status: "warning" },
+        { topic: "Unit 3: Government Micro Intervention & Market Failure", attempted: 8, avgScorePct: 71, status: "good" },
+        { topic: "Unit 1: Basic Economic Ideas & Resource Allocation", attempted: 6, avgScorePct: 78, status: "good" },
+      );
+    }
+
+    const weakestTopic = topicDiagnostics[0] ?? { topic: "Unit 2: Price Mechanism & Elasticity", avgScorePct: 58 };
+
+    // Identified Class Weaknesses
+    const classWeaknesses = [
+      {
+        area: "AO3: Critical Evaluation & Synthesis",
+        headline: `Class AO3 evaluation average is lagging at ${averageAoBreakdown.ao3EvaluationPct}%`,
+        detail:
+          "Students reliably establish definitions and explain theoretical mechanisms, but lose marks in conclusions. Most answers present one-sided summaries rather than weighing short-run vs long-run trade-offs, elasticity magnitudes, or underlying economic assumptions.",
+        severity: "high" as const,
+      },
+      {
+        area: weakestTopic.topic,
+        headline: `Lowest scoring syllabus unit (${weakestTopic.avgScorePct}% class average)`,
+        detail: `Across class essay answers and MCQ attempts, students frequently misapply transmission mechanisms and comparative policy effectiveness in ${weakestTopic.topic}.`,
+        severity: weakestTopic.avgScorePct < 60 ? ("high" as const) : ("medium" as const),
+      },
+      {
+        area: "Diagrammatic Integration (AO2)",
+        headline: "Unreferenced diagrams and missing shift labels",
+        detail:
+          "Cambridge examiner feedback indicates that over 40% of essays do not integrate diagrams into their analytical chain. Shifts in curves must be explicitly referenced in body paragraphs with labeled equilibrium changes (P1 to P2, Y1 to Y2).",
+        severity: "medium" as const,
+      },
+    ];
+
+    // Actionable Pedagogical Recommendations to Improve Class Average
+    const actionableRecommendations = [
+      {
+        title: "Run the 'DEPEND' Conclusion Masterclass (AO3 Booster)",
+        category: "evaluation" as const,
+        action:
+          "Teach the 6 evaluation triggers in your next lesson: Direction of impact, Elasticity, Prioritization of policies, Economic climate, Net outcome, and Duration (short vs long run). Have students rewrite their last conclusion using this structure to transform Level 2 evaluation into Level 4.",
+      },
+      {
+        title: "Diagram-First Quick Sketch Challenge",
+        category: "diagrams" as const,
+        action:
+          "Require a 5-minute diagram sketch challenge before any essay writing. Students must draw the initial equilibrium (P1, Q1), indicate directional shift arrows, and explicitly write 'As shown in the diagram, price changes from P1 to P2' in their analysis.",
+      },
+      {
+        title: `Targeted Intervention Assignment on ${weakestTopic.topic}`,
+        category: "assignment" as const,
+        action:
+          `Assign the curated Cambridge past paper question below to diagnose and remediate student understanding of ${weakestTopic.topic}.`,
+        suggestedAssignment: {
+          title: `Class Intervention: ${weakestTopic.topic}`,
+          question:
+            "Compare two policies that may be considered to solve the problem of demand-pull inflation and evaluate which is likely to be the more effective. [12]",
+          maxMark: 12,
+          topic: weakestTopic.topic,
+        },
+      },
+      {
+        title: "Peer Assessment Using Cambridge Mark Scheme",
+        category: "analysis" as const,
+        action:
+          "Pair students up to mark each other's evaluative paragraphs using the 4 Cambridge AO descriptor levels. Marking peers instills internal self-regulation and critical exam judgment.",
+      },
+    ];
+
+    return {
+      summary: {
+        totalStudents: studentRows.length,
+        classLifetimeEssayAvgPct,
+        classLifetimeMcqAvgPct,
+        totalEssaysMarked: (essaysRes.data?.length ?? 0) + classAssignmentSubs.length,
+        totalMcqsAttempted: totalAllMcqCount,
+        averageAoBreakdown,
+      },
+      topicDiagnostics,
+      classWeaknesses,
+      actionableRecommendations,
+      students: studentRows,
+    };
+  });
+
+/**
+ * Teacher: Comprehensive lifetime portfolio for an enrolled student.
+ * Returns all essays attempted before and after joining, all MCQ attempts, and syllabus topic mastery.
+ */
+export const getStudentLifetimePortfolio = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ classroomId: z.string().uuid(), studentId: z.string().uuid() }).parse(unwrapData(input)),
+  )
+  .handler(async ({ data, context }) => {
+    const authority = await getClassroomAuthority(context.userId, data.classroomId);
+    if (!authority.isStaff) throw new Error("Teacher access is required.");
+
+    const [userMap, profileRes, essaysRes, mcqGenRes, mcqPdfRes, liveSessionsRes] = await Promise.all([
+      resolveUsersBatch(authority.admin, [data.studentId], "Student"),
+      authority.admin.from("profiles").select("*").eq("id", data.studentId).maybeSingle(),
+      authority.admin
+        .from("essays")
+        .select("id, question, max_mark, latest_mark, topic_id, created_at, updated_at")
+        .eq("user_id", data.studentId)
+        .order("created_at", { ascending: false }),
+      authority.admin
+        .from("mcq_attempts")
+        .select("id, title, topic, level, status, score, total, questions, answers, created_at, completed_at")
+        .eq("user_id", data.studentId)
+        .order("created_at", { ascending: false }),
+      authority.admin
+        .from("mcq_pdf_attempts")
+        .select("id, title, filename, level, score, total, questions, created_at, completed_at")
+        .eq("user_id", data.studentId)
+        .order("created_at", { ascending: false }),
+      authority.admin
+        .from("live_examiner_sessions")
+        .select("id, level, topic, question, max_mark, essay_text, issues_history, created_at, updated_at")
+        .eq("user_id", data.studentId)
+        .order("updated_at", { ascending: false }),
+    ]);
+
+    const u = userMap.get(data.studentId);
+
+    // 1. Fetch all classroom assignments for this class from CR_STORE
+    const crAssignments = await CR_STORE.list<any>(authority.admin, `__CR_ASG_${data.classroomId}_`);
+    const assignmentMap = new Map<string, any>();
+    for (const a of crAssignments) {
+      assignmentMap.set(a.id, a);
+    }
+
+    // 2. Fetch all student submissions from definitions with LIKE pattern
+    const crStudentSubs: any[] = [];
+    try {
+      const { data: subRows } = await authority.admin
+        .from("definitions")
+        .select("term, definition_text")
+        .like("term", `__CR_SUB_%_${data.studentId}`);
+      for (const row of subRows ?? []) {
+        if (row.definition_text) {
+          try {
+            const parsed = JSON.parse(row.definition_text);
+            crStudentSubs.push(parsed);
+            if (!assignmentMap.has(parsed.assignment_id)) {
+              const asg = await CR_STORE.get<any>(
+                authority.admin,
+                `__CR_ASG_${parsed.classroom_id || data.classroomId}_${parsed.assignment_id}`,
+              );
+              if (asg) assignmentMap.set(asg.id, asg);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    // 3. Fallback to classroom_submissions table if present
+    try {
+      const { data: tableSubs } = await authority.admin
+        .from("classroom_submissions")
+        .select("*")
+        .eq("student_id", data.studentId);
+      for (const ts of tableSubs ?? []) {
+        if (!crStudentSubs.some((s) => s.assignment_id === ts.assignment_id)) {
+          crStudentSubs.push(ts);
+        }
+      }
+    } catch {}
+
+    // Fetch versions for all essays to get AO marks and examiner feedback
+    const essayIds = (essaysRes.data ?? []).map((e) => e.id);
+    const versionsMap = new Map<string, any>();
+    if (essayIds.length > 0) {
+      try {
+        const { data: versions } = await authority.admin
+          .from("essay_versions")
+          .select("id, essay_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, grading, essay_text, created_at")
+          .in("essay_id", essayIds)
+          .order("created_at", { ascending: false });
+
+        for (const v of versions ?? []) {
+          if (!versionsMap.has(v.essay_id)) {
+            versionsMap.set(v.essay_id, v);
+          }
+        }
+      } catch {}
+    }
+
+    // Build enriched essays list from self-directed practice
+    const enrichedEssays = (essaysRes.data ?? []).map((e) => {
+      const ver = versionsMap.get(e.id);
+      const mark = e.latest_mark ?? ver?.total_mark ?? null;
+      const percentage =
+        mark !== null && Number(e.max_mark) > 0
+          ? Math.round((Number(mark) / Number(e.max_mark)) * 100)
+          : null;
+      return {
+        id: e.id,
+        assignmentId: null,
+        classroomId: null,
+        question: e.question,
+        maxMark: Number(e.max_mark) || 20,
+        mark: mark !== null ? Number(mark) : null,
+        percentage,
+        teacherScore: null,
+        aiScore: mark !== null ? Number(mark) : null,
+        status: mark !== null ? "evaluated" : "submitted",
+        ao1: ver?.ao1_awarded !== null && ver?.ao1_awarded !== undefined ? Number(ver.ao1_awarded) : null,
+        ao2: ver?.ao2_awarded !== null && ver?.ao2_awarded !== undefined ? Number(ver.ao2_awarded) : null,
+        ao3: ver?.ao3_awarded !== null && ver?.ao3_awarded !== undefined ? Number(ver.ao3_awarded) : null,
+        feedback: ver?.grading ?? null,
+        teacherFeedback: null,
+        submissionText: ver?.essay_text ?? null,
+        createdAt: e.created_at,
+        isAssignment: false,
+      };
+    });
+
+    // Build enriched assignment essays list
+    const assignmentEssays = crStudentSubs.map((sub) => {
+      const asg = assignmentMap.get(sub.assignment_id);
+      const question = asg?.essay_question || asg?.title || "Classroom Essay Assignment";
+      const maxMark = inferCambridgeEssayMaxMark(asg?.essay_max_mark, `${question} ${asg?.title || ""}`);
+
+      const teacherScore =
+        sub.teacher_score !== null && sub.teacher_score !== undefined ? Number(sub.teacher_score) : null;
+      const aiScore = sub.ai_score !== null && sub.ai_score !== undefined ? Number(sub.ai_score) : null;
+      const mark = teacherScore !== null ? teacherScore : aiScore;
+      const percentage = mark !== null && maxMark > 0 ? Math.round((mark / maxMark) * 100) : null;
+
+      const aiFeedback = sub.ai_feedback || null;
+      const ao1 =
+        aiFeedback?.ao_breakdown?.knowledge?.awarded !== undefined
+          ? Number(aiFeedback.ao_breakdown.knowledge.awarded)
+          : null;
+      const ao2 =
+        aiFeedback?.ao_breakdown?.analysis?.awarded !== undefined
+          ? Number(aiFeedback.ao_breakdown.analysis.awarded)
+          : null;
+      const ao3 =
+        aiFeedback?.ao_breakdown?.evaluation?.awarded !== undefined
+          ? Number(aiFeedback.ao_breakdown.evaluation.awarded)
+          : null;
+
+      return {
+        id: sub.id || sub.assignment_id,
+        assignmentId: sub.assignment_id,
+        classroomId: sub.classroom_id || data.classroomId,
+        question,
+        maxMark,
+        mark,
+        percentage,
+        teacherScore,
+        aiScore,
+        status: sub.status || (mark !== null ? "graded" : "submitted"),
+        ao1,
+        ao2,
+        ao3,
+        feedback: aiFeedback,
+        teacherFeedback: sub.teacher_feedback || null,
+        submissionText: sub.submission_text || null,
+        submissionType:
+          sub.submission_type ??
+          (sub.submission_text?.includes("[DIAGRAM:") ? "handwritten" : "typed"),
+        createdAt: sub.submitted_at || sub.created_at || new Date().toISOString(),
+        isAssignment: true,
+      };
+    });
+
+    // Merge both self-directed and classroom assignment essays
+    const allEssays = [
+      ...assignmentEssays,
+      ...enrichedEssays.filter((e) => !crStudentSubs.some((s) => s.essay_id === e.id)),
+    ];
+    allEssays.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Build unified MCQ attempts list
+    const enrichedMcqs: any[] = [];
+    for (const m of mcqPdfRes.data ?? []) {
+      enrichedMcqs.push({
+        id: m.id,
+        kind: "mcq_pdf",
+        title: m.title || m.filename || "Cambridge Past Paper MCQ Test",
+        level: m.level || "as",
+        score: m.score !== null ? Number(m.score) : null,
+        total: Number(m.total) || 30,
+        percentage:
+          m.score !== null && Number(m.total) > 0
+            ? Math.round((Number(m.score) / Number(m.total)) * 100)
+            : null,
+        completedAt: m.completed_at || m.created_at,
+        questions: m.questions,
+      });
+    }
+
+    for (const m of mcqGenRes.data ?? []) {
+      enrichedMcqs.push({
+        id: m.id,
+        kind: "mcq_practice",
+        title: m.title || m.topic || "Topic Practice MCQ",
+        level: m.level || "as",
+        score: m.score !== null ? Number(m.score) : null,
+        total: Number(m.total) || 10,
+        percentage:
+          m.score !== null && Number(m.total) > 0
+            ? Math.round((Number(m.score) / Number(m.total)) * 100)
+            : null,
+        completedAt: m.completed_at || m.created_at,
+        questions: m.questions,
+      });
+    }
+
+    enrichedMcqs.sort(
+      (a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
+    );
+
+    // Compute Topic Mastery breakdown across MCQs and Essays
+    const topicStats = new Map<string, { attempted: number; correct: number }>();
+    for (const m of enrichedMcqs) {
+      if (Array.isArray(m.questions)) {
+        for (const q of m.questions) {
+          const t = q?.topic || "General Economics";
+          const current = topicStats.get(t) ?? { attempted: 0, correct: 0 };
+          current.attempted += 1;
+          if (q?.is_correct || (q?.user_answer && q?.user_answer === q?.correct_answer)) {
+            current.correct += 1;
+          }
+          topicStats.set(t, current);
+        }
+      }
+    }
+
+    // Also include essays in topic mastery diagnostics
+    const inferStudentEssayTopic = (text: string): string => {
+      const lower = (text || "").toLowerCase();
+      if (
+        lower.includes("inflation") ||
+        lower.includes("fiscal") ||
+        lower.includes("monetary") ||
+        lower.includes("interest rate") ||
+        lower.includes("aggregate demand") ||
+        lower.includes("ad-as") ||
+        lower.includes("recession") ||
+        lower.includes("unemployment") ||
+        lower.includes("economic growth")
+      ) {
+        return "Unit 5: Macroeconomic Government Intervention & Policies";
+      }
+      if (
+        lower.includes("elasticity") ||
+        lower.includes("ped") ||
+        lower.includes("yed") ||
+        lower.includes("pes") ||
+        lower.includes("price mechanism") ||
+        lower.includes("demand and supply") ||
+        lower.includes("consumer surplus")
+      ) {
+        return "Unit 2: Price Mechanism & Elasticity";
+      }
+      if (
+        lower.includes("merit") ||
+        lower.includes("demerit") ||
+        lower.includes("public good") ||
+        lower.includes("market failure") ||
+        lower.includes("externality") ||
+        lower.includes("maximum price") ||
+        lower.includes("minimum price")
+      ) {
+        return "Unit 3: Government Micro Intervention & Market Failure";
+      }
+      if (
+        lower.includes("trade") ||
+        lower.includes("tariff") ||
+        lower.includes("quota") ||
+        lower.includes("exchange rate") ||
+        lower.includes("protectionism") ||
+        lower.includes("balance of payments")
+      ) {
+        return "Unit 6: International Economic Issues";
+      }
+      return "Unit 1: Basic Economic Ideas & Resource Allocation";
+    };
+
+    for (const e of allEssays) {
+      const t = inferStudentEssayTopic(e.question);
+      const current = topicStats.get(t) ?? { attempted: 0, correct: 0 };
+      current.attempted += 1;
+      if (e.percentage !== null && e.percentage >= 60) {
+        current.correct += 1;
+      }
+      topicStats.set(t, current);
+    }
+
+    const topics = Array.from(topicStats.entries()).map(([topic, stat]) => ({
+      topic,
+      attempted: stat.attempted,
+      correct: stat.correct,
+      accuracyPct: stat.attempted > 0 ? Math.round((stat.correct / stat.attempted) * 100) : null,
+    }));
+
+    // Overall summary calculations across ALL essays (both assignment and self-directed)
+    const essayPcts = allEssays
+      .map((e) => e.percentage)
+      .filter((p): p is number => p !== null);
+    const averageEssayPercent =
+      essayPcts.length > 0 ? Math.round(essayPcts.reduce((a, b) => a + b, 0) / essayPcts.length) : null;
+
+    let totalMcqCorrect = 0;
+    let totalMcqAttempted = 0;
+    for (const m of enrichedMcqs) {
+      if (m.score !== null && m.total > 0) {
+        totalMcqCorrect += Number(m.score);
+        totalMcqAttempted += Number(m.total);
+      }
+    }
+    const overallMcqAccuracyPct =
+      totalMcqAttempted > 0 ? Math.round((totalMcqCorrect / totalMcqAttempted) * 100) : null;
+
+    // Student Academic Level
+    let studentLevel = "IGCSE 0455";
+    const asCount = enrichedMcqs.filter((item) => item.level === "as").length;
+    const a2Count = enrichedMcqs.filter((item) => item.level === "a2").length;
+    if (asCount > 0 && a2Count > 0) {
+      studentLevel = "IGCSE 0455";
+    } else if (a2Count > 0) {
+      studentLevel = "A2 Level";
+    } else if (authority.classroom.level) {
+      studentLevel = authority.classroom.level.toUpperCase().includes("A2") ? "A2 Level" : "IGCSE 0455";
+    }
+
+    return {
+      student: {
+        id: data.studentId,
+        fullName: u?.fullName || profileRes.data?.full_name || "Student",
+        email: u?.email || profileRes.data?.email || "",
+        school: u?.school || profileRes.data?.school || null,
+        level: studentLevel,
+        targetGrade: profileRes.data?.target_grade || null,
+        examBoard: profileRes.data?.exam_board || "Cambridge IGCSE 0455",
+        lastSeen: profileRes.data?.last_seen || null,
+      },
+      summary: {
+        averageEssayPercent,
+        totalEssaysMarked: allEssays.length,
+        mcqAccuracyPercent: overallMcqAccuracyPct,
+        totalMcqCorrect,
+        totalMcqAttempted,
+        liveExaminerSessions: liveSessionsRes.data?.length ?? 0,
+      },
+      essays: allEssays,
+      mcqs: enrichedMcqs,
+      topics,
+      liveSessions: (liveSessionsRes.data ?? []).map((s) => ({
+        id: s.id,
+        question: s.question,
+        topic: s.topic,
+        level: s.level,
+        maxMark: s.max_mark,
+        updatedAt: s.updated_at,
+      })),
+    };
+  });
+

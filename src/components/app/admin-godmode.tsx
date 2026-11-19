@@ -1,8 +1,11 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  Activity,
+  AlertTriangle,
   Award,
   BookOpen,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -13,21 +16,39 @@ import {
   Filter,
   GraduationCap,
   Layers,
+  MessageSquare,
   PenLine,
+  Radio,
   RefreshCw,
   Search,
+  Send,
+  ShieldAlert,
+  SlidersHorizontal,
   Sparkles,
   Target,
+  Trash2,
   User,
   Users,
+  Wrench,
   XCircle,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, Component, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +57,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -46,17 +69,107 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  adminFixFailedEssay,
   adminGetEssayDetail,
+  adminGetLiveUserMonitoring,
   adminGetMcqAttemptDetail,
+  adminDeleteMcqAttempt,
+  adminGetPlatformActivityFeed,
   adminGetStudentDossier,
+  adminListAllDossierUsers,
   adminListAllEssays,
   adminListAllMcqAttempts,
+  adminListFailedEssays,
 } from "@/lib/admin.functions";
 import { MarkBreakdown } from "@/components/app/mark-breakdown";
 import { cn } from "@/lib/utils";
 
-export function AdminGodmodeDashboard() {
-  const [subTab, setSubTab] = useState<"essays" | "mcq" | "dossier">("essays");
+interface GodmodeErrorBoundaryProps {
+  children: ReactNode;
+  tabName?: string;
+}
+
+interface GodmodeErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class GodmodeErrorBoundary extends Component<GodmodeErrorBoundaryProps, GodmodeErrorBoundaryState> {
+  constructor(props: GodmodeErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): GodmodeErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("God Mode tab error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-center space-y-3">
+          <AlertTriangle className="mx-auto size-8 text-destructive" />
+          <p className="text-sm font-semibold text-destructive">
+            Something went wrong while rendering {this.props.tabName || "this section"}
+          </p>
+          <p className="text-xs text-muted-foreground font-mono">
+            {this.state.error?.message || "Unexpected UI error"}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs gap-1.5"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            <RefreshCw className="size-3" />
+            <span>Try Again</span>
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export function AdminGodmodeDashboard({
+  initialTab,
+}: {
+  initialTab?: "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq";
+} = {}) {
+  const [subTab, setSubTab] = useState<
+    "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq"
+  >(initialTab || "radar");
+
+  useEffect(() => {
+    if (initialTab) {
+      setSubTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Fetch quick metrics for tab badge counters
+  const fetchLiveMonitor = useServerFn(adminGetLiveUserMonitoring);
+  const fetchFailedEssays = useServerFn(adminListFailedEssays);
+
+  const liveStatsQuery = useQuery({
+    queryKey: ["admin-live-monitor-badge"],
+    queryFn: () => fetchLiveMonitor(),
+    refetchInterval: 10_000,
+  });
+
+  const failedQuery = useQuery({
+    queryKey: ["admin-failed-essays-badge"],
+    queryFn: () => fetchFailedEssays(),
+    refetchInterval: 15_000,
+  });
+
+  const onlineCount = liveStatsQuery.data?.stats.onlineCount ?? 0;
+  const typingCount = liveStatsQuery.data?.stats.currentlyTypingCount ?? 0;
+  const openFailuresCount = (failedQuery.data ?? []).filter((f) => !f.resolved).length;
 
   return (
     <div className="space-y-6">
@@ -69,47 +182,149 @@ export function AdminGodmodeDashboard() {
                 <Crown className="size-4" />
               </span>
               <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
-                God-Mode Platform Vault &amp; Inspector
+                God-Mode Platform Vault &amp; Omniscient Monitor
               </h2>
               <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-400 font-mono text-[10px]">
                 ROOT ACCESS
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground max-w-2xl">
-              Inspect any student&apos;s written essays, full Cambridge examiner rubrics, past paper MCQ attempts,
-              and 360° student dossiers across the platform.
+            <p className="text-xs text-muted-foreground max-w-3xl">
+              Real-time user surveillance (live screens &amp; keystrokes), 1-click Cambridge essay failure diagnosis &amp; repair,
+              complete 360° student dossiers reflecting all users, and live platform-wide activity stream.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background/80 border border-border shadow-xs text-xs font-mono">
+              <span className="relative flex size-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{onlineCount}</span>
+              <span className="text-muted-foreground text-[11px]">online</span>
+              {typingCount > 0 && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="font-semibold text-indigo-500">✍️ {typingCount}</span>
+                  <span className="text-muted-foreground text-[11px]">typing</span>
+                </>
+              )}
+            </div>
+
+            {openFailuresCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSubTab("failures")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-colors"
+              >
+                <AlertTriangle className="size-3.5" />
+                <span className="font-bold">{openFailuresCount}</span>
+                <span className="text-[11px]">unfixed</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Vault Navigation Tabs */}
       <Tabs value={subTab} onValueChange={(val) => setSubTab(val as typeof subTab)}>
-        <TabsList className="grid grid-cols-3 w-full h-auto p-1 bg-muted/60 border border-border">
-          <TabsTrigger value="essays" className="py-2.5 text-xs font-medium gap-2">
-            <FileText className="size-3.5 text-primary" />
-            <span>Essays Vault</span>
+        <TabsList className="flex items-center justify-start gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar w-full h-auto p-1.5 rounded-2xl bg-muted/50 border border-border/80 shadow-2xs scroll-smooth">
+          <TabsTrigger
+            value="radar"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Radio className="size-3.5 shrink-0 text-emerald-500 animate-pulse" />
+            <span className="whitespace-nowrap">Live Radar &amp; Keystrokes</span>
+            {typingCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-[9px] h-4 px-1.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono shrink-0 font-semibold"
+              >
+                {typingCount}
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="mcq" className="py-2.5 text-xs font-medium gap-2">
-            <Target className="size-3.5 text-emerald-500" />
-            <span>MCQ Papers &amp; Attempts</span>
+
+          <TabsTrigger
+            value="failures"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Wrench className="size-3.5 shrink-0 text-rose-500" />
+            <span className="whitespace-nowrap">Essay Failures &amp; Fix</span>
+            {openFailuresCount > 0 && (
+              <Badge variant="destructive" className="text-[9px] h-4 px-1.5 font-mono shrink-0 font-semibold">
+                {openFailuresCount}
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="dossier" className="py-2.5 text-xs font-medium gap-2">
-            <User className="size-3.5 text-amber-500" />
-            <span>Student 360° Dossier</span>
+
+          <TabsTrigger
+            value="dossier"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <User className="size-3.5 shrink-0 text-amber-500" />
+            <span className="whitespace-nowrap">Student 360° Dossier</span>
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="activity"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Activity className="size-3.5 shrink-0 text-indigo-500" />
+            <span className="whitespace-nowrap">Activity Feed</span>
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="essays"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <FileText className="size-3.5 shrink-0 text-primary" />
+            <span className="whitespace-nowrap">Essays Vault</span>
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="mcq"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Target className="size-3.5 shrink-0 text-emerald-500" />
+            <span className="whitespace-nowrap">MCQ Attempts</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="essays" className="mt-4">
-          {subTab === "essays" && <EssaysVaultTab />}
+        <TabsContent value="radar" className="mt-4">
+          <GodmodeErrorBoundary tabName="Live Radar & Keystrokes">
+            {subTab === "radar" && <LiveRadarTab />}
+          </GodmodeErrorBoundary>
         </TabsContent>
 
-        <TabsContent value="mcq" className="mt-4">
-          {subTab === "mcq" && <McqVaultTab />}
+        <TabsContent value="failures" className="mt-4">
+          <GodmodeErrorBoundary tabName="Essay Failures & Fix">
+            {subTab === "failures" && <FailedEssaysTab />}
+          </GodmodeErrorBoundary>
         </TabsContent>
 
         <TabsContent value="dossier" className="mt-4">
-          {subTab === "dossier" && <StudentDossierTab />}
+          <GodmodeErrorBoundary tabName="Student 360° Dossier">
+            {subTab === "dossier" && <StudentDossierTab />}
+          </GodmodeErrorBoundary>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          <GodmodeErrorBoundary tabName="Activity Feed">
+            {subTab === "activity" && <PlatformActivityTab />}
+          </GodmodeErrorBoundary>
+        </TabsContent>
+
+        <TabsContent value="essays" className="mt-4">
+          <GodmodeErrorBoundary tabName="Essays Vault">
+            {subTab === "essays" && <EssaysVaultTab />}
+          </GodmodeErrorBoundary>
+        </TabsContent>
+
+        <TabsContent value="mcq" className="mt-4">
+          <GodmodeErrorBoundary tabName="MCQ Attempts">
+            {subTab === "mcq" && <McqVaultTab />}
+          </GodmodeErrorBoundary>
         </TabsContent>
       </Tabs>
     </div>
@@ -120,10 +335,14 @@ export function AdminGodmodeDashboard() {
  * TAB 1: ESSAYS VAULT
  * ============================================================================ */
 
-function EssaysVaultTab() {
+export function EssaysVaultTab() {
   const fetchAllEssays = useServerFn(adminListAllEssays);
   const fetchEssayDetail = useServerFn(adminGetEssayDetail);
-  const essaysQuery = useQuery({ queryKey: ["admin-all-essays"], queryFn: () => fetchAllEssays() });
+  const essaysQuery = useQuery({
+    queryKey: ["admin-all-essays"],
+    queryFn: () => fetchAllEssays(),
+    refetchInterval: 5_000,
+  });
 
   const [search, setSearch] = useState("");
   const [bandFilter, setBandFilter] = useState<"all" | "high" | "mid" | "low">("all");
@@ -142,9 +361,9 @@ function EssaysVaultTab() {
       const q = search.trim().toLowerCase();
       const matchesSearch =
         !q ||
-        e.studentName.toLowerCase().includes(q) ||
+        (e.studentName || "").toLowerCase().includes(q) ||
         (e.studentEmail && e.studentEmail.toLowerCase().includes(q)) ||
-        e.question.toLowerCase().includes(q) ||
+        (e.question || "").toLowerCase().includes(q) ||
         (e.school && e.school.toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
@@ -234,6 +453,22 @@ function EssaysVaultTab() {
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
+        </div>
+      ) : essaysQuery.isError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-center space-y-3">
+          <AlertTriangle className="mx-auto size-8 text-destructive" />
+          <p className="text-sm font-semibold text-destructive">Failed to load platform essays</p>
+          <p className="text-xs text-muted-foreground">{(essaysQuery.error as Error)?.message || "A database read error occurred."}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs gap-1.5"
+            onClick={() => essaysQuery.refetch()}
+          >
+            <RefreshCw className="size-3" />
+            <span>Try Again</span>
+          </Button>
         </div>
       ) : filteredEssays.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
@@ -416,10 +651,10 @@ function EssaysVaultTab() {
               {/* Version History Tabs */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Versions &amp; Reports ({essayDetailQuery.data.versions.length})
+                  Versions &amp; Reports ({essayDetailQuery.data?.versions?.length ?? 0})
                 </h4>
 
-                {essayDetailQuery.data.versions.map((ver: any) => (
+                {(essayDetailQuery.data?.versions ?? []).map((ver: any) => (
                   <div key={ver.id} className="rounded-xl border border-border p-4 space-y-4 bg-card/60">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
                       <div className="flex items-center gap-2">
@@ -451,14 +686,22 @@ function EssaysVaultTab() {
                     </div>
 
                     {/* Examiner Breakdown Report */}
-                    {ver.grading && typeof ver.grading === "object" && ver.grading.strengths ? (
-                      <div className="pt-2">
-                        <span className="text-xs font-semibold text-muted-foreground block mb-2">
-                          Cambridge Examiner Breakdown:
-                        </span>
-                        <MarkBreakdown grading={ver.grading} />
-                      </div>
-                    ) : null}
+                    {(() => {
+                      let g = ver.grading;
+                      if (typeof g === "string") {
+                        try {
+                          g = JSON.parse(g);
+                        } catch {}
+                      }
+                      return g && typeof g === "object" ? (
+                        <div className="pt-2">
+                          <span className="text-xs font-semibold text-muted-foreground block mb-2">
+                            Cambridge Examiner Breakdown:
+                          </span>
+                          <MarkBreakdown grading={g} />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 ))}
               </div>
@@ -475,13 +718,33 @@ function EssaysVaultTab() {
  * ============================================================================ */
 
 function McqVaultTab() {
+  const queryClient = useQueryClient();
   const fetchAllMcqs = useServerFn(adminListAllMcqAttempts);
   const fetchMcqDetail = useServerFn(adminGetMcqAttemptDetail);
+  const deleteMcq = useServerFn(adminDeleteMcqAttempt);
   const mcqsQuery = useQuery({ queryKey: ["admin-all-mcqs"], queryFn: () => fetchAllMcqs() });
 
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "generated" | "past_paper">("all");
   const [inspectTarget, setInspectTarget] = useState<{ id: string; kind: "generated" | "past_paper" } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; kind: "generated" | "past_paper" } | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (target: { id: string; kind: "generated" | "past_paper" }) =>
+      deleteMcq({ data: { id: target.id, kind: target.kind } }),
+    onSuccess: () => {
+      toast.success("MCQ score deleted successfully.");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-mcqs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-student-dossier"] });
+      setDeleteTarget(null);
+      if (inspectTarget?.id === deleteTarget?.id) {
+        setInspectTarget(null);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to delete MCQ score.");
+    },
+  });
 
   const mcqDetailQuery = useQuery({
     queryKey: ["admin-mcq-detail", inspectTarget?.id, inspectTarget?.kind],
@@ -667,11 +930,46 @@ function McqVaultTab() {
                   <Eye className="size-3.5" />
                   <span>Inspect</span>
                 </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-destructive"
+                  title="Delete this MCQ score"
+                  aria-label="Delete this MCQ score"
+                  onClick={() => setDeleteTarget({ id: mcq.id, title: mcq.title, kind: mcq.kind })}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete MCQ score?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the MCQ attempt for &ldquo;{deleteTarget?.title}&rdquo;?
+              This will permanently remove the score and answers from the system and recalculate student topic metrics.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Score"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Inspect MCQ Modal */}
       <Dialog open={Boolean(inspectTarget)} onOpenChange={(open) => !open && setInspectTarget(null)}>
@@ -708,6 +1006,24 @@ function McqVaultTab() {
                     <Badge variant="outline" className="text-xs font-bold">
                       Score: {mcqDetailQuery.data.attempt.score ?? 0} / {mcqDetailQuery.data.attempt.total}
                     </Badge>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => {
+                        if (inspectTarget) {
+                          setDeleteTarget({
+                            id: inspectTarget.id,
+                            title: mcqDetailQuery.data.attempt.title || "MCQ Paper",
+                            kind: inspectTarget.kind,
+                          });
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3" />
+                      <span>Delete Score</span>
+                    </Button>
                   </div>
                 </div>
                 <p className="text-sm font-semibold text-foreground">
@@ -784,34 +1100,1124 @@ function McqVaultTab() {
   );
 }
 
+/* ============================================================================
+ * TAB: LIVE RADAR & KEYSTROKE SURVEILLANCE
+ * ============================================================================ */
+
+function LiveRadarTab() {
+  const fetchLiveMonitor = useServerFn(adminGetLiveUserMonitoring);
+  const [pollInterval, setPollInterval] = useState<number>(3000);
+  const [search, setSearch] = useState("");
+  const [selectedUserForInspection, setSelectedUserForInspection] = useState<any | null>(null);
+
+  const queryClient = useQueryClient();
+  const monitorQuery = useQuery({
+    queryKey: ["admin-live-user-monitoring"],
+    queryFn: () => fetchLiveMonitor(),
+    refetchInterval: pollInterval > 0 ? pollInterval : false,
+  });
+
+  const data = monitorQuery.data;
+  const users = data?.users ?? [];
+  const stats = data?.stats ?? { onlineCount: 0, currentlyTypingCount: 0, totalMonitored: 0 };
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(
+      (u) =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.school && u.school.toLowerCase().includes(q)) ||
+        (u.screenDescription && u.screenDescription.toLowerCase().includes(q)) ||
+        (u.activeDraft?.question && u.activeDraft.question.toLowerCase().includes(q)),
+    );
+  }, [users, search]);
+
+  // Keep inspected user updated from live query data
+  const inspectedLiveUser = useMemo(() => {
+    if (!selectedUserForInspection) return null;
+    return users.find((u) => u.userId === selectedUserForInspection.userId) || selectedUserForInspection;
+  }, [users, selectedUserForInspection]);
+
+  return (
+    <div className="space-y-4">
+      {/* KPI banner */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground font-medium">Online Students Right Now</p>
+            <span className="relative flex size-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+            </span>
+          </div>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-emerald-500">
+            {stats.onlineCount}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Active heartbeats within last 2.5 minutes</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground font-medium">Actively Typing Live Drafts</p>
+            <PenLine className="size-4 text-indigo-500" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-indigo-500">
+            {stats.currentlyTypingCount}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Writing in Essay Grader or Data Response right now</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground font-medium">Total Monitored Sessions</p>
+            <Users className="size-4 text-muted-foreground" />
+          </div>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">
+            {stats.totalMonitored}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Students active within the last 2 hours</p>
+        </div>
+      </div>
+
+      {/* Controls & Search */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card/40 p-3 rounded-xl border border-border">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by student, email, school, or current screen..."
+            className="pl-9 text-xs h-9"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mr-1">
+            <Radio className="size-3 text-emerald-500 animate-pulse" />
+            <span>Radar:</span>
+          </div>
+
+          <Select value={String(pollInterval)} onValueChange={(v) => setPollInterval(Number(v))}>
+            <SelectTrigger className="h-8 text-xs w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2000" className="text-xs">⚡ Live (2s poll)</SelectItem>
+              <SelectItem value="5000" className="text-xs">Fast (5s poll)</SelectItem>
+              <SelectItem value="15000" className="text-xs">Normal (15s poll)</SelectItem>
+              <SelectItem value="0" className="text-xs">Paused</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => monitorQuery.refetch()}
+            disabled={monitorQuery.isFetching}
+          >
+            <RefreshCw className={cn("size-3", monitorQuery.isFetching && "animate-spin")} />
+            <span>Refresh</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Users Radar List */}
+      {monitorQuery.isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2 bg-card/20">
+          <Radio className="mx-auto size-8 text-muted-foreground/60 animate-pulse" />
+          <p className="text-sm font-medium">No active student sessions found</p>
+          <p className="text-xs text-muted-foreground">
+            {search ? "No students match your search query." : "When students open any platform feature, their screen and live keystrokes will appear here."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredUsers.map((user) => (
+            <div
+              key={user.userId}
+              className={cn(
+                "rounded-xl border p-4 transition-all space-y-3 bg-card/60",
+                user.isTyping
+                  ? "border-indigo-500/50 shadow-xs ring-1 ring-indigo-500/20 bg-indigo-500/5"
+                  : user.isOnline
+                  ? "border-emerald-500/30"
+                  : "border-border/80 opacity-90",
+              )}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-sm text-foreground">{user.name}</span>
+                    {user.email && (
+                      <span className="text-xs font-mono text-muted-foreground">({user.email})</span>
+                    )}
+                    {user.school && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                        {user.school}
+                      </Badge>
+                    )}
+
+                    {user.isOnline ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] h-4 gap-1">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Online Now
+                      </Badge>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">
+                        Seen {Math.round(user.secondsAgo / 60)}m ago
+                      </span>
+                    )}
+
+                    {user.isTyping && (
+                      <Badge className="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 text-[10px] h-4 gap-1">
+                        <PenLine className="size-2.5 animate-bounce" />
+                        Typing Live Draft
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <span className="text-xs font-medium text-foreground">
+                      Facing Screen:
+                    </span>
+                    <Badge variant="secondary" className="text-xs font-medium gap-1.5 py-0.5 px-2">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      {user.screenDescription}
+                    </Badge>
+                    {user.currentPath && (
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        ({user.currentPath})
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <Button
+                    type="button"
+                    variant={user.isTyping ? "default" : "outline"}
+                    size="sm"
+                    className={cn("h-8 text-xs gap-1.5 shadow-xs", user.isTyping && "bg-indigo-600 hover:bg-indigo-700 text-white")}
+                    onClick={() => setSelectedUserForInspection(user)}
+                  >
+                    <Eye className="size-3.5" />
+                    <span>Watch Keystrokes &amp; Screen</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Live Draft Preview Snippet */}
+              {user.activeDraft ? (
+                <div className="rounded-lg border border-border/80 bg-background/80 p-3 space-y-1.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground border-b border-border/50 pb-1.5">
+                    <span className="font-semibold text-foreground truncate max-w-md">
+                      Q: {user.activeDraft.question}
+                    </span>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span>✍️ {user.activeDraft.wordCount} words</span>
+                      <span>·</span>
+                      <span>{user.activeDraft.charCount} chars</span>
+                      <span>·</span>
+                      <span className="text-[10px]">
+                        Last keystroke: {new Date(user.activeDraft.updatedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="font-serif italic text-foreground text-xs leading-relaxed line-clamp-2">
+                    &ldquo;{user.activeDraft.text}&rdquo;
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Watch Keystrokes & Screen Dialog */}
+      <Dialog
+        open={Boolean(selectedUserForInspection)}
+        onOpenChange={(open) => !open && setSelectedUserForInspection(null)}
+      >
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                  <Radio className="size-4 text-emerald-500 animate-pulse" />
+                  Live Keystroke Mirror &amp; Student Screen
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Real-time mirror of student screen and live essay text input.
+                </DialogDescription>
+              </div>
+
+              {inspectedLiveUser?.isOnline && (
+                <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs gap-1">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Session Active
+                </Badge>
+              )}
+            </div>
+          </DialogHeader>
+
+          {inspectedLiveUser ? (
+            <div className="space-y-4 pt-2">
+              {/* Student Metadata Card */}
+              <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-foreground">
+                    Student: {inspectedLiveUser.name}{" "}
+                    {inspectedLiveUser.email && (
+                      <span className="font-mono text-muted-foreground">({inspectedLiveUser.email})</span>
+                    )}
+                  </span>
+                  {inspectedLiveUser.school && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {inspectedLiveUser.school}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Currently on screen:</span>
+                  <Badge variant="secondary" className="font-semibold text-xs">
+                    {inspectedLiveUser.screenDescription}
+                  </Badge>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {inspectedLiveUser.currentPath}
+                  </span>
+                </div>
+              </div>
+
+              {/* Active Draft Mirror */}
+              {inspectedLiveUser.activeDraft ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-border bg-card/60 p-3 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Target Question:
+                    </span>
+                    <p className="text-sm font-semibold text-foreground">
+                      {inspectedLiveUser.activeDraft.question}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">Live Keystroke Buffer:</span>
+                        <Badge variant="outline" className="text-[10px] h-4">
+                          {inspectedLiveUser.activeDraft.feature === "data_response" ? "Data Response" : "Essay Grader"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                        <span className="text-foreground font-semibold">
+                          ✍️ {inspectedLiveUser.activeDraft.wordCount} words
+                        </span>
+                        <span>·</span>
+                        <span>{inspectedLiveUser.activeDraft.charCount} characters</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-background p-4 text-xs font-serif leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto shadow-inner">
+                      {inspectedLiveUser.activeDraft.text || (
+                        <span className="text-muted-foreground italic font-sans">
+                          Student hasn&apos;t started typing words into this buffer yet...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2 bg-muted/20">
+                  <Eye className="mx-auto size-7 text-muted-foreground" />
+                  <p className="text-xs font-medium">No active text draft detected for this user right now</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    The student is viewing <span className="font-semibold">{inspectedLiveUser.screenDescription}</span>. Drafts will appear automatically when they start typing an essay.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 /* ============================================================================
- * TAB 3: 360° STUDENT DOSSIER
+ * TAB: FAILED ESSAYS & 1-CLICK CAMBRIDGE FIXER
+ * ============================================================================ */
+
+function FailedEssaysTab() {
+  const fetchFailures = useServerFn(adminListFailedEssays);
+  const fixEssay = useServerFn(adminFixFailedEssay);
+  const queryClient = useQueryClient();
+
+  const failuresQuery = useQuery({
+    queryKey: ["admin-failed-essays"],
+    queryFn: () => fetchFailures(),
+  });
+
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "unfixed" | "resolved">("unfixed");
+  const [selectedFailure, setSelectedFailure] = useState<any | null>(null);
+
+  // Fix modal form states
+  const [editQuestion, setEditQuestion] = useState("");
+  const [editEssayText, setEditEssayText] = useState("");
+  const [editMaxMark, setEditMaxMark] = useState("12");
+  const [fixMode, setFixMode] = useState<"auto_cambridge" | "manual">("auto_cambridge");
+  const [manualMark, setManualMark] = useState(8);
+  const [manualStrengths, setManualStrengths] = useState("Clear economic definitions and logical sequencing.");
+  const [manualImprovements, setManualImprovements] = useState("Deepen evaluation and include contextual real-world evidence.");
+  const [notifyStudent, setNotifyStudent] = useState(true);
+
+  const fixMutation = useMutation({
+    mutationFn: (payload: any) => fixEssay({ data: payload }),
+    onSuccess: () => {
+      toast.success("Essay successfully graded, repaired, and assigned to student!");
+      queryClient.invalidateQueries({ queryKey: ["admin-failed-essays"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-essays"] });
+      setSelectedFailure(null);
+    },
+    onError: (err: any) => {
+      toast.error(`Repair failed: ${err.message}`);
+    },
+  });
+
+  const failures = failuresQuery.data ?? [];
+
+  const filteredFailures = useMemo(() => {
+    return failures.filter((f) => {
+      if (filter === "unfixed" && f.resolved) return false;
+      if (filter === "resolved" && !f.resolved) return false;
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        f.studentName.toLowerCase().includes(q) ||
+        (f.studentEmail && f.studentEmail.toLowerCase().includes(q)) ||
+        f.question.toLowerCase().includes(q) ||
+        f.errorMessage.toLowerCase().includes(q)
+      );
+    });
+  }, [failures, filter, search]);
+
+  const openFixModal = (failure: any) => {
+    setSelectedFailure(failure);
+    setEditQuestion(failure.question || "Assess whether the benefits of inflation outweigh the costs for an economy.");
+    setEditEssayText(failure.essayText || "");
+    setEditMaxMark(String(failure.maxMark || 12));
+    setFixMode("auto_cambridge");
+  };
+
+  const handleExecuteFix = () => {
+    if (!selectedFailure) return;
+    if (!editQuestion.trim()) {
+      toast.error("Please provide the question.");
+      return;
+    }
+    if (!editEssayText.trim()) {
+      toast.error("Please provide the student's essay text to grade.");
+      return;
+    }
+
+    const payload: any = {
+      failureId: selectedFailure.id,
+      targetUserId: selectedFailure.userId,
+      question: editQuestion.trim(),
+      essayText: editEssayText.trim(),
+      maxMark: Number(editMaxMark) || 12,
+      mode: fixMode,
+      notifyStudent,
+    };
+
+    if (fixMode === "manual") {
+      const maxM = Number(editMaxMark) || 12;
+      const totalM = Math.min(maxM, Math.max(0, manualMark));
+      payload.manualGrading = {
+        totalMark: totalM,
+        ao1Awarded: Math.round(totalM * 0.35),
+        ao2Awarded: Math.round(totalM * 0.4),
+        ao3Awarded: Math.round(totalM * 0.25),
+        strengths: [manualStrengths.trim()],
+        improvements: [manualImprovements.trim()],
+      };
+    }
+
+    fixMutation.mutate(payload);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Banner */}
+      <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-5 space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Wrench className="size-4 text-rose-500" />
+              Failed Essay Submissions &amp; 1-Click Cambridge Repair
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Every grading failure, rate-limit rejection, timeout, or unscored script across the platform is captured here.
+              Inspect the student&apos;s full script and 1-click re-grade using root Cambridge Examiner privileges.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="destructive" className="font-mono text-xs px-2.5 py-1">
+              {failures.filter((f) => !f.resolved).length} Unfixed Failures
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by student, email, question, or error reason..."
+            className="pl-9 text-xs h-9"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/40">
+            <Button
+              type="button"
+              variant={filter === "unfixed" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("unfixed")}
+            >
+              Unfixed Only
+            </Button>
+            <Button
+              type="button"
+              variant={filter === "all" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("all")}
+            >
+              All Events
+            </Button>
+            <Button
+              type="button"
+              variant={filter === "resolved" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("resolved")}
+            >
+              Repaired
+            </Button>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => failuresQuery.refetch()}
+            disabled={failuresQuery.isFetching}
+          >
+            <RefreshCw className={cn("size-3", failuresQuery.isFetching && "animate-spin")} />
+            <span>Refresh</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Failures List */}
+      {failuresQuery.isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : filteredFailures.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2 bg-card/20">
+          <CheckCircle2 className="mx-auto size-8 text-emerald-500" />
+          <p className="text-sm font-medium">No failed essays found</p>
+          <p className="text-xs text-muted-foreground">
+            {filter === "unfixed"
+              ? "All student essays across the platform are properly graded with no open errors!"
+              : "No failed essays match your filter criteria."}
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-xl border border-border bg-card/40 overflow-hidden shadow-xs">
+          {filteredFailures.map((item) => (
+            <div
+              key={item.id}
+              className={cn(
+                "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors",
+                item.resolved && "opacity-75 bg-muted/10",
+              )}
+            >
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-xs text-foreground truncate">
+                    {item.studentName}
+                  </span>
+                  {item.studentEmail && (
+                    <span className="text-[11px] font-mono text-muted-foreground truncate">
+                      ({item.studentEmail})
+                    </span>
+                  )}
+                  {item.school && (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                      {item.school}
+                    </Badge>
+                  )}
+
+                  {item.resolved ? (
+                    <Badge variant="outline" className="text-[10px] h-4 text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+                      Resolved / Repaired
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="text-[10px] h-4">
+                      Open Failure
+                    </Badge>
+                  )}
+
+                  <span className="text-[10px] text-muted-foreground ml-auto sm:ml-0">
+                    {new Date(item.failedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+
+                {item.question ? (
+                  <p className="text-xs font-semibold text-foreground line-clamp-1">
+                    Q: {item.question}
+                  </p>
+                ) : null}
+
+                {/* Error reason */}
+                <div className="flex items-center gap-1.5 text-xs text-rose-500 font-mono bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-md">
+                  <AlertTriangle className="size-3 shrink-0" />
+                  <span className="truncate">{item.errorMessage}</span>
+                </div>
+
+                {item.essayText ? (
+                  <p className="text-[11px] text-muted-foreground line-clamp-2 italic font-serif">
+                    &ldquo;{item.essayText}&rdquo;
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="shrink-0 self-end sm:self-center">
+                <Button
+                  type="button"
+                  variant={item.resolved ? "outline" : "default"}
+                  size="sm"
+                  className={cn("h-8 text-xs gap-1.5 shadow-xs", !item.resolved && "bg-rose-600 hover:bg-rose-700 text-white")}
+                  onClick={() => openFixModal(item)}
+                >
+                  <Wrench className="size-3.5" />
+                  <span>{item.resolved ? "Re-evaluate / Edit" : "Inspect & Fix Essay"}</span>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Repair Essay Modal */}
+      <Dialog open={Boolean(selectedFailure)} onOpenChange={(open) => !open && setSelectedFailure(null)}>
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Wrench className="size-4 text-rose-500" />
+              Cambridge Examiner Essay Recovery &amp; Repair
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Fix and publish this essay directly into the student&apos;s portfolio.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedFailure ? (
+            <div className="space-y-4 pt-2">
+              {/* Student info & original error */}
+              <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-foreground">
+                    Target Student: {selectedFailure.studentName}{" "}
+                    {selectedFailure.studentEmail && (
+                      <span className="font-mono text-muted-foreground">({selectedFailure.studentEmail})</span>
+                    )}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    User ID: {selectedFailure.userId.slice(0, 8)}...
+                  </Badge>
+                </div>
+                <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-xs text-rose-500 font-mono">
+                  Failure Reason: {selectedFailure.errorMessage}
+                </div>
+              </div>
+
+              {/* Question Input */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Essay Question:</Label>
+                <Input
+                  value={editQuestion}
+                  onChange={(e) => setEditQuestion(e.target.value)}
+                  placeholder="Paste or enter the Cambridge economics question..."
+                  className="text-xs h-9"
+                />
+              </div>
+
+              {/* Max Mark */}
+              <div className="flex items-center gap-3">
+                <Label className="text-xs font-semibold">Max Mark:</Label>
+                <Select value={editMaxMark} onValueChange={setEditMaxMark}>
+                  <SelectTrigger className="w-28 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="8" className="text-xs">8 Marks</SelectItem>
+                    <SelectItem value="12" className="text-xs">12 Marks</SelectItem>
+                    <SelectItem value="20" className="text-xs">20 Marks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Student Essay Script */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">Student Essay Script:</Label>
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    {editEssayText.trim() ? editEssayText.trim().split(/\s+/).length : 0} words
+                  </span>
+                </div>
+                <Textarea
+                  value={editEssayText}
+                  onChange={(e) => setEditEssayText(e.target.value)}
+                  placeholder="Paste or edit the student's essay script..."
+                  className="text-xs font-serif leading-relaxed h-44 max-h-60"
+                />
+              </div>
+
+              {/* Repair Mode */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <Label className="text-xs font-semibold block">Repair Mode:</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFixMode("auto_cambridge")}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-all space-y-1",
+                      fixMode === "auto_cambridge"
+                        ? "border-primary bg-primary/10 ring-1 ring-primary"
+                        : "border-border bg-card/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                      <Sparkles className="size-3.5 text-primary" />
+                      <span>Auto-Fix with Cambridge AI</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Evaluates script via Gemini 3.8 Flash, awards AO1/AO2/AO3 marks &amp; creates full examiner report.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFixMode("manual")}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-all space-y-1",
+                      fixMode === "manual"
+                        ? "border-primary bg-primary/10 ring-1 ring-primary"
+                        : "border-border bg-card/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                      <SlidersHorizontal className="size-3.5 text-primary" />
+                      <span>Manual Mark Award</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Admin manually awards marks and enters examiner feedback directly.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Manual mode inputs */}
+              {fixMode === "manual" && (
+                <div className="rounded-xl border border-border bg-card/40 p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs font-semibold">Total Mark Awarded:</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={Number(editMaxMark) || 12}
+                      value={manualMark}
+                      onChange={(e) => setManualMark(Number(e.target.value))}
+                      className="w-24 h-8 text-xs font-mono font-bold"
+                    />
+                    <span className="text-xs text-muted-foreground">/ {editMaxMark} Marks</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Strengths:</Label>
+                    <Input
+                      value={manualStrengths}
+                      onChange={(e) => setManualStrengths(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Areas for Improvement:</Label>
+                    <Input
+                      value={manualImprovements}
+                      onChange={(e) => setManualImprovements(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Notify toggle */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="notifyStudent"
+                  checked={notifyStudent}
+                  onChange={(e) => setNotifyStudent(e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary size-4"
+                />
+                <label htmlFor="notifyStudent" className="text-xs text-foreground cursor-pointer select-none">
+                  Automatically send direct notification message to student that their essay has been graded &amp; repaired
+                </label>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-9"
+                  onClick={() => setSelectedFailure(null)}
+                  disabled={fixMutation.isPending}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  className="text-xs h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                  onClick={handleExecuteFix}
+                  disabled={fixMutation.isPending}
+                >
+                  {fixMutation.isPending ? (
+                    <>
+                      <RefreshCw className="size-3.5 animate-spin" />
+                      <span>Grading &amp; Repairing Script...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-3.5" />
+                      <span>Publish Repaired Essay to Student</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * TAB: OMNISCIENT PLATFORM ACTIVITY STREAM
+ * ============================================================================ */
+
+function PlatformActivityTab() {
+  const fetchActivity = useServerFn(adminGetPlatformActivityFeed);
+  const [pollInterval, setPollInterval] = useState<number>(10000);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  const activityQuery = useQuery({
+    queryKey: ["admin-platform-activity-feed"],
+    queryFn: () => fetchActivity(),
+    refetchInterval: pollInterval > 0 ? pollInterval : false,
+  });
+
+  const data = activityQuery.data;
+  const events = data?.events ?? [];
+  const stats = data?.stats ?? {
+    eventsToday: 0,
+    errorsToday: 0,
+    successRate: 100,
+    activeUsersToday: 0,
+    avgLatency: null,
+  };
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((ev) => {
+      if (categoryFilter === "errors" && ev.ok) return false;
+      if (categoryFilter === "essays" && !ev.feature.includes("grade_essay")) return false;
+      if (categoryFilter === "messages" && ev.feature !== "DIRECT_MESSAGE") return false;
+      if (categoryFilter === "chat" && ev.feature !== "chat") return false;
+
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        ev.userName.toLowerCase().includes(q) ||
+        (ev.userEmail && ev.userEmail.toLowerCase().includes(q)) ||
+        ev.feature.toLowerCase().includes(q) ||
+        (ev.error && ev.error.toLowerCase().includes(q))
+      );
+    });
+  }, [events, categoryFilter, search]);
+
+  return (
+    <div className="space-y-4">
+      {/* Activity KPIs */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Events Today</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">
+            {stats.eventsToday}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Total platform actions recorded</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Platform Success Rate</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-emerald-500">
+            {stats.successRate}%
+          </p>
+          <p className="text-[11px] text-muted-foreground">{stats.errorsToday} errors logged today</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Active Students Today</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-indigo-500">
+            {stats.activeUsersToday}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Distinct users executing features</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Avg AI Latency</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">
+            {stats.avgLatency !== null ? `${stats.avgLatency}ms` : "—"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">End-to-end response time</p>
+        </div>
+      </div>
+
+      {/* Search & Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card/40 p-3 rounded-xl border border-border">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search activity stream by user, feature, or error..."
+            className="pl-9 text-xs h-9"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/40 text-xs">
+            <Button
+              type="button"
+              variant={categoryFilter === "all" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => setCategoryFilter("all")}
+            >
+              All
+            </Button>
+            <Button
+              type="button"
+              variant={categoryFilter === "errors" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2 text-rose-500"
+              onClick={() => setCategoryFilter("errors")}
+            >
+              Errors Only
+            </Button>
+            <Button
+              type="button"
+              variant={categoryFilter === "essays" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => setCategoryFilter("essays")}
+            >
+              Essays
+            </Button>
+            <Button
+              type="button"
+              variant={categoryFilter === "messages" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => setCategoryFilter("messages")}
+            >
+              Messages
+            </Button>
+            <Button
+              type="button"
+              variant={categoryFilter === "chat" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => setCategoryFilter("chat")}
+            >
+              Chat
+            </Button>
+          </div>
+
+          <Select value={String(pollInterval)} onValueChange={(v) => setPollInterval(Number(v))}>
+            <SelectTrigger className="h-8 text-xs w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5000" className="text-xs">Poll: 5s</SelectItem>
+              <SelectItem value="10000" className="text-xs">Poll: 10s</SelectItem>
+              <SelectItem value="30000" className="text-xs">Poll: 30s</SelectItem>
+              <SelectItem value="0" className="text-xs">Paused</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => activityQuery.refetch()}
+            disabled={activityQuery.isFetching}
+          >
+            <RefreshCw className={cn("size-3", activityQuery.isFetching && "animate-spin")} />
+            <span>Refresh</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Events Stream */}
+      {activityQuery.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : filteredEvents.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2 bg-card/20">
+          <Activity className="mx-auto size-8 text-muted-foreground/60" />
+          <p className="text-sm font-medium">No activity logged yet</p>
+          <p className="text-xs text-muted-foreground">Platform events will appear here in real time as students and teachers interact.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-xl border border-border bg-card/40 overflow-hidden shadow-xs">
+          {filteredEvents.map((ev) => (
+            <div
+              key={ev.id}
+              className={cn(
+                "p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-muted/20 transition-colors",
+                !ev.ok && "bg-rose-500/5",
+              )}
+            >
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <span className="mt-0.5 shrink-0">
+                  {ev.ok ? (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+                      <CheckCircle2 className="size-3.5" />
+                    </span>
+                  ) : (
+                    <span className="flex size-6 items-center justify-center rounded-full bg-rose-500/10 text-rose-500">
+                      <XCircle className="size-3.5" />
+                    </span>
+                  )}
+                </span>
+
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-bold text-foreground truncate">{ev.summary}</span>
+                    <Badge variant="outline" className="text-[10px] h-4 font-mono">
+                      {ev.feature}
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      · {ev.userName} {ev.userEmail ? `(${ev.userEmail})` : ""}
+                    </span>
+                  </div>
+
+                  {ev.error && (
+                    <p className="text-[11px] font-mono text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded p-1.5 line-clamp-2">
+                      Error: {ev.error}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center font-mono text-[11px] text-muted-foreground">
+                {ev.latencyMs && (
+                  <span className="text-indigo-500 font-semibold">{ev.latencyMs}ms</span>
+                )}
+                <span>{new Date(ev.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+ * TAB 4: 360° STUDENT DOSSIER (REFLECTS ALL REGISTERED PLATFORM USERS)
  * ============================================================================ */
 
 function StudentDossierTab() {
-  const fetchAllEssays = useServerFn(adminListAllEssays);
+  const queryClient = useQueryClient();
+  const fetchAllDossierUsers = useServerFn(adminListAllDossierUsers);
   const fetchDossier = useServerFn(adminGetStudentDossier);
-  const essaysQuery = useQuery({ queryKey: ["admin-all-essays"], queryFn: () => fetchAllEssays() });
+  const deleteMcq = useServerFn(adminDeleteMcqAttempt);
 
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "online" | "has_essays" | "has_mcq" | "teachers">("all");
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
 
-  // Build unique students list
-  const students = useMemo(() => {
-    const list = essaysQuery.data ?? [];
-    const map = new Map<string, { id: string; name: string; email: string | null; school: string | null }>();
-    for (const e of list) {
-      if (!map.has(e.userId)) {
-        map.set(e.userId, {
-          id: e.userId,
-          name: e.studentName,
-          email: e.studentEmail,
-          school: e.school,
-        });
-      }
-    }
-    return Array.from(map.values());
-  }, [essaysQuery.data]);
+  const usersQuery = useQuery({
+    queryKey: ["admin-all-dossier-users"],
+    queryFn: () => fetchAllDossierUsers(),
+  });
+
+  const allUsers = usersQuery.data ?? [];
+
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter((u) => {
+      if (filter === "online" && !u.isOnline) return false;
+      if (filter === "has_essays" && u.totalEssays === 0) return false;
+      if (filter === "has_mcq" && u.totalMcqs === 0) return false;
+      if (filter === "teachers" && u.role !== "teacher") return false;
+
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.school && u.school.toLowerCase().includes(q))
+      );
+    });
+  }, [allUsers, filter, search]);
 
   const dossierQuery = useQuery({
     queryKey: ["admin-student-dossier", selectedStudentId],
@@ -821,26 +2227,102 @@ function StudentDossierTab() {
 
   return (
     <div className="space-y-5">
-      {/* Student Selector Card */}
-      <div className="rounded-xl border border-border bg-card/60 p-5 space-y-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <User className="size-4 text-primary" />
-          Select a Student to Inspect Complete Dossier
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          View all work ever completed by a student in one place: all written essays, past paper MCQ test attempts,
-          live writing sessions, and classroom memberships.
-        </p>
+      {/* User Selector Header Card */}
+      <div className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <User className="size-4 text-primary" />
+              Platform 360° User Dossier &amp; Academic Record
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Reflecting all registered users ({allUsers.length} total across the entire platform): inspect written essays, past paper MCQ attempts, live writing sessions, and classroom memberships.
+            </p>
+          </div>
 
-        <div className="max-w-md pt-1">
+          <Badge variant="outline" className="self-start sm:self-center font-mono text-xs">
+            {allUsers.length} Total Users Available
+          </Badge>
+        </div>
+
+        {/* Filter Pills & Search */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter users by name, email, or school..."
+              className="pl-8 text-xs h-8"
+            />
+          </div>
+
+          <div className="flex items-center rounded-lg border border-border p-0.5 bg-muted/40 text-xs">
+            <Button
+              type="button"
+              variant={filter === "all" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("all")}
+            >
+              All Users ({allUsers.length})
+            </Button>
+            <Button
+              type="button"
+              variant={filter === "online" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5 text-emerald-600 dark:text-emerald-400 font-semibold"
+              onClick={() => setFilter("online")}
+            >
+              Online ({allUsers.filter((u) => u.isOnline).length})
+            </Button>
+            <Button
+              type="button"
+              variant={filter === "has_essays" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("has_essays")}
+            >
+              Has Essays ({allUsers.filter((u) => u.totalEssays > 0).length})
+            </Button>
+            <Button
+              type="button"
+              variant={filter === "has_mcq" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs px-2.5"
+              onClick={() => setFilter("has_mcq")}
+            >
+              Has MCQs ({allUsers.filter((u) => u.totalMcqs > 0).length})
+            </Button>
+          </div>
+        </div>
+
+        {/* User Selection Dropdown */}
+        <div className="max-w-xl">
           <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-            <SelectTrigger className="text-xs h-9">
-              <SelectValue placeholder="Choose a student..." />
+            <SelectTrigger className="text-xs h-10">
+              <SelectValue placeholder="Choose any student or teacher from all platform users..." />
             </SelectTrigger>
-            <SelectContent>
-              {students.map((s) => (
-                <SelectItem key={s.id} value={s.id} className="text-xs">
-                  {s.name} {s.email ? `(${s.email})` : ""}
+            <SelectContent className="max-h-72">
+              {filteredUsers.map((u) => (
+                <SelectItem key={u.id} value={u.id} className="text-xs py-2">
+                  <div className="flex items-center gap-2">
+                    {u.isOnline ? (
+                      <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                    ) : (
+                      <span className="size-2 rounded-full bg-muted-foreground/30 shrink-0" />
+                    )}
+                    <span className="font-semibold text-foreground">{u.name}</span>
+                    {u.email && (
+                      <span className="font-mono text-[11px] text-muted-foreground">({u.email})</span>
+                    )}
+                    {u.school && (
+                      <span className="text-[10px] text-muted-foreground">· {u.school}</span>
+                    )}
+                    <Badge variant="outline" className="text-[9px] h-3.5 px-1 ml-auto font-mono">
+                      {u.totalEssays} essays · {u.totalMcqs} mcqs
+                    </Badge>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -850,10 +2332,10 @@ function StudentDossierTab() {
 
       {/* Dossier Content */}
       {!selectedStudentId ? (
-        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2 bg-card/20">
           <GraduationCap className="mx-auto size-8 text-muted-foreground/60" />
-          <p className="text-sm font-medium">No student selected</p>
-          <p className="text-xs text-muted-foreground">Select a student from the dropdown above to load their full record.</p>
+          <p className="text-sm font-medium">Select a student or teacher above</p>
+          <p className="text-xs text-muted-foreground">All {allUsers.length} platform users are loaded and ready to inspect in full 360° depth.</p>
         </div>
       ) : dossierQuery.isLoading ? (
         <div className="space-y-4">
@@ -868,27 +2350,32 @@ function StudentDossierTab() {
           <div className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
               <div>
-                <h3 className="text-base font-bold text-foreground">
-                  {dossierQuery.data.profile.fullName || "Student"}{" "}
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-foreground">
+                    {dossierQuery.data.profile.fullName || "Student"}{" "}
+                  </h3>
                   {dossierQuery.data.profile.email && (
                     <span className="font-mono text-xs text-muted-foreground">
                       ({dossierQuery.data.profile.email})
                     </span>
                   )}
-                </h3>
-                <p className="text-xs text-muted-foreground">
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {dossierQuery.data.profile.school ? `School: ${dossierQuery.data.profile.school} · ` : ""}
                   Joined:{" "}
                   {dossierQuery.data.profile.createdAt
                     ? new Date(dossierQuery.data.profile.createdAt).toLocaleDateString()
                     : "—"}
+                  {dossierQuery.data.profile.lastSignInAt && (
+                    <span> · Last sign in: {new Date(dossierQuery.data.profile.lastSignInAt).toLocaleString()}</span>
+                  )}
                 </p>
               </div>
 
-              {dossierQuery.data.classrooms.length > 0 ? (
+              {(dossierQuery.data?.classrooms ?? []).length > 0 ? (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-xs text-muted-foreground mr-1">Enrolled in:</span>
-                  {dossierQuery.data.classrooms.map((c: any) => (
+                  {(dossierQuery.data?.classrooms ?? []).map((c: any) => (
                     <Badge key={c.id} variant="secondary" className="text-[10px]">
                       {c.name} ({c.level})
                     </Badge>
@@ -902,27 +2389,27 @@ function StudentDossierTab() {
             </div>
 
             {/* Performance KPIs */}
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1">
                 <span className="text-[11px] text-muted-foreground font-medium">Essays Marked</span>
-                <p className="text-xl font-bold tabular-nums">{dossierQuery.data.stats.totalEssays}</p>
+                <p className="text-xl font-bold tabular-nums">{dossierQuery.data?.stats?.totalEssays ?? 0}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  Avg: {dossierQuery.data.stats.avgEssayPercent !== null ? `${dossierQuery.data.stats.avgEssayPercent}%` : "—"}
+                  Avg: {dossierQuery.data?.stats?.avgEssayPercent !== null && dossierQuery.data?.stats?.avgEssayPercent !== undefined ? `${dossierQuery.data.stats.avgEssayPercent}%` : "—"}
                 </p>
               </div>
 
               <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1">
                 <span className="text-[11px] text-muted-foreground font-medium">MCQ Tests Taken</span>
-                <p className="text-xl font-bold tabular-nums">{dossierQuery.data.stats.totalMcqs}</p>
+                <p className="text-xl font-bold tabular-nums">{dossierQuery.data?.stats?.totalMcqs ?? 0}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  Accuracy: {dossierQuery.data.stats.avgMcqPercent !== null ? `${dossierQuery.data.stats.avgMcqPercent}%` : "—"}
+                  Accuracy: {dossierQuery.data?.stats?.avgMcqPercent !== null && dossierQuery.data?.stats?.avgMcqPercent !== undefined ? `${dossierQuery.data.stats.avgMcqPercent}%` : "—"}
                 </p>
               </div>
 
               <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1">
                 <span className="text-[11px] text-muted-foreground font-medium">Total MCQs Answered</span>
                 <p className="text-xl font-bold tabular-nums text-emerald-500">
-                  {dossierQuery.data.stats.totalMcqCorrect} / {dossierQuery.data.stats.totalMcqQuestions}
+                  {dossierQuery.data?.stats?.totalMcqCorrect ?? 0} / {dossierQuery.data?.stats?.totalMcqQuestions ?? 0}
                 </p>
                 <p className="text-[10px] text-muted-foreground">Questions answered correctly</p>
               </div>
@@ -934,13 +2421,13 @@ function StudentDossierTab() {
             {/* Student's Essays */}
             <div className="rounded-xl border border-border bg-card/40 p-4 space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span>Essays Written ({dossierQuery.data.essays.length})</span>
+                <span>Essays Written ({(dossierQuery.data?.essays ?? []).length})</span>
               </h4>
-              {dossierQuery.data.essays.length === 0 ? (
+              {(dossierQuery.data?.essays ?? []).length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No essays submitted yet.</p>
               ) : (
                 <div className="divide-y divide-border/60 max-h-80 overflow-y-auto">
-                  {dossierQuery.data.essays.map((e: any) => (
+                  {(dossierQuery.data?.essays ?? []).map((e: any) => (
                     <div key={e.id} className="py-2.5 space-y-1 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-foreground truncate max-w-xs">{e.question}</span>
@@ -968,19 +2455,40 @@ function StudentDossierTab() {
             {/* Student's MCQ Attempts */}
             <div className="rounded-xl border border-border bg-card/40 p-4 space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span>MCQ Attempts ({dossierQuery.data.mcqAttempts.length})</span>
+                <span>MCQ Attempts ({(dossierQuery.data?.mcqAttempts ?? []).length})</span>
               </h4>
-              {dossierQuery.data.mcqAttempts.length === 0 ? (
+              {(dossierQuery.data?.mcqAttempts ?? []).length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No MCQ attempts completed yet.</p>
               ) : (
                 <div className="divide-y divide-border/60 max-h-80 overflow-y-auto">
-                  {dossierQuery.data.mcqAttempts.map((m: any) => (
+                  {(dossierQuery.data?.mcqAttempts ?? []).map((m: any) => (
                     <div key={m.id} className="py-2.5 space-y-1 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-foreground truncate max-w-xs">{m.title}</span>
-                        <span className="font-bold tabular-nums shrink-0 text-emerald-500">
-                          {m.score !== null ? `${m.score}/${m.total}` : "—"}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-bold tabular-nums text-emerald-500">
+                            {m.score !== null ? `${m.score}/${m.total}` : "—"}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-destructive p-0.5 rounded transition-colors"
+                            title="Delete this MCQ score"
+                            onClick={async () => {
+                              if (window.confirm(`Delete MCQ score for "${m.title}"?`)) {
+                                try {
+                                  await deleteMcq({ data: { id: m.id, kind: m.kind ?? "past_paper" } });
+                                  toast.success("MCQ score deleted.");
+                                  dossierQuery.refetch();
+                                  queryClient.invalidateQueries({ queryKey: ["admin-all-mcqs"] });
+                                } catch (e: any) {
+                                  toast.error(e.message || "Failed to delete score.");
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                         <span>

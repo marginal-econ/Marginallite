@@ -8,8 +8,8 @@ import { unwrapData } from "@/lib/safe-validator";
 import { checkUserEssayLimit } from "@/server/rate-limit";
 
 const GradeInput = z.object({
-  question: z.string().trim().min(10, "Paste the exam question.").max(2000),
-  essayText: z.string().trim().min(20, "That answer is too short to mark.").max(40_000),
+  question: z.string().trim().min(8, "Paste the exam question.").max(2000),
+  essayText: z.string().trim().min(10, "That answer is too short to mark.").max(40_000),
   // Ceiling of 20 - no IGCSE 0455 question part is worth more than 20 marks
   maxMark: z.number().int().min(1).max(20),
   isDiagramQuestion: z.boolean().optional(),
@@ -55,7 +55,7 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
     const { gradeEssay } = await import("./examiner/grade.server");
     const { defaultSplitForMaxMark } = await import("./examiner/config");
 
-    const split = defaultSplitForMaxMark(data.maxMark);
+    const split = defaultSplitForMaxMark(data.maxMark, undefined, data.question);
 
     // A referenced diagram is appended after the student's own text, exactly
     // like a hand-drawn diagram tag from OCR, so the examiner prompt's
@@ -310,7 +310,7 @@ export const getProgress = createServerFn({ method: "GET" })
     try {
       const { data, error } = await context.supabase
         .from("essay_submissions")
-        .select("awarded_marks, grading_result, created_at")
+        .select("max_marks, awarded_marks, grading_result, created_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -318,11 +318,16 @@ export const getProgress = createServerFn({ method: "GET" })
       if (!error && data && data.length > 0) {
         return data.map((row: any) => {
           const g = (row.grading_result || {}) as any;
+          const maxM = row.max_marks ?? g?.max_mark ?? 8;
           return {
             total_mark: row.awarded_marks,
+            max_mark: maxM,
             ao1_awarded: g?.ao_breakdown?.knowledge?.awarded ?? 0,
             ao2_awarded: g?.ao_breakdown?.analysis?.awarded ?? 0,
             ao3_awarded: g?.ao_breakdown?.evaluation?.awarded ?? 0,
+            ao1_out_of: g?.ao_breakdown?.knowledge?.out_of ?? 2,
+            ao2_out_of: g?.ao_breakdown?.analysis?.out_of ?? 3,
+            ao3_out_of: g?.ao_breakdown?.evaluation?.out_of ?? 3,
             confidence: g?.confidence ?? 0.9,
             created_at: row.created_at,
           };

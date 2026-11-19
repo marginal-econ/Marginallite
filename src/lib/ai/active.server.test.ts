@@ -128,4 +128,34 @@ describe("active.server provider key configuration and tiered pooling", () => {
     const order4 = getPrioritizedKeyOrder(config, cooldowns);
     expect(order4).toEqual(["free_1", "free_2", "free_3", "paid_emergency"]);
   });
+
+  it("normalises Mistral provider multi-key pool with fallback models", () => {
+    const rawJson = JSON.stringify({
+      freeKeys: ["mistral_key_1", "mistral_key_2", "mistral_key_3", "mistral_key_4"],
+      paidPrimary: "mistral_reserve_paid",
+    });
+
+    const config = normaliseConfig({
+      provider: "mistral",
+      api_key: rawJson,
+      base_url: null,
+      model: "mistral-large-latest",
+      label: "Mistral Pool",
+    });
+
+    expect(config.provider).toBe("mistral");
+    expect(config.baseUrl).toBe("https://api.mistral.ai/v1");
+    expect(config.model).toBe("mistral-large-latest");
+    expect(config.freeKeys?.length).toBe(4);
+    expect(config.paidKeys).toEqual(["mistral_reserve_paid"]);
+
+    const pool = buildOrderedKeyPool(config);
+    expect(pool.allOrderedKeys).toEqual([
+      "mistral_key_1",
+      "mistral_key_2",
+      "mistral_key_3",
+      "mistral_key_4",
+      "mistral_reserve_paid",
+    ]);
+  });
 });

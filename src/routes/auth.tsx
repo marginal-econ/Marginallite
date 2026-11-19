@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, GraduationCap, Hourglass, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, GraduationCap, Hourglass, KeyRound, Loader2, School, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -14,6 +14,9 @@ import { captureReferralCode } from "@/lib/waitlist-client";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/backend/client";
 import { getMe } from "@/lib/account.functions";
+import { registerTeacher, getTeacherProfileStatus } from "@/lib/teacher.functions";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 
 /**
  * A progress bar for waits with no real percentage to report (a single
@@ -65,18 +68,21 @@ export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>) => authSearchSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "Sign in — Marginalite | Cambridge 0455 Economics response marking" },
+      { title: "Sign In & Register — Marginalite AI | Cambridge Economics (0455)" },
       {
         name: "description",
         content:
-          "Sign in to Marginalite to mark Cambridge 0455 Economics responses against your own coursebook, syllabus and mark schemes.",
+          "Sign in or register for Marginalite AI to mark Cambridge IGCSE 0455 Economics essays, practice Paper 1 MCQs, and master Paper 2 Data Response.",
       },
-      { property: "og:title", content: "Sign in — Marginalite" },
+      { name: "robots", content: "noindex, follow" },
+      { property: "og:site_name", content: "Marginalite AI" },
+      { property: "og:title", content: "Sign In & Register — Marginalite AI" },
       {
         property: "og:description",
-        content: "Cambridge 0455 Economics response marking, calibrated to real examiner standards.",
+        content: "Cambridge IGCSE 0455 Economics AI essay marking, calibrated to real examiner standards.",
       },
     ],
+    links: [{ rel: "canonical", href: "https://lite.marginal-econ.com/auth" }],
   }),
   component: AuthPage,
 });
@@ -118,10 +124,20 @@ function readRecoveryLinkState(): "recovery" | "error" | null {
 
   const type = hash.get("type") || query.get("type");
   if (type === "recovery" || type === "invite") return "recovery";
-  if (hash.get("access_token") && !type) return "recovery"; // older Supabase links omit type
-  if (query.get("code") && window.location.pathname === "/auth") return "recovery";
+  if (query.get("type") === "recovery" || hash.get("type") === "recovery") return "recovery";
 
   return null;
+}
+
+function isOAuthCallback(): boolean {
+  if (typeof window === "undefined") return false;
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search);
+  return Boolean(
+    (query.get("code") && query.get("type") !== "recovery") ||
+    hash.get("provider_token") ||
+    (hash.get("access_token") && hash.get("type") !== "recovery")
+  );
 }
 
 function AuthPage() {
@@ -130,14 +146,14 @@ function AuthPage() {
   const fetchMe = useServerFn(getMe);
 
   const routeUserByRole = async () => {
-    if (search.redirect && search.redirect.startsWith("/") && search.redirect !== "/pricing" && search.redirect !== "/dashboard") {
+    if (search.redirect && search.redirect.startsWith("/") && true && search.redirect !== "/dashboard") {
       navigate({ to: search.redirect, replace: true });
       return;
     }
     try {
       const me = await fetchMe();
       if (me?.isAdmin) {
-        navigate({ to: "/admin", replace: true });
+        navigate({ to: "/admin", search: {}, replace: true });
         return;
       }
       if (me?.role === "teacher") {
@@ -152,7 +168,7 @@ function AuthPage() {
   };
 
   const targetRedirect =
-    search.redirect && search.redirect.startsWith("/") && search.redirect !== "/pricing"
+    search.redirect && search.redirect.startsWith("/") && true
       ? search.redirect
       : "/dashboard";
   const [email, setEmail] = useState("");
@@ -169,6 +185,108 @@ function AuthPage() {
   const [waitlistOtp, setWaitlistOtp] = useState("");
   const [waitlistResendIn, setWaitlistResendIn] = useState(0);
 
+  // Role & Teacher Auth State
+  const registerTeacherFn = useServerFn(registerTeacher);
+  const checkTeacherStatusFn = useServerFn(getTeacherProfileStatus);
+  const [accountType, setAccountType] = useState<"student" | "teacher">(
+    (search as any)?.role === "teacher" || (search as any)?.audience === "teachers" ? "teacher" : "student",
+  );
+  const [teacherTab, setTeacherTab] = useState<"signin" | "signup">(
+    (search as any)?.tab === "signup" ? "signup" : "signin",
+  );
+
+  // Teacher Sign In state
+  const [teacherEmail, setTeacherEmail] = useState("");
+  const [teacherPassword, setTeacherPassword] = useState("");
+  const [teacherSignInBusy, setTeacherSignInBusy] = useState(false);
+  const [teacherPendingWarning, setTeacherPendingWarning] = useState<string | null>(null);
+
+  // Teacher Sign Up state
+  const [teacherFullName, setTeacherFullName] = useState("");
+  const [teacherSchoolName, setTeacherSchoolName] = useState("");
+  const [teacherSignUpEmail, setTeacherSignUpEmail] = useState("");
+  const [teacherSignUpPassword, setTeacherSignUpPassword] = useState("");
+  const [teacherSignUpBusy, setTeacherSignUpBusy] = useState(false);
+  const [teacherSubmittedSuccess, setTeacherSubmittedSuccess] = useState(false);
+
+  const handleTeacherSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTeacherSignInBusy(true);
+    setTeacherPendingWarning(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: teacherEmail.trim(),
+        password: teacherPassword,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setTeacherSignInBusy(false);
+        return;
+      }
+
+      // Auto-activates teacher access
+      await checkTeacherStatusFn();
+
+      toast.success("Welcome, Educator! Staff privileges active.");
+      navigate({ to: "/classes", replace: true });
+    } catch (err: any) {
+      toast.error(err?.message || "Sign in failed.");
+    } finally {
+      setTeacherSignInBusy(false);
+    }
+  };
+
+  const handleTeacherSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teacherSchoolName.trim()) {
+      toast.error("Official School Name is required.");
+      return;
+    }
+    if (!teacherSignUpEmail.trim() || !teacherSignUpEmail.includes("@")) {
+      toast.error("A valid school or institutional email address is required.");
+      return;
+    }
+    if (teacherSignUpPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+
+    setTeacherSignUpBusy(true);
+    try {
+      const res = await registerTeacherFn({
+        data: {
+          fullName: teacherFullName,
+          schoolName: teacherSchoolName,
+          schoolEmail: teacherSignUpEmail,
+          password: teacherSignUpPassword,
+        },
+      });
+
+      if (res.success) {
+        toast.success("Teacher account created! Signing you in…");
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: teacherSignUpEmail.trim(),
+          password: teacherSignUpPassword,
+        });
+
+        if (signInErr) {
+          setTeacherEmail(teacherSignUpEmail.trim());
+          setTeacherTab("signin");
+          toast.info("Please enter your password to sign in.");
+        } else {
+          toast.success("Welcome, Educator! Full staff privileges active.");
+          navigate({ to: "/classes", replace: true });
+        }
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Registration failed.");
+    } finally {
+      setTeacherSignUpBusy(false);
+    }
+  };
+
   useEffect(() => {
     setReferralCode(captureReferralCode() ?? "");
   }, []);
@@ -182,7 +300,12 @@ function AuthPage() {
     return () => window.clearInterval(timer);
   }, [waitlistResendIn]);
 
-  const initialLinkState = useState(() => readRecoveryLinkState())[0];
+  const initialLinkState = useState(() => {
+    const rec = readRecoveryLinkState();
+    if (rec) return rec;
+    if (isOAuthCallback()) return "verifying";
+    return null;
+  })[0];
   const [view, setView] = useState<AuthView>(initialLinkState ? "verifying" : "credentials");
   const [linkError, setLinkError] = useState(initialLinkState === "error");
   const [resetEmail, setResetEmail] = useState("");
@@ -192,14 +315,30 @@ function AuthPage() {
   const [teacherDeclineWarning, setTeacherDeclineWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Check for error parameters (e.g. from expired links)
+    // 1. Check for error parameters (from expired links or cancelled OAuth)
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const queryParams = new URLSearchParams(window.location.search);
     const errCode = hashParams.get("error_code") || queryParams.get("error_code");
-    if (errCode) {
-      setLinkError(true);
-      setView("forgot");
-      toast.error("That link has expired or was already used. Request a fresh one below.");
+    const errDesc =
+      queryParams.get("error_description") ||
+      hashParams.get("error_description") ||
+      queryParams.get("error");
+
+    if (errDesc || errCode) {
+      if (errCode === "otp_expired" || errDesc?.toLowerCase().includes("expired")) {
+        setLinkError(true);
+        setView("forgot");
+        toast.error("That link has expired or was already used. Request a fresh one below.");
+      } else {
+        const cleanMsg = decodeURIComponent((errDesc || "Authentication encountered an error.").replace(/\+/g, " "));
+        toast.error(cleanMsg);
+        setView("credentials");
+      }
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("error");
+      cleanUrl.searchParams.delete("error_description");
+      cleanUrl.searchParams.delete("error_code");
+      window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
       return;
     }
 
@@ -243,36 +382,72 @@ function AuthPage() {
       });
     }, 8000);
 
-    supabase.auth.getSession().then(({ data }) => {
-      // A recovery session is still a session, so the plain "already signed
-      // in" redirect below must not fire for it — it would bounce the
-      // person straight to the dashboard instead of letting them set a new
-      // password. view is read fresh via the functional update below rather
-      // than closed over, so this can't act on a stale "credentials" value.
-      setView((current) => {
-        if (data.session && current !== "recovery" && current !== "verifying") {
-          fetchMe().then((me) => {
-            if (me?.role === "teacher" && !me?.isAdmin) {
-              supabase.auth.signOut().then(() => {
-                setTeacherDeclineWarning(
-                  "This account is registered as an authorized Cambridge Educator. Teacher accounts cannot access the student portal. Please sign in via the Teacher Portal.",
-                );
-              });
-            } else {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) {
+        // Clean URL code if present
+        if (window.location.search.includes("code=")) {
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("code");
+          window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+        }
+        setView((current) => {
+          if (current !== "recovery") {
+            routeUserByRole();
+            return "credentials";
+          }
+          return current;
+        });
+      } else if (isOAuthCallback()) {
+        const code = new URLSearchParams(window.location.search).get("code");
+        if (code) {
+          // Immediately strip code parameter so back-button / refresh does not re-use consumed code
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("code");
+          window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+
+          try {
+            const { data: exData, error: exError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exError) {
+              // Check if Supabase client already exchanged this session in the background
+              const { data: freshSession } = await supabase.auth.getSession();
+              if (freshSession?.session) {
+                toast.success("Welcome back to Marginalite!");
+                routeUserByRole();
+                return;
+              }
+              console.error("OAuth code exchange error:", exError);
+              toast.error(exError.message || "Failed to complete Google sign in.");
+              setView("credentials");
+            } else if (exData.session) {
+              toast.success("Welcome to Marginalite!");
               routeUserByRole();
             }
-          });
+          } catch (err: any) {
+            const { data: freshSession } = await supabase.auth.getSession();
+            if (freshSession?.session) {
+              routeUserByRole();
+              return;
+            }
+            toast.error(err?.message || "Authentication error.");
+            setView("credentials");
+          }
         }
-        if (data.session && current === "verifying") return "recovery";
-        return current;
-      });
+      }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         window.clearTimeout(timeout);
         setLinkError(false);
         setView("recovery");
+      } else if (event === "SIGNED_IN" && session) {
+        window.clearTimeout(timeout);
+        if (window.location.search.includes("code=")) {
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("code");
+          window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+        }
+        routeUserByRole();
       }
     });
     return () => {
@@ -289,21 +464,6 @@ function AuthPage() {
     if (error) {
       setBusy(false);
       return toast.error(error.message);
-    }
-
-    try {
-      const me = await fetchMe();
-      if (me?.role === "teacher" && !me?.isAdmin) {
-        await supabase.auth.signOut();
-        setBusy(false);
-        setTeacherDeclineWarning(
-          "This account is registered as an authorized Cambridge Educator. Teacher accounts cannot access the student portal. Please sign in via the Teacher Portal.",
-        );
-        toast.error("Educator account detected. Please sign in via the Teacher Portal.");
-        return;
-      }
-    } catch {
-      // safe fallback
     }
 
     setBusy(false);
@@ -388,175 +548,525 @@ function AuthPage() {
         <div className="mb-4 flex items-center justify-between gap-2 sm:mb-6 sm:gap-4">
           <Link to="/" className="group flex animate-in fade-in items-center gap-2 duration-500">
             <img
-              src="/marginalite-mark.svg"
-              alt=""
+              src="/marginal-m-icon-clean.png"
+              alt="Marginalite AI Cambridge Economics 0455 Essay Examiner"
               aria-hidden="true"
               className="size-8 object-contain transition-transform duration-200 group-hover:-rotate-6 sm:size-9"
             />
             <span className="text-base font-semibold sm:text-lg">Marginalite</span>
           </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" />
-            <span className="hidden min-[360px]:inline">Back to website</span>
-            <span className="min-[360px]:hidden">Back</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="size-8" />
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span className="hidden min-[360px]:inline">Back to website</span>
+              <span className="min-[360px]:hidden">Back</span>
+            </Link>
+          </div>
         </div>
 
         <div className="panel animate-in fade-in slide-in-from-bottom-2 overflow-hidden p-4 duration-500 sm:p-6 md:p-8">
           {view === "credentials" ? (
             <div className="animate-in fade-in duration-300" key="credentials">
-              <div className="mb-6">
-                <p className="eyebrow eyebrow-accent">Your workspace</p>
-                <h1 className="mt-2 text-2xl font-bold">Welcome to Marginalite</h1>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  Sign in to your account or create a new student workspace.
-                </p>
-              </div>
-              <Tabs defaultValue="signin">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger
-                    value="signin"
-                    className="transition-colors duration-150 data-[state=active]:animate-in data-[state=active]:fade-in"
-                  >
-                    Sign in
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="signup"
-                    className="transition-colors duration-150 data-[state=active]:animate-in data-[state=active]:fade-in"
-                  >
-                    Create account
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent
-                  value="signin"
-                  className="animate-in fade-in slide-in-from-bottom-1 duration-300"
+              {/* Role Switcher: Student vs Teacher */}
+              <div className="grid grid-cols-2 p-1 bg-muted/70 rounded-xl mb-5 border border-border/80">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("student")}
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
+                    accountType === "student"
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  {teacherDeclineWarning && (
-                    <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-xs text-primary space-y-2.5">
-                      <div className="flex items-center gap-2 font-bold text-sm text-foreground">
-                        <GraduationCap className="size-4 text-primary shrink-0" />
-                        Educator Account Detected
+                  <GraduationCap className={cn("size-3.5", accountType === "student" ? "text-primary" : "text-muted-foreground")} />
+                  <span className="hidden min-[380px]:inline">Student Workspace</span>
+                  <span className="min-[380px]:hidden">Student</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("teacher")}
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all",
+                    accountType === "teacher"
+                      ? "bg-background text-purple-600 dark:text-purple-400 shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <School className={cn("size-3.5", accountType === "teacher" ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground")} />
+                  <span className="hidden min-[380px]:inline">Teacher &amp; School</span>
+                  <span className="min-[380px]:hidden">Teacher</span>
+                </button>
+              </div>
+
+              {accountType === "teacher" ? (
+                /* ── Teacher & School Workspace Auth ── */
+                teacherSubmittedSuccess ? (
+                  <div className="text-center py-5 space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
+                      <Clock className="size-6" />
+                    </div>
+                    <h2 className="text-lg font-bold">Teacher Application Under Review</h2>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                      Thank you, <strong>{teacherFullName}</strong>. Your teacher account for <strong>{teacherSchoolName}</strong> ({teacherSignUpEmail}) has been registered and submitted for administrative verification.
+                    </p>
+                    <div className="rounded-xl border border-border bg-muted/50 p-3.5 text-xs text-left space-y-1.5 text-muted-foreground">
+                      <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <ShieldCheck className="size-4 text-purple-500" />
+                        Why is verification required?
                       </div>
-                      <p className="leading-relaxed">{teacherDeclineWarning}</p>
+                      <p>
+                        To protect confidential Cambridge IGCSE 0455 mark schemes, examination anchor calibrations, and student classwork, all teacher privileges require one-time institutional verification.
+                      </p>
+                      <p className="text-purple-600 dark:text-purple-400 font-medium">
+                        You will receive an email confirmation once your account is verified.
+                      </p>
+                    </div>
+                    <div className="pt-2">
                       <Button
-                        asChild
+                        variant="outline"
                         size="sm"
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow-xs"
+                        onClick={() => {
+                          setTeacherSubmittedSuccess(false);
+                          setTeacherTab("signin");
+                          setTeacherEmail(teacherSignUpEmail);
+                        }}
                       >
-                        <Link to="/teacher-auth">
-                          Switch to Teacher Portal →
-                        </Link>
+                        Return to Teacher Sign In
                       </Button>
                     </div>
-                  )}
-
-                  <form onSubmit={signIn} className="mt-5 space-y-4">
-                    <Field
-                      id="email"
-                      label="Email"
-                      type="email"
-                      value={email}
-                      onChange={setEmail}
-                    />
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password">Password</Label>
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                          onClick={() => {
-                            setResetEmail(email);
-                            setResetSent(false);
-                            setView("forgot");
-                          }}
-                        >
-                          Forgot password?
-                        </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-5">
+                      <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                        <School className="size-3.5" />
+                        Cambridge IGCSE 0455 Educators
                       </div>
-                      <Input
-                        id="password"
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        className="transition-shadow duration-150 focus-visible:ring-2"
-                      />
+                      <h1 className="text-2xl font-bold">Teacher Portal</h1>
+                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                        Sign in to manage classes and moderate essays, or register your school.
+                      </p>
                     </div>
-                    <Button
-                      type="submit"
-                      className="w-full transition-transform duration-150 active:scale-[0.98]"
-                      disabled={busy}
-                    >
-                      {busy ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" /> Signing in…
-                        </>
-                      ) : (
-                        "Sign in"
-                      )}
-                    </Button>
 
-                    <div className="pt-2 text-center text-xs text-muted-foreground">
-                      Are you a Cambridge economics teacher?{" "}
-                      <Link to="/teacher-auth" className="font-semibold text-primary hover:underline">
-                        Teacher Portal →
-                      </Link>
-                    </div>
-                  </form>
-                </TabsContent>
+                    {teacherPendingWarning && (
+                      <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+                        <Clock className="size-4.5 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block font-semibold mb-0.5">Account Pending Verification</strong>
+                          {teacherPendingWarning}
+                        </div>
+                      </div>
+                    )}
 
-                <TabsContent
-                  value="signup"
-                  className="animate-in fade-in slide-in-from-bottom-1 duration-300"
-                >
-                  <form onSubmit={signUp} className="mt-5 space-y-4">
-                    <Field id="name" label="Full name" value={fullName} onChange={setFullName} />
-                    <Field
-                      id="email-up"
-                      label="Email address"
-                      type="email"
-                      value={email}
-                      onChange={setEmail}
-                    />
-                    <div className="space-y-1.5">
-                      <Label htmlFor="password-up">Password (min. 6 characters)</Label>
-                      <Input
-                        id="password-up"
-                        type="password"
-                        required
-                        minLength={6}
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        className="transition-shadow duration-150 focus-visible:ring-2"
-                      />
-                    </div>
-                    <Field
-                      id="school"
-                      label="School or College (optional)"
-                      value={school}
-                      onChange={setSchool}
-                      required={false}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full transition-transform duration-150 active:scale-[0.98]"
-                      disabled={busy}
+                    <Tabs value={teacherTab} onValueChange={(val: any) => setTeacherTab(val)}>
+                      <TabsList className="grid w-full grid-cols-2 mb-5">
+                        <TabsTrigger value="signin">Teacher Sign In</TabsTrigger>
+                        <TabsTrigger value="signup">Create Teacher Account</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="signin" className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+                        {/* Google OAuth for Teacher Sign In */}
+                        <div className="space-y-3 mb-5">
+                          <GoogleSignInButton
+                            redirectTo="/classes"
+                            label="Sign in with Google"
+                          />
+
+                          <div className="relative flex items-center justify-center my-3">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border/80" />
+                            </div>
+                            <div className="relative flex justify-center text-[11px] uppercase">
+                              <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                                or sign in with email
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleTeacherSignIn} className="space-y-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="auth-t-email">School / Institutional Email</Label>
+                            <Input
+                              id="auth-t-email"
+                              type="email"
+                              required
+                              placeholder="teacher@school.edu"
+                              value={teacherEmail}
+                              onChange={(e) => setTeacherEmail(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="auth-t-password">Password</Label>
+                              <Link
+                                to="/teacher-auth"
+                                search={{ tab: "signin" }}
+                                className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-medium"
+                              >
+                                Forgot password?
+                              </Link>
+                            </div>
+                            <Input
+                              id="auth-t-password"
+                              type="password"
+                              required
+                              placeholder="••••••••"
+                              value={teacherPassword}
+                              onChange={(e) => setTeacherPassword(e.target.value)}
+                            />
+                          </div>
+
+                          <Button
+                            type="submit"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs"
+                            disabled={teacherSignInBusy}
+                          >
+                            {teacherSignInBusy ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin mr-1.5" /> Verifying Credentials…
+                              </>
+                            ) : (
+                              "Sign In to Teacher Portal →"
+                            )}
+                          </Button>
+
+                          <div className="pt-2 text-center text-xs text-muted-foreground">
+                            Student looking for revision?{" "}
+                            <button
+                              type="button"
+                              onClick={() => setAccountType("student")}
+                              className="text-purple-600 dark:text-purple-400 font-semibold hover:underline"
+                            >
+                              Switch to Student Workspace
+                            </button>
+                          </div>
+                        </form>
+                      </TabsContent>
+
+                      <TabsContent value="signup" className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+                        {/* Google OAuth for Teacher Sign Up */}
+                        <div className="space-y-3 mb-5">
+                          <GoogleSignInButton
+                            redirectTo="/classes"
+                            label="Sign up with Google"
+                          />
+
+                          <div className="relative flex items-center justify-center my-3">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border/80" />
+                            </div>
+                            <div className="relative flex justify-center text-[11px] uppercase">
+                              <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                                or register with school email
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleTeacherSignUp} className="space-y-3.5">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="auth-t-fullname">Full Name</Label>
+                            <Input
+                              id="auth-t-fullname"
+                              required
+                              placeholder="Dr. Eleanor Vance"
+                              value={teacherFullName}
+                              onChange={(e) => setTeacherFullName(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="auth-t-school">Official School / Institution Name</Label>
+                              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold uppercase">Compulsory</span>
+                            </div>
+                            <Input
+                              id="auth-t-school"
+                              required
+                              placeholder="e.g. Raffles Institution / Dubai College"
+                              value={teacherSchoolName}
+                              onChange={(e) => setTeacherSchoolName(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="auth-t-signup-email">Official School Email</Label>
+                              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold uppercase">Institutional</span>
+                            </div>
+                            <Input
+                              id="auth-t-signup-email"
+                              type="email"
+                              required
+                              placeholder="e.vance@school.edu"
+                              value={teacherSignUpEmail}
+                              onChange={(e) => setTeacherSignUpEmail(e.target.value)}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              School, institutional, or educator email. Instant teacher access enabled.
+                            </p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="auth-t-signup-pass">Password (min. 6 characters)</Label>
+                            <Input
+                              id="auth-t-signup-pass"
+                              type="password"
+                              required
+                              minLength={6}
+                              placeholder="••••••••"
+                              value={teacherSignUpPassword}
+                              onChange={(e) => setTeacherSignUpPassword(e.target.value)}
+                            />
+                          </div>
+
+                          <Button
+                            type="submit"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs"
+                            disabled={teacherSignUpBusy}
+                          >
+                            {teacherSignUpBusy ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin mr-1.5" /> Submitting Application…
+                              </>
+                            ) : (
+                              "Create Teacher Account →"
+                            )}
+                          </Button>
+
+                          <div className="pt-1.5 text-center text-xs text-muted-foreground">
+                            Already registered as an educator?{" "}
+                            <button
+                              type="button"
+                              onClick={() => setTeacherTab("signin")}
+                              className="text-purple-600 dark:text-purple-400 font-semibold hover:underline"
+                            >
+                              Sign In
+                            </button>
+                          </div>
+                        </form>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )
+              ) : (
+                /* ── Student Workspace Auth ── */
+                <div>
+                  <div className="mb-6">
+                    <p className="eyebrow eyebrow-accent">Your workspace</p>
+                    <h1 className="mt-2 text-2xl font-bold">Welcome to Marginalite</h1>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                      Sign in to your account or create a new student workspace.
+                    </p>
+                  </div>
+
+                  <Tabs defaultValue="signin">
+                    <TabsList className="grid w-full grid-cols-2 mb-5">
+                      <TabsTrigger
+                        value="signin"
+                        className="transition-colors duration-150 data-[state=active]:animate-in data-[state=active]:fade-in"
+                      >
+                        Sign in
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="signup"
+                        className="transition-colors duration-150 data-[state=active]:animate-in data-[state=active]:fade-in"
+                      >
+                        Create account
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent
+                      value="signin"
+                      className="animate-in fade-in slide-in-from-bottom-1 duration-300"
                     >
-                      {busy ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" /> Creating account…
-                        </>
-                      ) : (
-                        "Create account"
+                      {/* Google OAuth for Sign In */}
+                      <div className="space-y-3 mb-5">
+                        <GoogleSignInButton
+                          redirectTo={targetRedirect}
+                          label="Sign in with Google"
+                        />
+
+                        <div className="relative flex items-center justify-center my-3">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-border/80" />
+                          </div>
+                          <div className="relative flex justify-center text-[11px] uppercase">
+                            <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                              or sign in with email
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {teacherDeclineWarning && (
+                        <div className="mt-4 rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs text-purple-700 dark:text-purple-300 space-y-2.5">
+                          <div className="flex items-center gap-2 font-bold text-sm text-foreground">
+                            <GraduationCap className="size-4 text-purple-500 shrink-0" />
+                            Educator Account Detected
+                          </div>
+                          <p className="leading-relaxed">{teacherDeclineWarning}</p>
+                          <Button
+                            asChild
+                            size="sm"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs"
+                          >
+                            <Link to="/teacher-auth">
+                              Switch to Teacher Portal →
+                            </Link>
+                          </Button>
+                        </div>
                       )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+
+                      <form onSubmit={signIn} className="space-y-4">
+                        <Field
+                          id="email"
+                          label="Email"
+                          type="email"
+                          value={email}
+                          onChange={setEmail}
+                        />
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="password">Password</Label>
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                              onClick={() => {
+                                setResetEmail(email);
+                                setResetSent(false);
+                                setView("forgot");
+                              }}
+                            >
+                              Forgot password?
+                            </button>
+                          </div>
+                          <Input
+                            id="password"
+                            type="password"
+                            required
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            className="transition-shadow duration-150 focus-visible:ring-2"
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full transition-transform duration-150 active:scale-[0.98]"
+                          disabled={busy}
+                        >
+                          {busy ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" /> Signing in…
+                            </>
+                          ) : (
+                            "Sign in"
+                          )}
+                        </Button>
+
+                        <div className="pt-2 text-center text-xs text-muted-foreground">
+                          Are you a Cambridge economics teacher?{" "}
+                          <button
+                            type="button"
+                            onClick={() => setAccountType("teacher")}
+                            className="font-semibold text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            Teacher Portal →
+                          </button>
+                        </div>
+                      </form>
+                    </TabsContent>
+
+                    <TabsContent
+                      value="signup"
+                      className="animate-in fade-in slide-in-from-bottom-1 duration-300"
+                    >
+                      {/* Google OAuth for Sign Up */}
+                      <div className="space-y-3 mb-5">
+                        <GoogleSignInButton
+                          redirectTo={targetRedirect}
+                          label="Sign up with Google"
+                        />
+
+                        <div className="relative flex items-center justify-center my-3">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-border/80" />
+                          </div>
+                          <div className="relative flex justify-center text-[11px] uppercase">
+                            <span className="bg-card px-3 text-muted-foreground font-semibold tracking-wider">
+                              or create account with email
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <form onSubmit={signUp} className="space-y-4">
+                        <Field id="name" label="Full name" value={fullName} onChange={setFullName} />
+                        <Field
+                          id="email-up"
+                          label="Email address"
+                          type="email"
+                          value={email}
+                          onChange={setEmail}
+                        />
+                        <div className="space-y-1.5">
+                          <Label htmlFor="password-up">Password (min. 6 characters)</Label>
+                          <Input
+                            id="password-up"
+                            type="password"
+                            required
+                            minLength={6}
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            className="transition-shadow duration-150 focus-visible:ring-2"
+                          />
+                        </div>
+                        <Field
+                          id="school"
+                          label="School or College (optional)"
+                          value={school}
+                          onChange={setSchool}
+                          required={false}
+                        />
+                        <Button
+                          type="submit"
+                          className="w-full transition-transform duration-150 active:scale-[0.98]"
+                          disabled={busy}
+                        >
+                          {busy ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" /> Creating account…
+                            </>
+                          ) : (
+                            "Create account"
+                          )}
+                        </Button>
+
+                        <div className="pt-1.5 text-center text-xs text-muted-foreground">
+                          Are you a Cambridge economics educator?{" "}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAccountType("teacher");
+                              setTeacherTab("signup");
+                            }}
+                            className="font-semibold text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            Create Teacher Account →
+                          </button>
+                        </div>
+                      </form>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
 
               <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
                 By continuing, you agree to our{" "}
@@ -567,24 +1077,34 @@ function AuthPage() {
                 <Link to="/privacy" className="underline hover:text-foreground">
                   Privacy Policy
                 </Link>
-                . High-scoring student essays (8/8, &gt;10/12, &gt;15/20) are automatically
-                showcased in strictly anonymised format for academic peer learning.
+                .
               </p>
             </div>
           ) : view === "verifying" ? (
             <div
               key="verifying"
-              className="animate-in fade-in flex flex-col items-center gap-4 py-6 text-center duration-300"
+              className="animate-in fade-in flex flex-col items-center gap-4 py-8 text-center duration-300"
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <KeyRound className="size-5" />
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-xs">
+                {isOAuthCallback() ? (
+                  <Loader2 className="size-6 animate-spin text-primary" />
+                ) : (
+                  <KeyRound className="size-6 text-primary" />
+                )}
               </span>
-              <div>
-                <p className="text-sm font-medium">Verifying your email link…</p>
-                <p className="mt-1 text-xs text-muted-foreground">This only takes a moment.</p>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-foreground">
+                  {isOAuthCallback() ? "Completing Google authentication…" : "Verifying your email link…"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isOAuthCallback() ? "Setting up your secure workspace session." : "This only takes a moment."}
+                </p>
               </div>
               <div className="w-full">
-                <WaitingBar active label="Confirming with your email link" />
+                <WaitingBar
+                  active
+                  label={isOAuthCallback() ? "Connecting to Supabase session" : "Confirming with your email link"}
+                />
               </div>
             </div>
           ) : view === "forgot" ? (

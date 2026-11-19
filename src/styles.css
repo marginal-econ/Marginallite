@@ -22,7 +22,7 @@
 
 @theme inline {
   --font-sans: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Outfit", "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Inter Tight", "Outfit", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius-sm: calc(var(--radius) - 4px);
@@ -130,28 +130,29 @@
 :root {
   --radius: 0.75rem;
 
-  --background: oklch(0.993 0.004 300);
-  --foreground: oklch(0.2 0.018 295);
+  /* Light Lavender & Cool Blue-Purple Orchid Palette (zero pink/magenta) */
+  --background: oklch(0.992 0.008 282);
+  --foreground: oklch(0.195 0.022 276);
 
   --surface: oklch(1 0 0);
-  --surface-raised: oklch(0.972 0.016 300);
+  --surface-raised: oklch(0.968 0.022 280);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.018 295);
+  --card-foreground: oklch(0.195 0.022 276);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.018 295);
+  --popover-foreground: oklch(0.195 0.022 276);
 
-  --primary: oklch(0.58 0.17 295);
-  --primary-foreground: oklch(0.995 0.006 295);
+  --primary: oklch(0.515 0.175 276);
+  --primary-foreground: oklch(0.995 0.006 280);
 
-  --secondary: oklch(0.965 0.012 300);
-  --secondary-foreground: oklch(0.28 0.02 295);
+  --secondary: oklch(0.952 0.025 280);
+  --secondary-foreground: oklch(0.26 0.032 276);
 
-  --muted: oklch(0.97 0.008 300);
-  --muted-foreground: oklch(0.48 0.02 295);
+  --muted: oklch(0.96 0.018 280);
+  --muted-foreground: oklch(0.475 0.028 276);
 
-  --accent: oklch(0.955 0.018 298);
-  --accent-foreground: oklch(0.24 0.03 295);
+  --accent: oklch(0.935 0.036 282);
+  --accent-foreground: oklch(0.23 0.042 276);
 
   --destructive: oklch(0.545 0.198 27);
   --destructive-foreground: oklch(0.99 0.005 20);
@@ -159,25 +160,25 @@
   --success: oklch(0.53 0.115 168);
   --warning: oklch(0.63 0.145 58);
 
-  --border: oklch(0.905 0.01 298);
-  --input: oklch(0.875 0.014 298);
-  --ring: oklch(0.58 0.17 295 / 40%);
+  --border: oklch(0.892 0.022 280);
+  --input: oklch(0.86 0.026 280);
+  --ring: oklch(0.515 0.175 276 / 40%);
 
   /* Fixed assessment-objective hues — never reuse these for decoration. */
-  --ao1: oklch(0.575 0.125 228);
+  --ao1: oklch(0.565 0.135 232);
   --ao2: oklch(0.53 0.115 168);
   --ao3: oklch(0.63 0.145 58);
 
   /* Examiner semantic colour-coding tokens (Light Theme) */
-  --examiner-question: oklch(0.38 0.14 290);
-  --examiner-question-fg: oklch(0.98 0.01 290);
-  --examiner-question-bg: oklch(0.96 0.03 290 / 45%);
-  --examiner-question-border: oklch(0.72 0.08 290 / 60%);
+  --examiner-question: oklch(0.38 0.14 276);
+  --examiner-question-fg: oklch(0.98 0.01 280);
+  --examiner-question-bg: oklch(0.955 0.032 280 / 50%);
+  --examiner-question-border: oklch(0.72 0.09 278 / 60%);
 
-  --examiner-student: oklch(0.24 0.02 295);
-  --examiner-student-fg: oklch(0.2 0.018 295);
-  --examiner-student-bg: oklch(0.99 0.005 300);
-  --examiner-student-border: oklch(0.58 0.17 295 / 75%);
+  --examiner-student: oklch(0.24 0.024 276);
+  --examiner-student-fg: oklch(0.195 0.022 276);
+  --examiner-student-bg: oklch(0.992 0.008 282);
+  --examiner-student-border: oklch(0.515 0.175 276 / 75%);
 
   --examiner-positive: oklch(0.48 0.14 165);
   --examiner-positive-fg: oklch(0.98 0.01 165);
@@ -214,122 +215,103 @@
   --examiner-warning-bg: oklch(0.95 0.06 65 / 45%);
   --examiner-warning-border: oklch(0.72 0.14 65 / 70%);
 
-  --chart-1: oklch(0.58 0.17 295);
-  --chart-2: oklch(0.575 0.125 228);
+  --chart-1: oklch(0.515 0.175 276);
+  --chart-2: oklch(0.565 0.135 232);
   --chart-3: oklch(0.63 0.145 58);
   --chart-4: oklch(0.53 0.115 168);
-  --chart-5: oklch(0.58 0.17 12);
+  --chart-5: oklch(0.62 0.145 286);
 
-  --sidebar: oklch(0.982 0.01 300);
-  --sidebar-foreground: oklch(0.25 0.02 295);
-  --sidebar-primary: oklch(0.58 0.17 295);
-  --sidebar-primary-foreground: oklch(0.995 0.006 295);
-  --sidebar-accent: oklch(0.932 0.025 298);
-  --sidebar-accent-foreground: oklch(0.22 0.035 295);
-  --sidebar-border: oklch(0.91 0.01 298);
-  --sidebar-ring: oklch(0.58 0.17 295 / 35%);
+  --sidebar: oklch(0.972 0.018 280);
+  --sidebar-foreground: oklch(0.24 0.025 276);
+  --sidebar-primary: oklch(0.515 0.175 276);
+  --sidebar-primary-foreground: oklch(0.995 0.006 280);
+  --sidebar-accent: oklch(0.922 0.036 280);
+  --sidebar-accent-foreground: oklch(0.22 0.04 276);
+  --sidebar-border: oklch(0.895 0.02 280);
+  --sidebar-ring: oklch(0.515 0.175 276 / 35%);
 
-  /* The outline colour for the "sticker" cards and buttons. Near-black
-     rather than pure black so it sits with the ink type instead of
-     shouting over it. */
-  --ink: oklch(0.19 0.045 300);
+  /* The outline colour for the "sticker" cards and buttons. */
+  --ink: oklch(0.2 0.048 276);
 
-  /* Deep purple. The house colour one octave down from --primary: used for
-     the ribbon, the examiner chrome and the footer, so the page has
-     somewhere dark to land. Never used for AO hues or for body text. */
-  --plum: oklch(0.35 0.135 300);
-  --plum-deep: oklch(0.25 0.105 302);
-  --plum-soft: oklch(0.45 0.165 298);
-  --plum-foreground: oklch(0.98 0.01 300);
+  /* Deep twilight blue-violet / orchid anchor (zero pink/magenta). */
+  --plum: oklch(0.305 0.118 276);
+  --plum-deep: oklch(0.225 0.095 274);
+  --plum-soft: oklch(0.45 0.148 282);
+  --plum-foreground: oklch(0.978 0.014 280);
 
   --shadow-panel:
-    0 1px 2px 0 oklch(0.24 0.04 295 / 6%), 0 10px 28px -18px oklch(0.24 0.04 295 / 20%);
+    0 1px 2px 0 oklch(0.24 0.045 276 / 6%), 0 10px 28px -18px oklch(0.24 0.045 276 / 20%);
   --gradient-hero: radial-gradient(
     130% 90% at 50% -18%,
-    oklch(0.58 0.17 295 / 12%) 0%,
-    transparent 64%
+    oklch(0.62 0.165 280 / 15%) 0%,
+    oklch(0.68 0.12 248 / 8%) 42%,
+    transparent 68%
   );
-  --hairline: oklch(0.905 0.01 298);
+  --hairline: oklch(0.892 0.022 280);
 
-  /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
-  --aurora-1: oklch(0.62 0.19 295);
-  --aurora-2: oklch(0.66 0.15 228);
-  --aurora-3: oklch(0.68 0.14 168);
-  --glow: oklch(0.58 0.17 295 / 22%);
+  /* Aurora ribbons — cool light lavender, periwinkle blue, and soft orchid. */
+  --aurora-1: oklch(0.66 0.165 282);
+  --aurora-2: oklch(0.66 0.155 242);
+  --aurora-3: oklch(0.72 0.13 288);
+  --glow: oklch(0.56 0.165 278 / 24%);
 
-  /*
-   * Mascot palette.
-   *
-   * The character is drawn once and re-tinted per theme, so the cap, lenses
-   * and jumper shift with the rest of the product instead of sitting in the
-   * page like an imported sticker.
-   */
-  --mascot-line: oklch(0.22 0.05 315);
-  --mascot-panel: oklch(0.66 0.16 355);
-  --mascot-panel-2: oklch(0.6 0.18 340);
+  /* Mascot palette — harmonized with Light Lavender / Blue-Purple Orchid (zero pink). */
+  --mascot-line: oklch(0.22 0.045 276);
+  --mascot-panel: oklch(0.72 0.125 282);
+  --mascot-panel-2: oklch(0.62 0.15 274);
   --mascot-skin: oklch(0.82 0.075 48);
   --mascot-skin-shade: oklch(0.74 0.085 42);
-  --mascot-hair: oklch(0.31 0.075 330);
-  --mascot-cap: oklch(0.52 0.21 268);
-  --mascot-cap-shade: oklch(0.46 0.18 300);
-  --mascot-frame: oklch(0.52 0.12 325);
+  --mascot-hair: oklch(0.29 0.06 276);
+  --mascot-cap: oklch(0.52 0.19 266);
+  --mascot-cap-shade: oklch(0.44 0.17 278);
+  --mascot-frame: oklch(0.5 0.13 278);
   --mascot-lens: oklch(0.94 0.11 105);
   --mascot-mint: oklch(0.83 0.1 178);
-  --mascot-sweater: oklch(0.65 0.11 182);
-  --mascot-sweater-2: oklch(0.58 0.12 190);
-  --mascot-collar: oklch(0.5 0.16 305);
-  --mascot-band: oklch(0.87 0.14 92);
+  --mascot-sweater: oklch(0.62 0.12 248);
+  --mascot-sweater-2: oklch(0.54 0.14 260);
+  --mascot-collar: oklch(0.5 0.15 280);
+  --mascot-stripe: oklch(0.87 0.14 92);
   --mascot-pencil: oklch(0.63 0.18 32);
-  --mascot-tongue: oklch(0.58 0.2 27);
-  --mascot-blush: oklch(0.7 0.16 15);
+  --mascot-tongue: oklch(0.58 0.16 28);
+  --mascot-blush: oklch(0.74 0.11 28);
 }
 
 /*
- * Night theme — "neon aurora".
- *
- * Not a desaturated inversion of the light theme. The ground is a deep
- * blue-black, every surface is a translucent pane lifted off it, and the
- * accents are the two aurora hues (electric rose-pink and cyan) that also drive
- * the WebGL hero. Borders carry a faint inner light rather than a flat grey,
- * which is what stops a dark UI reading as "the light one with the lamp off".
- *
- * The three assessment-objective hues stay recognisably themselves — the same
- * blue / green / amber a student learned in daylight — just pushed brighter so
- * they hold their identity against the dark ground.
+ * Night theme — cool twilight blue-violet & luminous light lavender orchid.
  */
 .dark {
-  --background: oklch(0.145 0.032 288);
-  --foreground: oklch(0.965 0.012 285);
+  --background: oklch(0.142 0.028 274);
+  --foreground: oklch(0.968 0.012 280);
 
-  --surface: oklch(0.196 0.038 288 / 82%);
-  --surface-raised: oklch(0.235 0.048 290 / 88%);
+  --surface: oklch(0.192 0.036 276 / 84%);
+  --surface-raised: oklch(0.232 0.046 278 / 88%);
 
-  --card: oklch(0.196 0.038 288 / 82%);
-  --card-foreground: oklch(0.965 0.012 285);
-  --popover: oklch(0.19 0.04 288);
-  --popover-foreground: oklch(0.965 0.012 285);
+  --card: oklch(0.192 0.036 276 / 84%);
+  --card-foreground: oklch(0.968 0.012 280);
+  --popover: oklch(0.185 0.038 276);
+  --popover-foreground: oklch(0.968 0.012 280);
 
-  --primary: oklch(0.74 0.19 300);
-  --primary-foreground: oklch(0.14 0.05 300);
+  --primary: oklch(0.755 0.155 282);
+  --primary-foreground: oklch(0.14 0.042 276);
 
-  --secondary: oklch(0.27 0.05 290);
-  --secondary-foreground: oklch(0.95 0.012 285);
+  --secondary: oklch(0.265 0.048 278);
+  --secondary-foreground: oklch(0.95 0.012 280);
 
-  --muted: oklch(0.255 0.045 290);
-  --muted-foreground: oklch(0.735 0.035 288);
+  --muted: oklch(0.25 0.042 276);
+  --muted-foreground: oklch(0.745 0.035 280);
 
-  --accent: oklch(0.3 0.07 292);
-  --accent-foreground: oklch(0.97 0.012 285);
+  --accent: oklch(0.295 0.065 280);
+  --accent-foreground: oklch(0.97 0.012 280);
 
-  --destructive: oklch(0.55 0.22 27);
+  --destructive: oklch(0.68 0.21 18);
   --destructive-foreground: oklch(0.99 0.005 20);
 
   --success: oklch(0.8 0.16 168);
   --warning: oklch(0.85 0.15 82);
 
-  --border: oklch(0.38 0.05 285 / 35%);
-  --input: oklch(0.38 0.05 285 / 45%);
-  --ring: oklch(0.68 0.12 285 / 50%);
+  --border: oklch(0.78 0.12 280 / 22%);
+  --input: oklch(0.78 0.12 280 / 30%);
+  --ring: oklch(0.755 0.155 282 / 60%);
 
   /* Fixed assessment-objective hues — never reuse these for decoration. */
   --ao1: oklch(0.76 0.16 232);
@@ -388,57 +370,52 @@
   --chart-4: oklch(0.81 0.17 168);
   --chart-5: oklch(0.75 0.19 12);
 
-  --sidebar: oklch(0.17 0.036 288);
-  --sidebar-foreground: oklch(0.93 0.014 285);
-  --sidebar-primary: oklch(0.74 0.19 300);
-  --sidebar-primary-foreground: oklch(0.14 0.05 300);
-  --sidebar-accent: oklch(0.28 0.055 290);
-  --sidebar-accent-foreground: oklch(0.965 0.012 285);
-  --sidebar-border: oklch(0.78 0.15 300 / 18%);
-  --sidebar-ring: oklch(0.74 0.19 300 / 50%);
+  --sidebar: oklch(0.165 0.032 274);
+  --sidebar-foreground: oklch(0.935 0.014 280);
+  --sidebar-primary: oklch(0.755 0.155 282);
+  --sidebar-primary-foreground: oklch(0.14 0.042 276);
+  --sidebar-accent: oklch(0.275 0.052 278);
+  --sidebar-accent-foreground: oklch(0.968 0.012 280);
+  --sidebar-border: oklch(0.78 0.12 280 / 18%);
+  --sidebar-ring: oklch(0.755 0.155 282 / 50%);
 
-  /* The outline colour for "sticker" cards */
-  --ink: oklch(0.86 0.11 300);
+  --ink: oklch(0.86 0.1 282);
 
-  /* Deep plum */
-  --plum: oklch(0.335 0.135 300);
-  --plum-deep: oklch(0.245 0.105 302);
-  --plum-soft: oklch(0.435 0.165 298);
-  --plum-foreground: oklch(0.975 0.014 300);
+  --plum: oklch(0.275 0.102 276);
+  --plum-deep: oklch(0.195 0.08 274);
+  --plum-soft: oklch(0.375 0.135 282);
+  --plum-foreground: oklch(0.968 0.014 280);
 
   --shadow-panel:
-    0 1px 0 0 oklch(0.9 0.1 300 / 10%) inset, 0 18px 46px -26px oklch(0.6 0.22 300 / 55%);
+    0 1px 0 0 oklch(0.88 0.09 280 / 10%) inset, 0 18px 46px -26px oklch(0.58 0.19 278 / 55%);
   --gradient-hero: radial-gradient(
     120% 85% at 50% -12%,
-    oklch(0.74 0.19 300 / 25%) 0%,
-    oklch(0.62 0.2 220 / 14%) 42%,
+    oklch(0.62 0.2 280 / 28%) 0%,
+    oklch(0.62 0.18 238 / 16%) 42%,
     transparent 70%
   );
-  --hairline: oklch(0.78 0.15 300 / 16%);
+  --hairline: oklch(0.78 0.12 280 / 16%);
 
-  /* Aurora ribbons — used by the WebGL hero and the CSS fallback. */
-  --aurora-1: oklch(0.76 0.17 354);
-  --aurora-2: oklch(0.72 0.2 218);
-  --aurora-3: oklch(0.74 0.19 168);
-  --glow: oklch(0.76 0.17 354 / 35%);
+  --aurora-1: oklch(0.7 0.2 282);
+  --aurora-2: oklch(0.72 0.19 236);
+  --aurora-3: oklch(0.76 0.15 288);
+  --glow: oklch(0.755 0.155 282 / 42%);
 
-  /* Mascot, after dark: the cap and jumper pick up the aurora, the lenses
-     go from lemon to a cool glowing cyan, and the outline stops being ink. */
-  --mascot-line: oklch(0.16 0.045 295);
-  --mascot-panel: oklch(0.42 0.19 305);
-  --mascot-panel-2: oklch(0.34 0.17 275);
+  --mascot-line: oklch(0.16 0.042 276);
+  --mascot-panel: oklch(0.46 0.16 280);
+  --mascot-panel-2: oklch(0.36 0.15 268);
   --mascot-skin: oklch(0.78 0.08 46);
   --mascot-skin-shade: oklch(0.68 0.09 38);
-  --mascot-hair: oklch(0.26 0.08 320);
-  --mascot-cap: oklch(0.58 0.23 272);
-  --mascot-cap-shade: oklch(0.52 0.22 312);
-  --mascot-frame: oklch(0.7 0.16 320);
+  --mascot-hair: oklch(0.26 0.065 276);
+  --mascot-cap: oklch(0.58 0.21 268);
+  --mascot-cap-shade: oklch(0.5 0.18 282);
+  --mascot-frame: oklch(0.72 0.14 284);
   --mascot-lens: oklch(0.88 0.15 190);
   --mascot-mint: oklch(0.86 0.15 172);
   --mascot-sweater: oklch(0.6 0.14 192);
   --mascot-sweater-2: oklch(0.5 0.15 218);
   --mascot-collar: oklch(0.55 0.2 305);
-  --mascot-band: oklch(0.88 0.16 96);
+  --mascot-stripe: oklch(0.88 0.16 96);
   --mascot-pencil: oklch(0.7 0.19 34);
   --mascot-tongue: oklch(0.62 0.21 25);
   --mascot-blush: oklch(0.72 0.18 12);
@@ -454,6 +431,25 @@
   body {
     overflow-x: hidden;
     max-width: 100vw;
+  }
+
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+  }
+
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Suppress global bottom navigation bar during full-screen exam / practice sessions */
+  body[data-in-exam-session="true"] nav[aria-label="Mobile Navigation"] {
+    display: none !important;
+  }
+  body[data-in-exam-session="true"] main {
+    padding-bottom: 0 !important;
   }
 
   body {
@@ -479,14 +475,14 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: -0.021em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   /* Big display type wants to be tighter still — matches the reference's
      confident, closely-set headlines. */
   h1 {
-    letter-spacing: -0.032em;
+    letter-spacing: -0.035em;
   }
 
   ::selection {
@@ -798,7 +794,7 @@ html.motion-ready .reveal-pop:not([data-revealed="true"]) {
 @utility marquee-track {
   display: flex;
   width: max-content;
-  animation: marquee-slide var(--marquee-duration, 26s) linear infinite;
+  animation: marquee-slide var(--marquee-duration, 54s) linear infinite;
 }
 
 @keyframes bob {
@@ -1226,128 +1222,300 @@ html.motion-ready .reveal-pop:not([data-revealed="true"]) {
   }
 }
 
-/* ── Mystical Celestial Comets & Stardust Engine ────────────────────────── */
-@keyframes mystic-comet-travel {
+/* ── Grand Bluish-White Celestial Comet with Long Tail (Realistic & Night-Only) ── */
+:root:not(.dark) .grand-celestial-comet,
+html:not(.dark) .grand-celestial-comet {
+  display: none !important;
+}
+
+@keyframes grand-comet-orbit {
   0% {
-    transform: translate3d(-360px, 0, 0) scale(0.65);
+    /* Starts completely outside the screen in deep space (upper-left) */
+    transform: translate3d(-780px, -345px, 0);
     opacity: 0;
   }
-  2.5% {
+  5% {
+    /* Still offscreen, beginning approach */
+    transform: translate3d(-520px, -230px, 0);
     opacity: 0.2;
   }
-  8% {
-    transform: translate3d(60px, 0, 0) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translate3d(780px, 0, 0) scale(1.02);
+  11% {
+    /* Head crosses naturally into view from beyond the top-left edge */
+    transform: translate3d(-180px, -80px, 0);
     opacity: 0.95;
   }
-  72% {
-    transform: translate3d(1200px, 0, 0) scale(0.88);
-    opacity: 0.35;
+  30% {
+    /* Gliding majestically across the upper celestial sky */
+    transform: translate3d(550px, 243px, 0);
+    opacity: 1;
   }
-  85%,
+  52% {
+    /* Passing through center-right of the hero view */
+    transform: translate3d(1400px, 620px, 0);
+    opacity: 0.95;
+  }
+  68% {
+    /* Tail exiting smoothly off the lower-right horizon into deep space */
+    transform: translate3d(2050px, 908px, 0);
+    opacity: 0.4;
+  }
+  73% {
+    /* Vanished into cosmic void */
+    transform: translate3d(2300px, 1018px, 0);
+    opacity: 0;
+  }
   100% {
-    transform: translate3d(1450px, 0, 0) scale(0.6);
+    /* Peaceful cosmic starry pause before next celestial passage */
+    transform: translate3d(2300px, 1018px, 0);
     opacity: 0;
   }
 }
 
-@keyframes mystic-core-pulse {
+@keyframes comet-nucleus-pulse {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.88;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 20px #38bdf8);
   }
   50% {
-    transform: scale(1.3);
+    transform: scale(1.12);
     opacity: 1;
+    filter: drop-shadow(0 0 14px #ffffff) drop-shadow(0 0 32px #7dd3fc) drop-shadow(0 0 50px rgba(56, 189, 248, 0.7));
   }
 }
 
-@keyframes mystic-spark-float {
+@keyframes comet-tail-shimmer {
   0%, 100% {
-    transform: translate(0, 0) scale(0.85);
-    opacity: 0.45;
+    opacity: 0.88;
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.75)) drop-shadow(0 0 24px rgba(96, 165, 250, 0.5));
   }
   50% {
-    transform: translate(-3px, 1.5px) scale(1.2);
     opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(125, 211, 252, 0.95)) drop-shadow(0 0 36px rgba(56, 189, 248, 0.7));
   }
 }
 
-@keyframes micro-meteor-dash {
+@keyframes stardust-sparkle {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.2);
+  }
+}
+
+.grand-celestial-comet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: left center;
+  will-change: transform, opacity;
+  animation: grand-comet-orbit 14s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation-delay: 1.2s;
+  opacity: 0;
+  z-index: 2;
+}
+
+.grand-comet-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  transform: rotate(23.8deg);
+}
+
+/* Long glowing bluish-white tail */
+.grand-comet-tail {
+  position: relative;
+  width: 540px;
+  height: 4.5px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.02) 8%,
+    rgba(96, 165, 250, 0.18) 25%,
+    rgba(56, 189, 248, 0.45) 55%,
+    rgba(186, 230, 253, 0.8) 82%,
+    rgba(255, 255, 255, 0.98) 96%,
+    #ffffff 100%
+  );
+  animation: comet-tail-shimmer 2.8s ease-in-out infinite;
+}
+
+/* Ethereal gas vapor plume sheath */
+.grand-comet-plume {
+  position: absolute;
+  top: -14px;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(37, 99, 235, 0) 10%,
+    rgba(56, 189, 248, 0.08) 35%,
+    rgba(56, 189, 248, 0.22) 65%,
+    rgba(147, 197, 253, 0.45) 85%,
+    rgba(224, 242, 254, 0.75) 100%
+  );
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+/* Radiant celestial coma and nucleus head */
+.grand-comet-head {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: comet-nucleus-pulse 2s ease-in-out infinite;
+}
+
+/* Ethereal gas coma surrounding the nucleus */
+.grand-comet-coma {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95) 20%,
+    rgba(186, 230, 253, 0.8) 45%,
+    rgba(56, 189, 248, 0.4) 70%,
+    transparent 100%
+  );
+  filter: blur(3px);
+}
+
+/* Condensed, intensely bright icy nucleus core */
+.grand-comet-nucleus {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow:
+    0 0 8px 2px #ffffff,
+    0 0 20px 6px #7dd3fc,
+    0 0 45px 14px rgba(56, 189, 248, 0.8),
+    0 0 75px 24px rgba(96, 165, 250, 0.4);
+  z-index: 2;
+}
+
+/* Soft optical diffraction spike */
+.grand-comet-diffraction {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 12px #38bdf8);
+}
+
+/* Floating stardust sparks trailing behind */
+.grand-comet-stardust {
+  position: absolute;
+  border-radius: 9999px;
+  background: #ffffff;
+  filter: drop-shadow(0 0 5px #7dd3fc);
+  animation: stardust-sparkle 1.8s ease-in-out infinite;
+}
+
+/* ── Day Mode Serene Sky Atmosphere: Soaring Birds & Prismatic Sunbeams ──── */
+@keyframes bird-soar-across {
   0% {
-    transform: translate3d(-120px, 0, 0) scaleX(0.2);
+    transform: translate3d(-12vw, 0, 0);
     opacity: 0;
   }
-  6% {
-    opacity: 0.85;
+  4% {
+    opacity: 0.55;
   }
-  35% {
-    transform: translate3d(550px, 0, 0) scaleX(1.3);
-    opacity: 0.75;
+  25% {
+    transform: translate3d(25vw, -14px, 0);
+    opacity: 0.6;
   }
-  55% {
-    transform: translate3d(900px, 0, 0) scaleX(0.7);
-    opacity: 0;
+  50% {
+    transform: translate3d(55vw, 6px, 0);
+    opacity: 0.55;
+  }
+  75% {
+    transform: translate3d(85vw, -10px, 0);
+    opacity: 0.5;
+  }
+  96% {
+    opacity: 0.2;
   }
   100% {
-    transform: translate3d(1050px, 0, 0) scaleX(0.2);
+    transform: translate3d(112vw, 0, 0);
     opacity: 0;
   }
 }
 
-.mystic-comet-track {
-  position: absolute;
-  transform-origin: 0 0;
-  pointer-events: none;
-  will-change: transform;
+@keyframes bird-wing-flap {
+  0%, 100% {
+    transform: scaleY(1) translateY(0);
+  }
+  22% {
+    transform: scaleY(0.55) translateY(-2.5px);
+  }
+  44% {
+    transform: scaleY(1.3) translateY(1.5px);
+  }
+  66% {
+    transform: scaleY(0.85) translateY(-0.5px);
+  }
+  85% {
+    transform: scaleY(1.05) translateY(0);
+  }
 }
 
-.mystic-comet-body {
-  position: relative;
-  width: 380px;
-  height: 60px;
-  animation: mystic-comet-travel var(--comet-duration, 7.5s) cubic-bezier(0.22, 0.1, 0.25, 1) infinite;
-  animation-delay: var(--comet-delay, 0s);
+.bird-flight-track {
+  position: absolute;
+  pointer-events: none;
+  animation: bird-soar-across var(--flight-duration, 26s) linear infinite;
+  animation-delay: var(--flight-delay, 0s);
   will-change: transform, opacity;
-  pointer-events: none;
-}
-
-.mystic-comet-core-glow {
-  transform-origin: center;
-  animation: mystic-core-pulse 2s ease-in-out infinite;
-}
-
-.mystic-stardust-spark {
-  transform-origin: center;
-  animation: mystic-spark-float 2.4s ease-in-out infinite;
-}
-
-.micro-meteor-track {
-  position: absolute;
-  transform-origin: 0 0;
-  pointer-events: none;
-  will-change: transform;
-}
-
-.micro-meteor-streak {
-  width: 150px;
-  height: 2px;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 55%, #ffffff 90%, #a5f3fc 100%);
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 14px rgba(56, 189, 248, 0.7));
-  animation: micro-meteor-dash var(--meteor-duration, 5.5s) cubic-bezier(0.15, 0.85, 0.2, 1) infinite;
-  animation-delay: var(--meteor-delay, 1s);
   opacity: 0;
-  will-change: transform, opacity;
+}
+
+.bird-wings-silhouette {
+  transform-origin: 50% 40%;
+  animation: bird-wing-flap var(--flap-speed, 2.2s) ease-in-out infinite;
+}
+
+@keyframes daylight-prism-pulse {
+  0%, 100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.daylight-sun-prism {
+  animation: daylight-prism-pulse 8s ease-in-out infinite;
   pointer-events: none;
 }
 
-/* Fallback for legacy class if referenced anywhere */
-.shooting-comet {
-  display: none;
+/* Fallback for legacy classes if referenced anywhere */
+.shooting-comet,
+.mystic-comet-track,
+.mystic-comet-body,
+.micro-meteor-track,
+.micro-meteor-streak {
+  display: none !important;
 }
 
 .mascot-sparkles > * {
@@ -1525,46 +1693,28 @@ html.motion-ready .reveal-pop:not([data-revealed="true"]) {
 /* ══════════════════════════════════════════════════════════════════════════
    Theme orb
    ──────────────────────────────────────────────────────────────────────────
-   The floating switch, bottom right. It is a real <button> with a live
-   accessible label; the 3D coin-flip and the ripple are decoration layered
-   on top of an ordinary toggle.
+   The day/night switch with 3D coin flip effect. Integrated natively into
+   top headers, navigation toolbars, and menus without blocking corner content.
    ══════════════════════════════════════════════════════════════════════════ */
 
 .theme-orb {
-  position: fixed;
-  right: clamp(1rem, 2.5vw, 1.5rem);
-  bottom: clamp(1rem, 2.5vw, 1.5rem);
-  z-index: 60;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  display: grid;
+  position: relative;
+  display: inline-grid;
   place-items: center;
   perspective: 500px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  box-shadow:
-    0 4px 14px -2px rgba(0, 0, 0, 0.12),
-    0 2px 6px -1px rgba(0, 0, 0, 0.08);
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+  cursor: pointer;
+  user-select: none;
 }
 
-@media (max-width: 767px) {
-  .theme-orb {
-    right: 0.75rem;
-    bottom: 0.75rem;
-    width: 40px;
-    height: 40px;
-  }
+.theme-orb-inline {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  perspective: 500px;
 }
 
 .theme-orb:hover {
-  transform: scale(1.06);
   border-color: var(--primary);
-  box-shadow: 0 6px 20px -3px rgba(0, 0, 0, 0.16);
 }
 
 .theme-orb:active {
@@ -1573,18 +1723,19 @@ html.motion-ready .reveal-pop:not([data-revealed="true"]) {
 
 .theme-orb:focus-visible {
   outline: 2px solid var(--ring);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .orb-coin {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   transform-style: preserve-3d;
   transition: transform 450ms cubic-bezier(0.34, 1.3, 0.64, 1);
 }
 
-.theme-orb[data-theme="dark"] .orb-coin {
+.theme-orb[data-theme="dark"] .orb-coin,
+.theme-orb-inline[data-theme="dark"] .orb-coin {
   transform: rotateY(180deg);
 }
 
@@ -1885,6 +2036,10 @@ html.theme-shifting * {
   .orb-orbit,
   .aurora-wash,
   .starfield,
+  .glimmer-shooting-star,
+  .bird-flight-track,
+  .bird-wings-silhouette,
+  .daylight-sun-prism,
   .mystic-comet-track,
   .mystic-comet-body,
   .micro-meteor-track,
@@ -1917,6 +2072,7 @@ html.theme-shifting * {
    the same marker language as the section headings. */
 .nav-link {
   position: relative;
+  white-space: nowrap;
 }
 
 .nav-link::after {
@@ -1965,61 +2121,29 @@ html.theme-shifting * {
    band and both tails cast one consistent shadow.
    ══════════════════════════════════════════════════════════════════════════ */
 
-.ribbon {
-  --ribbon-height: 2.75rem;
-  --ribbon-tail: 3.5rem;
-  filter: drop-shadow(3px 4px 0 var(--ink));
-}
-
-.ribbon-band {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  height: var(--ribbon-height);
-  overflow: hidden;
-  border: 1.5px solid var(--ink);
-  border-radius: 0.35rem;
-  background-image: linear-gradient(
-    180deg,
-    var(--plum-soft) 0%,
-    var(--plum) 62%,
-    var(--plum-deep) 100%
+.marquee-mask {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 48px,
+    black calc(100% - 48px),
+    transparent 100%
   );
-  color: var(--plum-foreground);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 48px,
+    black calc(100% - 48px),
+    transparent 100%
+  );
 }
 
-/* A hairline of light along the top edge — the fold catching the light, and
-   the thing that stops the band reading as a flat rectangle of deep pink. */
-.ribbon-band::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  background-color: oklch(1 0 0 / 22%);
-  pointer-events: none;
-}
-
-.ribbon-tail {
-  position: absolute;
-  top: 56%;
-  z-index: 1;
-  height: calc(var(--ribbon-height) * 0.94);
-  width: var(--ribbon-tail);
-  translate: 0 -50%;
-}
-
-.ribbon-tail-left {
-  left: calc(var(--ribbon-tail) * -0.72);
-}
-
-.ribbon-tail-right {
-  right: calc(var(--ribbon-tail) * -0.72);
-  scale: -1 1;
+.marquee-container:hover .marquee-track {
+  animation-play-state: paused;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Interactive Examiner Preview
+   Live Examiner
    ══════════════════════════════════════════════════════════════════════════
    The hero's animated proof: a script typing itself while the examiner marks
    underneath it. Everything here is either a slow loop or a one-shot pop, so
@@ -2169,7 +2293,7 @@ html.theme-shifting * {
   color: var(--foreground);
 }
 
-/* The headline highlighter, in the deep pink plum rather than the accent — one
+/* The headline highlighter, in the deep purple rather than the accent — one
    per page, and it is what the eye lands on first. */
 @utility highlight-deep {
   background-color: var(--plum);
@@ -2191,4 +2315,58 @@ html.theme-shifting * {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+
+
+
+/* Sleek custom scrollbars with smooth hover styling */
+.custom-scrollbar,
+.styled-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar,
+.styled-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track,
+.styled-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.styled-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+  transition: background 0.15s ease-in-out;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Mobile phone viewport ergonomics: prevent iOS Safari auto-zoom on input focus */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+
 

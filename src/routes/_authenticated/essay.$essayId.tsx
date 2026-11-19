@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
+  Clock,
   Columns2,
+  Copy,
   FileText,
   GraduationCap,
   History,
@@ -19,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/app/app-shell";
+import { GradingProgress } from "@/components/app/grading-progress";
 import { MarkBreakdown } from "@/components/app/mark-breakdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,13 +36,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/essay/$essayId")({
   head: () => ({
     meta: [
-      { title: "Response Report — Cambridge 0455 Economics" },
+      { title: "Essay Report — Cambridge IGCSE 0455 Economics" },
       {
         name: "description",
         content:
-          "Full examiner report for your Cambridge 0455 Economics response, with rewrite progression tracked against earlier attempts.",
+          "Full examiner report for your Cambridge IGCSE 0455 Economics essay, with rewrite progression tracked against earlier attempts.",
       },
-      { property: "og:title", content: "Response Report — Cambridge 0455 Economics" },
+      { property: "og:title", content: "Essay Report — Cambridge IGCSE 0455 Economics" },
       {
         property: "og:description",
         content: "Mark, AO breakdown, and rewrite history for a single essay.",
@@ -97,6 +101,8 @@ function EssayPage() {
       queryClient.invalidateQueries({ queryKey: ["essay", essayId] });
       queryClient.invalidateQueries({ queryKey: ["progress"] });
       queryClient.invalidateQueries({ queryKey: ["essays"] });
+      queryClient.invalidateQueries({ queryKey: ["review-essays"] });
+      queryClient.invalidateQueries({ queryKey: ["review-panel"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -105,6 +111,15 @@ function EssayPage() {
     ? active.essay_text.trim().split(/\s+/).filter(Boolean).length
     : 0;
   const rewriteWordCount = rewrite.trim() ? rewrite.trim().split(/\s+/).filter(Boolean).length : 0;
+
+  const [scriptCopied, setScriptCopied] = useState(false);
+  const handleCopyScript = () => {
+    if (!active?.essay_text) return;
+    navigator.clipboard.writeText(active.essay_text);
+    setScriptCopied(true);
+    toast.success("Student script copied to clipboard!");
+    setTimeout(() => setScriptCopied(false), 2000);
+  };
 
   // Previous attempt delta
   const previousAttempt = activeIndex > 0 ? versions[activeIndex - 1] : null;
@@ -165,7 +180,7 @@ function EssayPage() {
         <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5 sm:size-4 shrink-0 text-primary" />
           <p className="leading-snug sm:leading-relaxed">
-            <strong className="text-foreground font-semibold">Cambridge 0455 Standard:</strong>{" "}
+            <strong className="text-foreground font-semibold">Cambridge IGCSE 0455 Standard:</strong>{" "}
             Calibrated against published Cambridge guidelines. Independent study platform.
           </p>
         </div>
@@ -334,6 +349,22 @@ function EssayPage() {
                 </Button>
               </div>
             </div>
+
+            {mutation.isPending && (
+              <div className="pt-3 border-t border-border/60">
+                <GradingProgress
+                  active
+                  totalMs={25_000}
+                  stages={[
+                    { label: "Retrieving Cambridge IGCSE 0455 Knowledge Base & Mark Schemes", weight: 3 },
+                    { label: "Dual-Examiner Parallel Evaluation (Pass 1 Error Check & Pass 2 Holistic)", weight: 5 },
+                    { label: "Auditing Assessment Objectives: AO1 Knowledge · AO2 Application · AO3 Evaluation", weight: 4 },
+                    { label: "Weighing Policy Trade-offs, Multi-Perspective Analysis & Examples", weight: 3 },
+                    { label: "Synthesizing Diagnostic Examiner Report & Actionable Feedback", weight: 3 },
+                  ]}
+                />
+              </div>
+            )}
           </section>
         ) : null}
 
@@ -347,26 +378,44 @@ function EssayPage() {
                   <Sparkles className="size-4 text-primary" />
                   <h3 className="text-sm font-semibold">Cambridge Examiner Report</h3>
                 </div>
-                <MarkBreakdown grading={active.grading as unknown as Grading} />
+                <MarkBreakdown
+                  grading={active.grading as unknown as Grading}
+                  question={thread.data?.essay.question}
+                />
               </div>
 
               {/* Right Column: Student Script */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="size-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">
+              <div className="space-y-3 lg:sticky lg:top-6 lg:self-start">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-border/80 bg-card/90 shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="size-4 text-primary shrink-0" />
+                    <h3 className="text-xs sm:text-sm font-bold text-foreground truncate">
                       Student Script (Attempt {active.version})
                     </h3>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {wordCount} words
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className="text-[11px] font-mono px-2 py-0.5">
+                      {wordCount} words
+                    </Badge>
+                    <Badge variant="outline" className="hidden sm:inline-flex text-[11px] font-mono px-2 py-0.5 border-primary/30 text-primary">
+                      ~{Math.max(1, Math.ceil(wordCount / 220))} min read
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyScript}
+                      className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      {scriptCopied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                      <span className="hidden xs:inline">{scriptCopied ? "Copied" : "Copy"}</span>
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="rounded-xl border border-border/80 bg-card p-5 shadow-sm">
+                <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-sm max-h-[calc(100vh-12rem)] overflow-y-auto">
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <p className="text-[15px] leading-[1.8] whitespace-pre-wrap font-sans text-foreground/90">
+                    <p className="text-[14.5px] sm:text-[15px] leading-[1.85] whitespace-pre-wrap font-sans text-foreground/95 select-text">
                       {active.essay_text}
                     </p>
                   </div>
@@ -375,20 +424,41 @@ function EssayPage() {
             </div>
           ) : viewMode === "report" ? (
             <div className="space-y-6">
-              <MarkBreakdown grading={active.grading as unknown as Grading} />
+              <MarkBreakdown
+                grading={active.grading as unknown as Grading}
+                question={thread.data?.essay.question}
+              />
             </div>
           ) : (
             <div className="space-y-4 max-w-3xl mx-auto">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold">
-                  Student Script (Attempt {active.version})
-                </h3>
-                <Badge variant="outline" className="text-xs">
-                  {wordCount} words
-                </Badge>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-xl border border-border/80 bg-card shadow-xs">
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 text-primary" />
+                  <h3 className="text-sm font-bold text-foreground">
+                    Student Script (Attempt {active.version})
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-mono">
+                    {wordCount} words
+                  </Badge>
+                  <Badge variant="outline" className="text-xs font-mono border-primary/30 text-primary">
+                    ~{Math.max(1, Math.ceil(wordCount / 220))} min read
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyScript}
+                    className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    {scriptCopied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                    <span>{scriptCopied ? "Copied" : "Copy Script"}</span>
+                  </Button>
+                </div>
               </div>
-              <div className="rounded-xl border border-border/80 bg-card p-6 shadow-sm">
-                <p className="text-[15px] leading-[1.8] whitespace-pre-wrap font-sans text-foreground/90">
+              <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
+                <p className="text-[15px] sm:text-[15.5px] leading-[1.9] whitespace-pre-wrap font-sans text-foreground/95 select-text">
                   {active.essay_text}
                 </p>
               </div>

@@ -11,13 +11,27 @@
  * observing genuine multi-attempt patterns.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
+import { unwrapData } from "@/lib/safe-validator";
+import { cleanStars } from "./utils";
 import { chat } from "./ai.server";
 import { MODEL_ANALYSIS } from "./examiner/config";
 import { extractFirstJsonObject } from "./examiner/json";
 import type { Grading } from "./examiner/types";
-import { aggregateMcqDomains, MCQ_DOMAIN_LABEL, type DomainStat } from "./mcq-domain";
+import {
+  aggregateMcqDomains,
+  classifyMcqQuestion,
+  MCQ_DOMAIN_LABEL,
+  type DomainStat,
+} from "./mcq-domain";
+import {
+  type CambridgeSeriesId,
+  calculatePredictedGradeFromThresholds,
+  buildThresholdPromptInstruction,
+  normalizeSeriesId,
+} from "./cambridge-thresholds";
 
 export const MIN_ESSAYS_FOR_REVIEW = 3;
 export const MIN_MCQ_PAPERS_FOR_REVIEW = 1;
@@ -47,11 +61,22 @@ export type MasteryPillar = {
 };
 
 export type GradeProjection = {
-  projectedGrade: "A*" | "A" | "B" | "C" | "D" | "E" | "U";
+  projectedGrade: "A*" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "U";
   currentAveragePercent: number;
   targetGrade: "A*" | "A" | "B";
   marksToNextGrade: string;
   confidence: "high" | "medium" | "emerging";
+  seriesId: CambridgeSeriesId;
+  seriesLabel: string;
+  isCustomSeries: boolean;
+  cutoffs: {
+    aStar?: number;
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+  };
 };
 
 export type DomainComparison = {
@@ -67,6 +92,9 @@ export type ReviewPanelResult = {
   essayCount: number;
   mcqPaperCount: number;
   generatedAt: string;
+  nextRecalculationDate: string;
+  daysRemainingInCycle: number;
+  isCached: boolean;
   overallSummary: string;
   gradeTrend: "improving" | "steady" | "declining" | "not enough data";
   gradeProjection: GradeProjection;
@@ -123,15 +151,16 @@ record, not like a template. Concretely:
 - Prefer a plain, concrete fact ("your last three essays each lost the
   AO3 marks on the conclusion paragraph") over a vague verdict ("your
   evaluation needs work").
+- NO ASTERISKS: Never use asterisks (* or **) anywhere in any JSON string. Do not use markdown bold, italics, or asterisk bullets. Return plain text only with zero asterisks.
 `.trim();
 
 const CONTRACT = `
-Return ONLY one JSON object with this exact shape:
+Return ONLY one JSON object with this exact shape (zero asterisks anywhere in any field):
 {
   "overall_summary": string (3-5 sentences, direct, addressed to the student as "you"),
   "grade_trend": "improving" | "steady" | "declining",
   "grade_projection": {
-    "projected_grade": "A*" | "A" | "B" | "C" | "D" | "E" | "U",
+    "projected_grade": "A*" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "U",
     "current_average_percent": number 0-100,
     "target_grade": "A*" | "A" | "B",
     "marks_to_next_grade": string (e.g. "+3 marks on 12-mark evaluation or +2 correct MCQs"),
@@ -166,21 +195,57 @@ Return ONLY one JSON object with this exact shape:
 ${CLICHE_BAN}
 `.trim();
 
-export const getReviewPanel = createServerFn({ method: "GET" })
+export const getReviewPanel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<ReviewPanelResult | ReviewPanelEligibility> => {
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        force: z.boolean().optional(),
+        examSeries: z.string().optional(),
+        targetLevel: z.string().optional(),
+      })
+      .default({})
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }): Promise<ReviewPanelResult | ReviewPanelEligibility> => {
     const { supabase, userId } = context;
 
-    const { data: essayRows, error: essayError } = await supabase
-      .from("essays")
+    // 1. Determine candidate's examination series and level
+    let chosenSeries = data?.examSeries;
+    let chosenLevel = data?.targetLevel;
+
+    if (!chosenSeries) {
+      try {
+        const userPrefsTerm = `__USER_PREFS_${userId}`;
+        const { data: prefsRow } = await supabase
+          .from("definitions")
+          .select("definition_text")
+          .eq("term", userPrefsTerm)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (prefsRow?.definition_text) {
+          const parsedPrefs = JSON.parse(prefsRow.definition_text);
+          if (parsedPrefs.examSeries) chosenSeries = parsedPrefs.examSeries;
+          if (parsedPrefs.targetLevel && !chosenLevel) chosenLevel = parsedPrefs.targetLevel;
+        }
+      } catch {
+        /* fallback */
+      }
+    }
+
+    const seriesId = normalizeSeriesId(chosenSeries);
+    const targetLevel = chosenLevel || "full_a_level";
+
+    const { data: essayRows, error: essayError } = await (supabase as any).from("essays")
       .select("id, question, max_mark, updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(ESSAY_WINDOW);
     if (essayError) throw new Error(essayError.message);
 
-    const { count: essayCount, error: countError } = await supabase
-      .from("essays")
+    const { count: essayCount, error: countError } = await (supabase as any).from("essays")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
     if (countError) throw new Error(countError.message);
@@ -201,7 +266,15 @@ export const getReviewPanel = createServerFn({ method: "GET" })
       .not("completed_at", "is", null);
     if (mcqCountError) throw new Error(mcqCountError.message);
 
-    const totalEssays = essayCount ?? 0;
+    let subCount = 0;
+    try {
+      const { count } = await (supabase as any)
+        .from("essay_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId);
+      subCount = count ?? 0;
+    } catch {}
+    const totalEssays = Math.max(essayCount ?? 0, subCount);
     const totalMcqPapers = mcqCount ?? 0;
 
     // Accessible gating: 3 essays + 1 MCQ paper (or 2 essays if at least 1 MCQ paper is done)
@@ -218,22 +291,51 @@ export const getReviewPanel = createServerFn({ method: "GET" })
       };
     }
 
-    const essayIds = (essayRows ?? []).map((row) => row.id);
-    const { data: versionRows, error: versionError } = await supabase
-      .from("essay_versions")
+    // Fetch latest versions and summaries upfront to compute live empirical percentage
+    let resolvedEssaySummaries: EssaySummary[] = [];
+    try {
+      const { data: subRows } = await (supabase as any)
+        .from("essay_submissions")
+        .select("id, question, max_marks, awarded_marks, band, grading_result, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (Array.isArray(subRows) && subRows.length > 0) {
+        resolvedEssaySummaries = subRows
+          .map((row: any) => {
+            const g = (row.grading_result || {}) as Grading;
+            if (!g || !g.ao_breakdown) return null;
+            return {
+              essayId: row.id,
+              question: row.question,
+              maxMark: row.max_marks ?? g.max_mark ?? 8,
+              totalMark: row.awarded_marks ?? g.total_mark ?? 0,
+              band: row.band ?? g.band ?? "",
+              aoBreakdown: g.ao_breakdown,
+              strengths: g.strengths ?? [],
+              weaknesses: g.weaknesses ?? [],
+              missingElements: g.missing_elements,
+              createdAt: row.created_at,
+            } as EssaySummary;
+          })
+          .filter((x: any): x is EssaySummary => x !== null);
+      }
+    } catch {}
+    const essayIds = ((essayRows as any[]) ?? []).map((row: any) => row.id);
+    const { data: versionRows, error: versionError } = await (supabase as any).from("essay_versions")
       .select("essay_id, version, grading, total_mark, created_at")
       .in("essay_id", essayIds.length > 0 ? essayIds : ["00000000-0000-0000-0000-000000000000"])
       .order("version", { ascending: false });
-    if (versionError) throw new Error(versionError.message);
+    
 
-    const latestVersionByEssay = new Map<string, (typeof versionRows)[number]>();
-    for (const version of versionRows ?? []) {
+    const latestVersionByEssay = new Map<string, any>();
+    for (const version of (versionRows as any[]) ?? []) {
       if (!latestVersionByEssay.has(version.essay_id)) {
         latestVersionByEssay.set(version.essay_id, version);
       }
     }
 
-    const essaySummaries: EssaySummary[] = (essayRows ?? [])
+    const legacyEssaySummaries: EssaySummary[] = ((essayRows as any[]) ?? [])
       .map((essay) => {
         const version = latestVersionByEssay.get(essay.id);
         const grading = version?.grading as Grading | null | undefined;
@@ -252,11 +354,99 @@ export const getReviewPanel = createServerFn({ method: "GET" })
         };
         return summary;
       })
-      .filter((item): item is EssaySummary => item !== null);
+      .filter((item: any): item is EssaySummary => item !== null);
+    const essaySummaries: EssaySummary[] = resolvedEssaySummaries.length > 0 ? resolvedEssaySummaries : legacyEssaySummaries;
+
+    // Compute live empirical average percentage from essays & MCQs
+    let totalScore = 0;
+    let totalMax = 0;
+    essaySummaries.forEach((e) => {
+      totalScore += e.totalMark;
+      totalMax += e.maxMark;
+    });
+    (mcqRows ?? []).forEach((m) => {
+      totalScore += m.score ?? 0;
+      totalMax += m.total ?? 0;
+    });
+    const empiricalPercent = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 65;
+
+    // Check cached diagnostic review (auto-invalidated on new submissions or forced refresh)
+    const cacheTerm = `__REVIEW_CACHE_${userId}`;
+    const { data: cachedRow } = await supabase
+      .from("definitions")
+      .select("term, definition_text, updated_at")
+      .eq("term", cacheTerm)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (cachedRow?.definition_text && !data?.force) {
+      try {
+        const parsed = JSON.parse(cachedRow.definition_text) as ReviewPanelResult;
+        const cachedSeriesId = parsed.gradeProjection?.seriesId;
+
+        // Auto-refresh when candidate has submitted new essays or MCQ papers since cache was created
+        const hasWorkCountChanged =
+          parsed.essayCount !== totalEssays ||
+          parsed.mcqPaperCount !== totalMcqPapers;
+
+        // Auto-refresh if empirical performance has shifted noticeably (>= 2%)
+        const cachedAvg = parsed.gradeProjection?.currentAveragePercent;
+        const hasAverageDrifted =
+          cachedAvg != null && Math.abs(cachedAvg - empiricalPercent) >= 2;
+
+        // If no force flag, series matches, count is unchanged, and performance has not diverged:
+        if (
+          !hasWorkCountChanged &&
+          !hasAverageDrifted &&
+          cachedSeriesId === seriesId &&
+          parsed.gradeProjection?.cutoffs
+        ) {
+          const generatedTime = new Date(parsed.generatedAt || cachedRow.updated_at).getTime();
+          const ageInDays = (Date.now() - generatedTime) / (1000 * 60 * 60 * 24);
+
+          if (ageInDays < 30) {
+            const daysRemaining = Math.max(1, Math.ceil(30 - ageInDays));
+            const nextDate = new Date(generatedTime + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+            // Re-calibrate against official Cambridge thresholds in case of past model drift
+            const recalc = calculatePredictedGradeFromThresholds(
+              empiricalPercent,
+              targetLevel,
+              seriesId,
+            );
+            parsed.gradeProjection.currentAveragePercent = empiricalPercent;
+            parsed.gradeProjection.projectedGrade = recalc.projectedGrade;
+            parsed.gradeProjection.targetGrade = recalc.targetGrade;
+            parsed.gradeProjection.cutoffs = recalc.cutoffs;
+            parsed.gradeProjection.seriesId = recalc.seriesId;
+            parsed.gradeProjection.seriesLabel = recalc.seriesLabel;
+            parsed.gradeProjection.isCustomSeries = recalc.isCustomSeries;
+            if (recalc.projectedGrade === "A*") {
+              parsed.gradeProjection.marksToNextGrade = "Solid Cambridge A* benchmark maintained";
+            }
+
+            return cleanStars({
+              ...parsed,
+              eligible: true,
+              isCached: true,
+              essayCount: totalEssays,
+              mcqPaperCount: totalMcqPapers,
+              daysRemainingInCycle: daysRemaining,
+              nextRecalculationDate: nextDate,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse cached review panel:", err);
+      }
+    }
 
     type StoredPdfQuestion = {
       number: number;
       topic: string;
+      subtopic?: string;
+      stem_text?: string;
       correct_answer: "A" | "B" | "C" | "D" | null;
       user_answer: "A" | "B" | "C" | "D" | null;
       correct: boolean | null;
@@ -265,14 +455,22 @@ export const getReviewPanel = createServerFn({ method: "GET" })
     const mcqTopicStats = new Map<string, { correct: number; total: number }>();
     const gradedMcqQuestions: { topic: string; correct: boolean }[] = [];
     for (const attempt of mcqRows ?? []) {
+      const levelUpper = attempt.level === "a2" ? "A2" : "AS";
       const questions = (attempt.questions ?? []) as StoredPdfQuestion[];
       for (const question of questions) {
         if (question.correct === null) continue;
-        const entry = mcqTopicStats.get(question.topic) ?? { correct: 0, total: 0 };
+        const classified = classifyMcqQuestion({
+          level: levelUpper,
+          number: question.number,
+          text: question.stem_text,
+          existingTopic: question.topic,
+          existingSubtopic: question.subtopic,
+        });
+        const entry = mcqTopicStats.get(classified.topic) ?? { correct: 0, total: 0 };
         entry.total += 1;
         if (question.correct) entry.correct += 1;
-        mcqTopicStats.set(question.topic, entry);
-        gradedMcqQuestions.push({ topic: question.topic, correct: question.correct });
+        mcqTopicStats.set(classified.topic, entry);
+        gradedMcqQuestions.push({ topic: classified.topic, correct: question.correct });
       }
     }
     const weakTopicsFromData = [...mcqTopicStats.entries()]
@@ -319,25 +517,24 @@ export const getReviewPanel = createServerFn({ method: "GET" })
       )
       .join("\n");
 
-    // Compute empirical average percentage from essays & MCQs
-    let totalScore = 0;
-    let totalMax = 0;
-    essaySummaries.forEach((e) => {
-      totalScore += e.totalMark;
-      totalMax += e.maxMark;
-    });
-    (mcqRows ?? []).forEach((m) => {
-      totalScore += m.score ?? 0;
-      totalMax += m.total ?? 0;
-    });
-    const empiricalPercent = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 65;
+    // Compute Cambridge threshold prediction using chosen series or multi-year all-series average
+    const thresholdPrediction = calculatePredictedGradeFromThresholds(
+      empiricalPercent,
+      targetLevel,
+      seriesId,
+    );
+
+    const thresholdInstruction = buildThresholdPromptInstruction(seriesId);
 
     const systemPrompt = [
       "You are the senior Cambridge International 0455 Economics principal examiner reviewing a candidate's",
       "full academic diagnostic portfolio — essays AND MCQ papers together — to write a holistic diagnostic assessment.",
       "",
-      "Calibrate according to official Cambridge 0455 grade thresholds:",
-      "- A* >= 80%, A >= 70%, B >= 60%, C >= 50%, D >= 40%, E >= 35%, U < 35%.",
+      thresholdInstruction,
+      `Candidate's empirical weighted achievement: ${empiricalPercent}%.`,
+      `Official Cambridge projected grade: Grade ${thresholdPrediction.projectedGrade} (Target: Grade ${thresholdPrediction.targetGrade}).`,
+      "Your diagnostic summary, feedback, and action plan MUST remain strictly calibrated to this Cambridge grade standard.",
+      "",
       "Provide actionable advice across the 5 core pillars of Cambridge economics (Definitions, Causal chains,",
       "Evaluation weighing, Diagram synthesis, and MCQ distractor rejection).",
       "",
@@ -442,33 +639,24 @@ export const getReviewPanel = createServerFn({ method: "GET" })
           ? "steady"
           : "not enough data";
 
-    // Build Grade Projection with defaults
+    // Build Grade Projection strictly grounded in Cambridge thresholds (authoritative, never hallucinated)
     const rawProj = (raw.grade_projection ?? {}) as Record<string, unknown>;
-    const projectedGrade = (
-      ["A*", "A", "B", "C", "D", "E", "U"].includes(String(rawProj.projected_grade))
-        ? rawProj.projected_grade
-        : empiricalPercent >= 80
-          ? "A*"
-          : empiricalPercent >= 70
-            ? "A"
-            : empiricalPercent >= 60
-              ? "B"
-              : empiricalPercent >= 50
-                ? "C"
-                : empiricalPercent >= 40
-                  ? "D"
-                  : "E"
-    ) as GradeProjection["projectedGrade"];
 
     const gradeProjection: GradeProjection = {
-      projectedGrade,
-      currentAveragePercent: Number(rawProj.current_average_percent) || empiricalPercent,
-      targetGrade: projectedGrade === "A*" ? "A*" : projectedGrade === "A" ? "A*" : "A",
+      projectedGrade: thresholdPrediction.projectedGrade,
+      currentAveragePercent: empiricalPercent,
+      targetGrade: thresholdPrediction.targetGrade,
       marksToNextGrade:
-        typeof rawProj.marks_to_next_grade === "string" && rawProj.marks_to_next_grade.length > 0
-          ? rawProj.marks_to_next_grade
-          : "+2 marks on 12-mark evaluation or +2 correct MCQs",
+        thresholdPrediction.projectedGrade === "A*"
+          ? "Solid Cambridge A* benchmark maintained"
+          : (typeof rawProj.marks_to_next_grade === "string" && rawProj.marks_to_next_grade.length > 0
+              ? rawProj.marks_to_next_grade
+              : thresholdPrediction.marksToNextGrade),
       confidence: totalEssays >= 5 ? "high" : totalEssays >= 3 ? "medium" : "emerging",
+      seriesId: thresholdPrediction.seriesId,
+      seriesLabel: thresholdPrediction.seriesLabel,
+      isCustomSeries: thresholdPrediction.isCustomSeries,
+      cutoffs: thresholdPrediction.cutoffs,
     };
 
     // Build 5 Mastery Pillars
@@ -557,12 +745,18 @@ export const getReviewPanel = createServerFn({ method: "GET" })
           : "Keep micro and macro practice balanced across papers.",
     };
 
-    return {
+    const nowIso = new Date().toISOString();
+    const nextRecalcIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const output: ReviewPanelResult = cleanStars({
       eligible: true,
       sampleLevel: totalEssays >= 5 && totalMcqPapers >= 2 ? "comprehensive" : "diagnostic",
       essayCount: totalEssays,
       mcqPaperCount: totalMcqPapers,
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso,
+      nextRecalculationDate: nextRecalcIso,
+      daysRemainingInCycle: 30,
+      isCached: false,
       overallSummary: String(raw.overall_summary ?? "").trim(),
       gradeTrend,
       gradeProjection,
@@ -575,5 +769,20 @@ export const getReviewPanel = createServerFn({ method: "GET" })
       mcqDomainBreakdown,
       actionPlan,
       encouragement: String(raw.encouragement ?? "").trim(),
-    };
+    });
+
+    // Cache the review panel for 30 days
+    try {
+      await supabase.from("definitions").delete().eq("term", cacheTerm);
+      await supabase.from("definitions").insert({
+        term: cacheTerm,
+        definition_text: JSON.stringify(output),
+        category: "review_analytics_cache",
+        updated_at: nowIso,
+      });
+    } catch (saveErr) {
+      console.error("Failed to save review cache:", saveErr);
+    }
+
+    return output;
   });

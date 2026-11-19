@@ -3,8 +3,22 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/backend/auth-middleware";
 import { isAdmin } from "@/lib/auth-admin";
+import { type CambridgeSeriesId, normalizeSeriesId } from "@/lib/cambridge-thresholds";
+import { unwrapData } from "@/lib/safe-validator";
 
 export type AppRole = "student" | "teacher" | "admin";
+export type NavigationLayout = "topbar" | "sidebar" | "dock";
+
+export type UserAcademicPreferences = {
+  examSeries: CambridgeSeriesId;
+  targetLevel: "igcse_0455" | "igcse_core" | "igcse_extended";
+  targetGrade: "A*" | "A" | "B" | "C";
+  currencyContext?: string;
+  feedbackDepth?: string;
+  timedModeDefault?: boolean;
+  showDiagramLabels?: boolean;
+  navigationLayout?: NavigationLayout;
+};
 
 export const getMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -20,16 +34,38 @@ export const getMe = createServerFn({ method: "GET" })
       const { supabaseAdmin } = await import("@/integrations/backend/client.server");
       const db = supabaseAdmin ?? supabase;
 
-      let profile: { id: string; full_name: string | null; school: string | null; tutorial_completed: boolean } | null = null;
+      let profile: {
+        id: string;
+        full_name: string | null;
+        school: string | null;
+        tutorial_completed: boolean;
+        avatar_url?: string | null;
+      } | null = null;
       let roles: { role: string }[] | null = null;
+
+      let extendedProfile: { bio?: string; birthday?: string; avatarUrl?: string } = {};
+      try {
+        const { data: extData } = await db
+          .from("definitions")
+          .select("definition_text")
+          .eq("term", `__USER_PROFILE_EXT_${userId}`)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (extData?.definition_text) {
+          extendedProfile = JSON.parse(extData.definition_text);
+        }
+      } catch {
+        /* fallback */
+      }
 
       try {
         const profileRes = await db
           .from("profiles")
-          .select("id, full_name, school, tutorial_completed")
+          .select("id, full_name, school, tutorial_completed, avatar_url")
           .eq("id", userId)
           .maybeSingle();
-        profile = profileRes.data;
+        profile = profileRes.data as any;
       } catch {
         profile = null;
       }
@@ -48,8 +84,10 @@ export const getMe = createServerFn({ method: "GET" })
       if (roleList.includes("admin")) {
         isUserAdmin = true;
       }
+
       let isTeacherUser =
         roleList.includes("teacher") ||
+        roleList.includes("teacher_pending") ||
         (context as any).claims?.user_metadata?.role === "teacher" ||
         (context as any).claims?.app_metadata?.role === "teacher";
 
@@ -60,7 +98,7 @@ export const getMe = createServerFn({ method: "GET" })
             .select("status")
             .eq("user_id", userId)
             .maybeSingle();
-          if (tp?.status === "approved") {
+          if (tp?.status === "approved" || tp?.status === "pending") {
             isTeacherUser = true;
           }
         } catch {
@@ -68,24 +106,44 @@ export const getMe = createServerFn({ method: "GET" })
         }
       }
 
-      let role: AppRole = "student";
+      if (isTeacherUser && !roleList.includes("teacher")) {
+        try {
+          await db.from("user_roles").upsert(
+            { user_id: userId, role: "teacher" } as any,
+            { onConflict: "user_id,role" },
+          );
+        } catch {
+          /* best effort */
+        }
+      }
 
+      let role: AppRole = "student";
       if (isUserAdmin) {
         role = "admin";
       } else if (isTeacherUser) {
         role = "teacher";
-      } else {
-        role = "student";
       }
 
-      const metaName = (context as any).claims?.user_metadata?.full_name || (context as any).claims?.user_metadata?.name;
+      const metaName =
+        (context as any).claims?.user_metadata?.full_name ||
+        (context as any).claims?.user_metadata?.name;
       const emailPrefix = (context as any).email ? (context as any).email.split("@")[0] : null;
-      const resolvedName = profile?.full_name || metaName || (isUserAdmin ? "Marginalite Admin" : emailPrefix);
+      const resolvedName =
+        profile?.full_name || metaName || (isUserAdmin ? "Marginalite Admin" : emailPrefix);
+
+      const resolvedAvatar =
+        profile?.avatar_url ||
+        extendedProfile?.avatarUrl ||
+        (context as any).claims?.user_metadata?.avatar_url ||
+        null;
 
       return {
         userId,
         fullName: resolvedName,
         school: profile?.school ?? (context as any).claims?.user_metadata?.school ?? null,
+        avatarUrl: resolvedAvatar,
+        bio: extendedProfile?.bio || "",
+        birthday: extendedProfile?.birthday || "",
         role,
         isAdmin: isUserAdmin,
         isStaff: isUserAdmin || role === "teacher",
@@ -97,6 +155,9 @@ export const getMe = createServerFn({ method: "GET" })
         userId,
         fullName: isUserAdmin ? "Marginalite Admin" : null,
         school: null,
+        avatarUrl: null,
+        bio: "",
+        birthday: "",
         role: isUserAdmin ? ("admin" as AppRole) : ("student" as AppRole),
         isAdmin: isUserAdmin,
         isStaff: isUserAdmin,
@@ -106,9 +167,7 @@ export const getMe = createServerFn({ method: "GET" })
   });
 
 /**
- * A privacy-safe community signal for the Dashboard. It intentionally exposes
- * counts only: students can see that Marginalite is active without seeing who is
- * online, their email addresses, or the pages they are using.
+ * Privacy-safe community signal for the Dashboard (counts only).
  */
 export const getCommunityPulse = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -119,13 +178,13 @@ export const getCommunityPulse = createServerFn({ method: "GET" })
 
       let onlineCount = 0;
       try {
-        const { count, error } = await supabaseAdmin
+        const { count, error } = await (supabaseAdmin as any)
           .from("user_presence")
           .select("user_id", { count: "exact", head: true })
           .gte("last_seen", onlineSince);
         if (!error && count != null) onlineCount = count;
       } catch {
-        // user_presence table might not be present
+        // user_presence table might not be present yet
       }
 
       let memberCount = 0;
@@ -137,7 +196,7 @@ export const getCommunityPulse = createServerFn({ method: "GET" })
           ).length;
         }
       } catch {
-        // Safe fallback if auth list fails
+        // Safe fallback
       }
 
       return { onlineCount, memberCount };
@@ -146,8 +205,6 @@ export const getCommunityPulse = createServerFn({ method: "GET" })
     }
   });
 
-// Called when the user clicks either "Start tutorial" or "Skip" on the
-// onboarding dialog — either way we don't show it again.
 export const markTutorialSeen = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -161,19 +218,190 @@ export const markTutorialSeen = createServerFn({ method: "POST" })
 
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((input: unknown) =>
+  .inputValidator((input: unknown) =>
     z
       .object({
         fullName: z.string().trim().max(120).optional(),
         school: z.string().trim().max(160).optional(),
+        avatarUrl: z.string().trim().max(500000).optional().nullable(),
+        bio: z.string().trim().max(500).optional().nullable(),
+        birthday: z.string().trim().max(30).optional().nullable(),
       })
-      .parse(input),
+      .parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
-      .from("profiles")
-      .update({ full_name: data.fullName ?? null, school: data.school ?? null })
-      .eq("id", context.userId);
-    if (error) throw new Error(error.message);
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+    const db = supabaseAdmin ?? supabase;
+
+    try {
+      const updatePayload: Record<string, any> = {
+        full_name: data.fullName ?? null,
+        school: data.school ?? null,
+        updated_at: new Date().toISOString(),
+      };
+      if (data.avatarUrl !== undefined) {
+        updatePayload.avatar_url = data.avatarUrl;
+      }
+
+      await db.from("profiles").update(updatePayload).eq("id", userId);
+    } catch (err) {
+      console.warn("Profiles table update error:", err);
+    }
+
+    // Persist extended profile info (bio, birthday, custom avatar) in definitions table
+    try {
+      const term = `__USER_PROFILE_EXT_${userId}`;
+      const extPayload = {
+        bio: data.bio ?? "",
+        birthday: data.birthday ?? "",
+        avatarUrl: data.avatarUrl ?? "",
+        updatedAt: new Date().toISOString(),
+      };
+      const { data: existing } = await db
+        .from("definitions")
+        .select("id")
+        .eq("term", term)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        await db
+          .from("definitions")
+          .update({
+            definition_text: JSON.stringify(extPayload),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await db.from("definitions").insert({
+          term,
+          definition_text: JSON.stringify(extPayload),
+          category: "candidate_profile",
+          source_label: "Marginalite Profile",
+        } as any);
+      }
+    } catch (extErr) {
+      console.warn("Could not save extended profile:", extErr);
+    }
+
     return { ok: true };
+  });
+
+export const getUserAcademicPreferences = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<UserAcademicPreferences> => {
+    const { supabase, userId } = context;
+    const term = `__USER_PREFS_${userId}`;
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+      const db = supabaseAdmin ?? supabase;
+      const { data } = await db
+        .from("definitions")
+        .select("definition_text")
+        .eq("term", term)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data?.definition_text) {
+        const parsed = JSON.parse(data.definition_text);
+        return {
+          examSeries: normalizeSeriesId(parsed.examSeries),
+          targetLevel: parsed.targetLevel || "igcse_0455",
+          targetGrade: parsed.targetGrade || "A*",
+          currencyContext: parsed.currencyContext || "uk_intl",
+          feedbackDepth: parsed.feedbackDepth || "detailed",
+          timedModeDefault: parsed.timedModeDefault ?? true,
+          showDiagramLabels: parsed.showDiagramLabels ?? true,
+          navigationLayout: (parsed.navigationLayout as NavigationLayout) || "topbar",
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
+    return {
+      examSeries: "all_average",
+      targetLevel: "igcse_0455",
+      targetGrade: "A*",
+      currencyContext: "uk_intl",
+      feedbackDepth: "detailed",
+      timedModeDefault: true,
+      showDiagramLabels: true,
+      navigationLayout: "topbar",
+    };
+  });
+
+export const saveUserAcademicPreferences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        examSeries: z.string().optional(),
+        targetLevel: z.enum(["igcse_0455", "igcse_core", "igcse_extended"]).optional(),
+        targetGrade: z.enum(["A*", "A", "B", "C"]).optional(),
+        currencyContext: z.string().optional(),
+        feedbackDepth: z.string().optional(),
+        timedModeDefault: z.boolean().optional(),
+        showDiagramLabels: z.boolean().optional(),
+        navigationLayout: z.enum(["topbar", "sidebar", "dock"]).optional(),
+      })
+      .parse(unwrapData(input)),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+    const db = supabaseAdmin ?? supabase;
+    const term = `__USER_PREFS_${userId}`;
+    const cacheTerm = `__REVIEW_CACHE_${userId}`;
+
+    const normalizedSeries = normalizeSeriesId(data.examSeries);
+    const payload: UserAcademicPreferences = {
+      examSeries: normalizedSeries,
+      targetLevel: data.targetLevel || "igcse_0455",
+      targetGrade: data.targetGrade || "A*",
+      currencyContext: data.currencyContext || "uk_intl",
+      feedbackDepth: data.feedbackDepth || "detailed",
+      timedModeDefault: data.timedModeDefault ?? true,
+      showDiagramLabels: data.showDiagramLabels ?? true,
+      navigationLayout: data.navigationLayout || "topbar",
+    };
+
+    try {
+      const { data: existing } = await db
+        .from("definitions")
+        .select("id")
+        .eq("term", term)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        await db
+          .from("definitions")
+          .update({
+            definition_text: JSON.stringify(payload),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await db.from("definitions").insert({
+          term,
+          definition_text: JSON.stringify(payload),
+          category: "candidate_preferences",
+          source_label: "Cambridge IGCSE 0455 Candidate Preferences",
+        } as any);
+      }
+    } catch (err) {
+      console.warn("Could not persist preferences in definitions table:", err);
+    }
+
+    try {
+      await db.from("definitions").delete().eq("term", cacheTerm);
+    } catch {
+      // Non-fatal
+    }
+
+    return { ok: true, preferences: payload };
   });

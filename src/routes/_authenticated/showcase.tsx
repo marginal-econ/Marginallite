@@ -88,7 +88,7 @@ function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
               ) : essay.source === "teacher_model" ? (
                 <Badge
                   variant="outline"
-                  className="border-pink-500/30 bg-pink-500/10 text-xs text-pink-700 dark:text-pink-300"
+                  className="border-violet-500/30 bg-violet-500/10 text-xs text-violet-700 dark:text-violet-300"
                 >
                   <GraduationCap className="mr-1 size-3" /> Teacher Exemplar
                 </Badge>

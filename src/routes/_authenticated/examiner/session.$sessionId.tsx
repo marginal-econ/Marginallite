@@ -126,7 +126,7 @@ function SessionDetailsPage() {
         );
       case "moderated":
         return (
-          <Badge variant="outline" className="text-[10px] border-pink-500/40 text-pink-600 bg-pink-500/10">
+          <Badge variant="outline" className="text-[10px] border-violet-500/40 text-violet-600 bg-violet-500/10">
             Moderated
           </Badge>
         );

@@ -1,20 +1,44 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import {
+  GraduationCap,
+  PenLine,
+  Wand2,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
+  BookOpen,
+  Award,
+  Lightbulb,
+  Layers,
+  Compass,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/app/app-shell";
-import {
-  STRUCTURE_GUIDANCE,
-  STRUCTURE_GUIDANCE_DIAGRAM_6,
-  type StructureGuidance,
-} from "@/lib/examiner/config";
+import { STRUCTURE_GUIDANCE, type StructureGuidance } from "@/lib/examiner/config";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/response-structure")({
   head: () => ({
     meta: [
-      { title: "How to structure a response — Marginalite" },
+      { title: "How to Write an Essay — Cambridge IGCSE 0455 Response Structures" },
       {
         name: "description",
         content:
-          "A class-taught default structure for 2-mark, 4-mark, 6-mark, and 8-mark Cambridge IGCSE 0455 questions.",
+          "Master the class-taught Cambridge IGCSE 0455 essay structures for 8-mark, 12-mark, and 20-mark questions with knowledge setup, analysis chains, and justified evaluation.",
+      },
+      {
+        property: "og:title",
+        content: "How to Write a Cambridge IGCSE 0455 Economics Essay — Marginalite",
+      },
+      {
+        property: "og:description",
+        content:
+          "Step-by-step layouts and examiner guidance for 8m, 12m, and 20m Cambridge IGCSE 0455 Economics essays.",
       },
     ],
   }),
@@ -22,85 +46,253 @@ export const Route = createFileRoute("/_authenticated/response-structure")({
 });
 
 function ResponseStructurePage() {
-  const guides = [
-    STRUCTURE_GUIDANCE[2],
-    STRUCTURE_GUIDANCE[4],
-    STRUCTURE_GUIDANCE[6],
-    STRUCTURE_GUIDANCE_DIAGRAM_6,
-    STRUCTURE_GUIDANCE[8],
-  ].filter(Boolean) as StructureGuidance[];
+  const [selectedTariff, setSelectedTariff] = useState<"all" | "8" | "12" | "20">("all");
+  const guides = Object.values(STRUCTURE_GUIDANCE).sort((a, b) => a.tariff - b.tariff);
+
+  const displayedGuides = selectedTariff === "all"
+    ? guides
+    : guides.filter((g) => g.tariff.toString() === selectedTariff);
 
   return (
-    <>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+      {/* Top Header */}
       <PageHeader
-        title="How to structure a response"
-        description="A strong default layout for each question type, as taught in class. Not the only valid structure — a different, equally well-argued response is never marked down for using a different layout."
+        title="How to Write an Essay"
+        subtitle="Official Cambridge IGCSE 0455 Response Structures & Writing Guide. Master the exact layouts, analysis chains, and evaluative weigh-ups rewarded by examiners."
       />
 
-      <div className="grid gap-6 px-5 py-6 md:px-8 lg:grid-cols-2">
-        {guides.map((guide, idx) => (
-          <StructureCard key={`${guide.tariff}-${idx}`} guide={guide} />
+      {/* Hero Banner with Quick Links */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-muted/40 p-6 shadow-sm backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs font-bold uppercase tracking-wider">
+                Cambridge IGCSE 0455 Standard
+              </Badge>
+              <Badge variant="outline" className="text-xs font-semibold text-muted-foreground">
+                8m · 12m · 20m Tariffs
+              </Badge>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
+              Master the Structure That Cambridge Examiners Reward
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Examiners award top-band marks to candidates who build clear chains of analytical reasoning and justified evaluation. Use these class-taught templates to structure your responses for any tariff.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Button asChild className="gap-1.5 text-xs font-bold h-9 bg-purple-600 hover:bg-purple-700 text-white shadow-xs">
+              <Link to="/essay-generator">
+                <Wand2 className="h-4 w-4" />
+                Sample Essay Generator
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-1.5 text-xs font-semibold h-9">
+              <Link to="/grade">
+                <PenLine className="h-4 w-4" />
+                Open Essay Grader
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tariff Filter Pills */}
+      <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">
+            Tariff Filter:
+          </span>
+          <Button
+            variant={selectedTariff === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("all")}
+            className="text-xs font-semibold h-8"
+          >
+            All Tariffs (3)
+          </Button>
+          <Button
+            variant={selectedTariff === "8" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("8")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "8" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
+            )}
+          >
+            8 Marks · IGCSE 0455
+          </Button>
+          <Button
+            variant={selectedTariff === "12" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("12")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "12" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""
+            )}
+          >
+            12 Marks · AS Evaluative
+          </Button>
+          <Button
+            variant={selectedTariff === "20" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("20")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "20" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""
+            )}
+          >
+            20 Marks · IGCSE 0455 (Paper 2)
+          </Button>
+        </div>
+      </div>
+
+      {/* Structure Cards Grid */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {displayedGuides.map((guide) => (
+          <StructureCard key={guide.tariff} guide={guide} />
         ))}
       </div>
 
-      <div className="px-5 pb-8 md:px-8">
-        <div className="panel space-y-2 p-5">
-          <h3 className="text-sm font-semibold">
-            A few general principles that apply to any tariff
-          </h3>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-            <li>
-              Every analytical point should follow a chain: <em>define</em> the term,{" "}
-              <em>explain</em> the mechanism,
-              <em> analyse</em> the effect, then <em>apply</em> it explicitly to the exact context
-              in the question — not a generic textbook explanation.
-            </li>
-            <li>
-              Evaluation earns marks when it is <em>justified</em> — a reason is given for why a
-              point is significant, conditional, or contestable — not just an asserted "it depends"
-              with nothing behind it.
-            </li>
-            <li>
-              A diagram is never compulsory unless the question explicitly requires one. A complete,
-              well-applied chain of reasoning can reach full marks with no diagram at all — but
-              where you do use one, make sure the written analysis actually refers back to it.
-            </li>
-            <li>
-              A conclusion should follow logically from your own evaluation. Conditional conclusions
-              ("this depends on X, because...") are exactly what Cambridge rewards at the top band —
-              you don't need a rigid ranking.
-            </li>
-          </ul>
-        </div>
-      </div>
-    </>
+      {/* Cambridge General Principles & Key Advice */}
+      <Card className="border border-border/80 shadow-sm bg-card/60">
+        <CardHeader className="p-5 pb-3 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+              <Lightbulb className="h-4 w-4" />
+            </div>
+            <CardTitle className="text-base font-bold">
+              4 Golden Principles That Apply to Any Cambridge Essay
+            </CardTitle>
+          </div>
+          <CardDescription className="text-xs text-muted-foreground">
+            Fundamental marking principles enforced by Principal Examiners across all papers.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-border/70 bg-muted/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <h4 className="font-bold text-xs text-foreground">Complete Analytical Chains</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Every analytical point must follow a chain: <em>define</em> the term, <em>explain</em> the mechanism, <em>analyse</em> the economic transmission, and <em>apply</em> explicitly to the question's context — not just generic textbook theory.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-border/70 bg-muted/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <Award className="h-4 w-4 text-amber-500" />
+                <h4 className="font-bold text-xs text-foreground">Justified Evaluation</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Evaluation earns marks when it is <em>justified</em> — a solid economic reason is given for why a point is significant, conditional, or contestable (e.g., elasticity of supply, time lag, market structure) — not an unsubstantiated "it depends".
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-border/70 bg-muted/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-blue-500" />
+                <h4 className="font-bold text-xs text-foreground">Diagram Integration</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                A diagram is not compulsory unless explicitly requested, but when drawn, you must reference it directly in your text (e.g., shifts from S1 to S2, price moving from P1 to P2) to claim full credit.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-border/70 bg-muted/20 space-y-2">
+              <div className="flex items-center gap-2">
+                <Compass className="h-4 w-4 text-purple-500" />
+                <h4 className="font-bold text-xs text-foreground">Reasoned & Conditional Conclusions</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                A top-band conclusion must follow logically from your evaluation. Conditional judgements (<em>"this policy will succeed if X holds, but fails if Y dominates..."</em>) are precisely what Cambridge rewards at Level 3.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
 function StructureCard({ guide }: { guide: StructureGuidance }) {
+  const is8 = guide.tariff === 8;
+  const is12 = guide.tariff === 12;
+
   return (
-    <div className="panel space-y-4 p-5">
-      <div>
-        <h2 className="text-lg font-semibold">{guide.label}</h2>
-        <p className="text-sm text-muted-foreground">{guide.questionType}</p>
-        <p className="mt-1 text-xs font-medium text-foreground/80">{guide.aoSummary}</p>
-      </div>
+    <Card className="border border-border/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+      <CardHeader className="p-5 pb-3 border-b bg-muted/20 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Badge
+            className={cn(
+              "font-bold text-xs font-mono",
+              is8
+                ? "bg-emerald-600 text-white"
+                : is12
+                ? "bg-indigo-600 text-white"
+                : "bg-amber-600 text-white"
+            )}
+          >
+            {guide.tariff} Marks
+          </Badge>
+          <span className="text-[11px] font-mono font-semibold text-muted-foreground uppercase">
+            {is8 ? "AS Section B" : is12 ? "AS Evaluative Essay" : "IGCSE 0455 Paper 2 Section B/C"}
+          </span>
+        </div>
 
-      <ol className="space-y-3">
-        {guide.steps.map((step, index) => (
-          <li key={step.title} className="flex gap-3">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-              {index + 1}
-            </span>
-            <div>
-              <p className="text-sm font-medium">{step.title}</p>
-              <p className="text-sm text-muted-foreground">{step.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+        <CardTitle className="text-base font-bold text-foreground">
+          {guide.label}
+        </CardTitle>
 
-      <p className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">{guide.note}</p>
-    </div>
+        <CardDescription className="text-xs text-muted-foreground line-clamp-2">
+          {guide.questionType}
+        </CardDescription>
+
+        <div className="pt-1">
+          <Badge variant="outline" className="text-[11px] font-mono border-primary/30 text-primary bg-primary/5">
+            {guide.aoSummary}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-5 space-y-4 flex-1">
+        <ol className="space-y-3">
+          {guide.steps.map((step, index) => (
+            <li key={step.title} className="flex gap-3 text-xs">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary mt-0.5">
+                {index + 1}
+              </span>
+              <div className="space-y-0.5">
+                <p className="font-semibold text-foreground text-xs">{step.title}</p>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">{step.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <div className="rounded-lg bg-muted/40 p-3 text-[11px] text-muted-foreground border border-border/50 italic leading-relaxed">
+          {guide.note}
+        </div>
+      </CardContent>
+
+      <CardFooter className="p-4 border-t bg-muted/10 flex items-center justify-between gap-2">
+        <Button asChild size="sm" variant="outline" className="text-xs font-semibold h-8 flex-1 gap-1">
+          <Link to="/essay-generator">
+            <Wand2 className="h-3 w-3 text-purple-500" />
+            Model Answer
+          </Link>
+        </Button>
+        <Button asChild size="sm" className="text-xs font-semibold h-8 flex-1 gap-1 bg-primary text-primary-foreground">
+          <Link to="/grade">
+            <PenLine className="h-3 w-3" />
+            Practice Essay
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

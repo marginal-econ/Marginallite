@@ -63,22 +63,22 @@ export async function sendPasswordResetEmail(
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fdf2f8;padding:38px 14px">
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:2px solid #21172d;border-radius:24px;box-shadow:8px 8px 0 #21172d;overflow:hidden">
-        <tr><td style="height:10px;background:#ec4899"></td></tr>
+        <tr><td style="height:10px;background:#7c6df0"></td></tr>
         <tr><td style="padding:34px 38px 16px">
           <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-            <td style="width:44px;height:44px;background:#ec4899;border:2px solid #21172d;border-radius:13px;text-align:center;color:#ffffff;font-size:24px;font-weight:700">m</td>
+            <td style="width:44px;height:44px;background:#7c6df0;border:2px solid #21172d;border-radius:13px;text-align:center;color:#ffffff;font-size:24px;font-weight:700">m</td>
             <td style="padding-left:12px"><div style="font-size:22px;font-weight:700">Marginalite</div><div style="margin-top:2px;color:#777180;font-size:12px">Cambridge IGCSE Economics (0455)</div></td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:12px 38px 38px">
-          <p style="margin:0 0 12px;color:#ec4899;font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Account security</p>
+          <p style="margin:0 0 12px;color:#7c6df0;font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase">Account security</p>
           <h1 style="margin:0 0 18px;font-size:34px;line-height:1.14">Reset your password</h1>
           <p style="margin:0 0 24px;color:#625d6c;font-size:17px;line-height:1.65">We received a request to reset the password for <strong style="color:#181323">${safeEmail}</strong>. Choose a new password using the secure button below.</p>
-          <a href="${safeActionLink}" style="display:inline-block;background:#ec4899;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:15px 24px;border:2px solid #21172d;border-radius:13px;box-shadow:4px 4px 0 #21172d">Choose a new password →</a>
+          <a href="${safeActionLink}" style="display:inline-block;background:#7c6df0;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:15px 24px;border:2px solid #21172d;border-radius:13px;box-shadow:4px 4px 0 #21172d">Choose a new password →</a>
           <div style="margin-top:28px;padding:17px 18px;border-radius:13px;background:#fdf2f8;color:#625d6c;font-size:13px;line-height:1.6"><strong style="color:#181323">Didn’t request this?</strong><br>You can safely ignore this email. Your password will remain unchanged, and nobody can access your account through this message without the secure link.</div>
           <p style="margin:20px 0 0;color:#625d6c;font-size:13px;line-height:1.6"><strong style="color:#181323">Keep Marginalite emails visible.</strong><br>If this message was filtered, mark it as not spam and add Marginalite to your trusted senders.</p>
           <p style="margin:24px 0 6px;color:#777180;font-size:12px;line-height:1.5">If the button does not work, copy and paste this address into your browser:</p>
-          <p style="margin:0;word-break:break-all;font-size:11px;line-height:1.5"><a href="${safeActionLink}" style="color:#ec4899">${safeActionLink}</a></p>
+          <p style="margin:0;word-break:break-all;font-size:11px;line-height:1.5"><a href="${safeActionLink}" style="color:#7c6df0">${safeActionLink}</a></p>
         </td></tr>
       </table>
       <p style="margin:24px 0 5px;color:#625d6c;font-size:12px;font-weight:700">Marginalite · Built for Cambridge IGCSE Economics (0455)</p>

@@ -7,39 +7,39 @@ import {
 } from "./retrieval.server";
 
 describe("Advanced RAG Retrieval Engine", () => {
-  describe("Syllabus-aware Query Expansion", () => {
-    it("expands an exchange rate question with Marshall-Lerner and J-curve", () => {
+  describe("Syllabus-aware Query Expansion (Cambridge IGCSE 0455)", () => {
+    it("expands an exchange rate question with IGCSE 0455 current account & trade terms", () => {
       const query = "Evaluate the effect of a currency depreciation on the current account.";
       const expanded = expandEconomicQuery(query);
-      expect(expanded).toContain("Marshall-Lerner condition");
-      expect(expanded).toContain("J-curve effect");
-      expect(expanded).toContain("terms of trade");
+      expect(expanded).toContain("current account");
+      expect(expanded).toContain("export competitiveness");
+      expect(expanded).toContain("import prices");
     });
 
-    it("expands a monetary policy question with transmission mechanism", () => {
+    it("expands a monetary policy question with IGCSE 0455 interest rates & inflation terms", () => {
       const query = "Discuss whether monetary policy is effective in controlling inflation.";
       const expanded = expandEconomicQuery(query);
-      expect(expanded).toContain("transmission mechanism");
       expect(expanded).toContain("interest rates");
-      expect(expanded).toContain("Phillips curve");
+      expect(expanded).toContain("money supply");
+      expect(expanded).toContain("consumer prices index CPI");
     });
 
-    it("expands a PPC and scarcity micro question with allocative efficiency", () => {
+    it("expands a PPC and scarcity micro question with IGCSE 0455 opportunity cost terms", () => {
       const query =
         "Explain how the production possibility curve illustrates scarcity and opportunity cost.";
       const expanded = expandEconomicQuery(query);
       expect(expanded).toContain("production possibility curve");
-      expect(expanded).toContain("allocative efficiency");
-      expect(expanded).toContain("capital goods");
+      expect(expanded).toContain("opportunity cost");
+      expect(expanded).toContain("finite resources");
     });
 
-    it("expands an elasticity question with PED and tax incidence", () => {
+    it("expands an elasticity question with IGCSE 0455 PED & total revenue terms", () => {
       const query =
         "Assess the usefulness of price elasticity of demand to a business setting prices.";
       const expanded = expandEconomicQuery(query);
       expect(expanded).toContain("price elasticity of demand");
-      expect(expanded).toContain("tax incidence");
-      expect(expanded).toContain("total revenue test");
+      expect(expanded).toContain("total revenue");
+      expect(expanded).toContain("inelastic demand");
     });
 
     it("leaves unrelated non-economic queries unexpanded", () => {

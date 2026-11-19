@@ -259,8 +259,8 @@ export function getShadedPolygons(
         { q, p: pc },
         { q, p: pp },
       ],
-      fillClass: "fill-pink-500/25",
-      strokeClass: "stroke-pink-600/70",
+      fillClass: "fill-violet-500/25",
+      strokeClass: "stroke-violet-600/70",
       areaValue: metrics.taxRevenue,
       description: "Direct tax yield collected by government (box between consumer price and producer price).",
     });
@@ -297,8 +297,8 @@ export function getShadedPolygons(
         { q: qd2, p: pt },
         { q: qd2, p: pw },
       ],
-      fillClass: "fill-pink-500/25",
-      strokeClass: "stroke-pink-600/70",
+      fillClass: "fill-violet-500/25",
+      strokeClass: "stroke-violet-600/70",
       areaValue: metrics.tariffRevenue,
       description: "Revenue collected on imported quantity (Q3 to Q2) at the tariff rate.",
     });
