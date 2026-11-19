@@ -120,8 +120,8 @@ export function DataResponseStudio() {
   // Selected Paper State (default to authentic Feb/March 2026 0455/22 Senegal paper)
   const [selectedPaperId, setSelectedPaperId] = useState<string>("0455_22_2026_fm");
 
-  // Extract View Mode: "text" (Typeset Cambridge insert reference) | "pdf" (Original PDF)
-  const [extractViewMode, setExtractViewMode] = useState<"pdf" | "text">("text");
+  // Extract View Mode: "pdf" (Original PDF - Primary) | "text" (Typeset Cambridge insert reference - Secondary)
+  const [extractViewMode, setExtractViewMode] = useState<"pdf" | "text">("pdf");
   const [pdfModalOpen, setPdfModalOpen] = useState<boolean>(false);
 
   // Answering State (questionId/number -> text)

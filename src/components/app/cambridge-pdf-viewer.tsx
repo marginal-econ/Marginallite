@@ -188,18 +188,13 @@ export function CambridgePdfViewer({
     return () => observer.disconnect();
   }, []);
 
-  // Convert Base64 to Uint8Array and Blob URL
-  const processBase64Data = useCallback(
-    async (base64Data: string, filename: string) => {
+  // Process raw PDF bytes into Blob URL and load into PDF.js Canvas
+  const processBytes = useCallback(
+    async (bytes: Uint8Array, filename: string) => {
+      let createdBlobUrl: string | null = null;
       try {
-        const binaryString = window.atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        const blob = new Blob([bytes], { type: "application/pdf" });
-        const createdBlobUrl = URL.createObjectURL(blob);
+        const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+        createdBlobUrl = URL.createObjectURL(blob);
         setBlobUrl(createdBlobUrl);
         setPdfFilename(filename);
 
@@ -217,51 +212,117 @@ export function CambridgePdfViewer({
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setCurrentPage(1);
+        setViewMode("canvas");
         setLoading(false);
         setError(null);
       } catch (err: any) {
-        console.error("PDF processing error:", err);
-        setError(err.message || "Failed to parse PDF document.");
-        setLoading(false);
+        console.warn("PDF.js canvas init failed, falling back to native iframe viewer:", err);
+        // Fall back gracefully to native iframe embedding so the PDF renders immediately
+        if (createdBlobUrl || pdfUrl) {
+          setViewMode("native");
+          setLoading(false);
+          setError(null);
+        } else {
+          setError(err?.message || "Failed to parse PDF document.");
+          setLoading(false);
+        }
       }
     },
-    []
+    [pdfUrl]
   );
 
-  // Fetch PDF base64 from server or cache
+  // Convert Base64 to Uint8Array and process
+  const processBase64Data = useCallback(
+    async (base64Data: string, filename: string) => {
+      try {
+        const binaryString = window.atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        await processBytes(bytes, filename);
+      } catch (err: any) {
+        console.error("Base64 decoding error:", err);
+        if (pdfUrl) {
+          setViewMode("native");
+          setLoading(false);
+          setError(null);
+        } else {
+          setError("Failed to decode PDF data.");
+          setLoading(false);
+        }
+      }
+    },
+    [processBytes, pdfUrl]
+  );
+
+  // Fetch PDF base64 from server or direct client fetch
   const fetchPdf = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    // Check memory cache first
+    const filename = `${examCode ? examCode.replace(/[\/\\]/g, "_") : paperId}.pdf`;
+
+    // 1. Check memory cache first
     const cached = pdfBase64Cache.get(paperId);
     if (cached) {
       await processBase64Data(cached.base64, cached.filename);
       return;
     }
 
+    // 2. Direct client fetch if pdfUrl is provided (e.g. /papers/0455_22_2026_fm.pdf)
+    if (pdfUrl) {
+      try {
+        const directUrl =
+          pdfUrl.startsWith("/") && typeof window !== "undefined"
+            ? `${window.location.origin}${pdfUrl}`
+            : pdfUrl;
+        const res = await fetch(directUrl);
+        if (res.ok) {
+          const arrayBuffer = await res.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          await processBytes(bytes, filename);
+          return;
+        }
+      } catch (clientErr) {
+        console.warn("Direct client PDF fetch failed, falling back to server proxy:", clientErr);
+      }
+    }
+
+    // 3. Fallback to server proxy function getPaperPdfBase64
     try {
       const res = await getPaperPdfBase64({ data: { paperId } });
-      if (!res || !res.base64) {
-        throw new Error("Server returned empty PDF data.");
+      if (res && res.base64) {
+        pdfBase64Cache.set(paperId, {
+          base64: res.base64,
+          filename: res.filename || filename,
+        });
+
+        await processBase64Data(res.base64, res.filename || filename);
+        return;
       }
-
-      pdfBase64Cache.set(paperId, {
-        base64: res.base64,
-        filename: res.filename || `${paperId}.pdf`,
-      });
-
-      await processBase64Data(res.base64, res.filename || `${paperId}.pdf`);
     } catch (err: any) {
-      console.warn("Server PDF fetch failed, fallback to direct link:", err);
-      setError(
-        "Could not load PDF directly into viewer. You can open the authentic past paper in a new tab."
-      );
-      setLoading(false);
+      console.warn("Server PDF fetch failed:", err);
     }
-  }, [paperId, processBase64Data]);
 
-  // Trigger fetch when paperId changes
+    // 4. If arrayBuffer/Base64 processing failed, but a valid pdfUrl exists:
+    // Render native iframe directly using the URL
+    if (pdfUrl) {
+      setPdfFilename(filename);
+      setViewMode("native");
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    // 5. Ultimate fallback if PDF data could not be reached
+    setError(
+      "Could not load PDF directly into viewer. You can open the authentic past paper in a new tab."
+    );
+    setLoading(false);
+  }, [paperId, pdfUrl, examCode, processBase64Data, processBytes]);
+
+  // Trigger fetch when paperId or pdfUrl changes
   useEffect(() => {
     fetchPdf();
 
@@ -270,7 +331,7 @@ export function CambridgePdfViewer({
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [paperId]);
+  }, [paperId, pdfUrl]);
 
   const handleDownload = () => {
     if (blobUrl) {
@@ -407,7 +468,7 @@ export function CambridgePdfViewer({
                 className={cn(
                   "h-7 px-2.5 text-xs font-bold gap-1 transition-all",
                   currentPage < numPages
-                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+                    ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
                     : "opacity-50"
                 )}
                 title="Go to Next Page (Arrow Right or Down)"
@@ -493,7 +554,7 @@ export function CambridgePdfViewer({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-1 ml-auto">
-          {blobUrl && (
+          {(blobUrl || pdfUrl) && (
             <div className="hidden lg:flex items-center gap-0.5 bg-background/90 p-0.5 rounded-lg border border-border/60">
               <Button
                 type="button"
@@ -675,7 +736,7 @@ export function CambridgePdfViewer({
                 variant="default"
                 size="sm"
                 onClick={goToNextPage}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full p-0 bg-rose-600 hover:bg-rose-700 text-white shadow-md border-rose-500 backdrop-blur-sm hidden sm:flex items-center justify-center hover:scale-105 transition-all"
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full p-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md border-primary/40 backdrop-blur-sm hidden sm:flex items-center justify-center hover:scale-105 transition-all"
                 title={`Next Page (Page ${currentPage + 1})`}
               >
                 <ChevronRight className="h-5 w-5" />
@@ -721,7 +782,7 @@ export function CambridgePdfViewer({
               className={cn(
                 "h-8 px-3 text-xs font-bold gap-1.5 transition-all",
                 currentPage < numPages
-                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+                  ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
                   : "opacity-50"
               )}
             >
@@ -732,9 +793,9 @@ export function CambridgePdfViewer({
         )}
 
         {/* NATIVE BROWSER PDF FRAME */}
-        {!loading && !error && viewMode === "native" && blobUrl && (
+        {!loading && !error && viewMode === "native" && (blobUrl || pdfUrl) && (
           <iframe
-            src={blobUrl}
+            src={blobUrl || pdfUrl}
             className="w-full h-full border-0 bg-white dark:bg-zinc-950"
             title={`${paperTitle} - Native PDF Viewer`}
           />
