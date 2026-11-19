@@ -197,7 +197,7 @@ ${CLICHE_BAN}
 
 export const getReviewPanel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         force: z.boolean().optional(),

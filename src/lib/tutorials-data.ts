@@ -272,7 +272,7 @@ export const FEATURE_TUTORIALS: FeatureTutorial[] = [
     summary:
       "Generate Cambridge IGCSE 0455 Level 3 (Top Band) distinction-grade exemplar essays on demand. Learn how top students structure chains of analysis, incorporate diagrams, and execute nuanced evaluations.",
     whatItDoes: [
-      "Select syllabus level: IGCSE 0455 (8 or 12 marks) or IGCSE Level (20 marks)",
+      "Select syllabus level: Cambridge IGCSE 0455 (2, 4, 6, or 8 marks)",
       "Choose from popular past paper topics or enter any custom prompt",
       "Generates clear, step-by-step PEEL / KAA paragraph architectures",
       "Includes diagram descriptions and explicit labeling references for exam scripts",
@@ -287,9 +287,9 @@ export const FEATURE_TUTORIALS: FeatureTutorial[] = [
         step: 1,
         title: "Set Syllabus Level & Mark Tariff",
         description:
-          "Select IGCSE 0455 (Paper 2) or IGCSE Level (Paper 2), and specify the mark allocation (8 marks, 12 marks, or 20 marks). The generator applies the exact Cambridge weighting for that paper.",
+          "Select Cambridge IGCSE 0455 (Paper 2), and specify the mark allocation (2 marks, 4 marks, 6 marks, or 8 marks). The generator applies the exact Cambridge weighting for that paper.",
         proTip:
-          "8-mark essays require pure analysis (AO1, AO2, AO3) with NO evaluation, whereas 12m and 20m essays require substantive evaluation (AO4).",
+          "6-mark essays require pure analysis (AO2) with NO evaluation, whereas 8-mark discussion essays require substantive, balanced two-sided evaluation (AO3).",
         badge: "Setup",
       },
       {

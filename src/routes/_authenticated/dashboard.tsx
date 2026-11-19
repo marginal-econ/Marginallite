@@ -892,7 +892,7 @@ export function DashboardPage() {
               to="/response-structure"
               icon={GraduationCap}
               title="How to Write an Essay"
-              badge="8, 12 & 20 Marks"
+              badge="2, 4, 6 & 8 Marks"
               description="Cambridge class-taught layout for 2m, 4m, 6m, and 8m IGCSE questions with chains of analysis and justified evaluation."
             />
             <QuickActionCard

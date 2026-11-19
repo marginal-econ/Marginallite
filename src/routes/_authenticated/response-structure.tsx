@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/response-structure")({
       {
         name: "description",
         content:
-          "Master the class-taught Cambridge IGCSE 0455 essay structures for 8-mark, 12-mark, and 20-mark questions with knowledge setup, analysis chains, and justified evaluation.",
+          "Master the class-taught Cambridge IGCSE 0455 response structures for 2-mark, 4-mark, 6-mark, and 8-mark questions with knowledge setup, analysis chains, and justified evaluation.",
       },
       {
         property: "og:title",
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_authenticated/response-structure")({
       {
         property: "og:description",
         content:
-          "Step-by-step layouts and examiner guidance for 8m, 12m, and 20m Cambridge IGCSE 0455 Economics essays.",
+          "Step-by-step layouts and examiner guidance for 2m, 4m, 6m, and 8m Cambridge IGCSE 0455 Economics structured questions.",
       },
     ],
   }),
@@ -46,7 +46,7 @@ export const Route = createFileRoute("/_authenticated/response-structure")({
 });
 
 function ResponseStructurePage() {
-  const [selectedTariff, setSelectedTariff] = useState<"all" | "8" | "12" | "20">("all");
+  const [selectedTariff, setSelectedTariff] = useState<"all" | "2" | "4" | "6" | "8">("all");
   const guides = Object.values(STRUCTURE_GUIDANCE).sort((a, b) => a.tariff - b.tariff);
 
   const displayedGuides = selectedTariff === "all"
@@ -70,14 +70,14 @@ function ResponseStructurePage() {
                 Cambridge IGCSE 0455 Standard
               </Badge>
               <Badge variant="outline" className="text-xs font-semibold text-muted-foreground">
-                8m · 12m · 20m Tariffs
+                2m · 4m · 6m · 8m Tariffs
               </Badge>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
               Master the Structure That Cambridge Examiners Reward
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Examiners award top-band marks to candidates who build clear chains of analytical reasoning and justified evaluation. Use these class-taught templates to structure your responses for any tariff.
+              Examiners award top-band marks to candidates who build clear chains of analytical reasoning and justified evaluation. Use these class-taught templates to structure your responses for any 0455 tariff.
             </p>
           </div>
 
@@ -110,7 +110,40 @@ function ResponseStructurePage() {
             onClick={() => setSelectedTariff("all")}
             className="text-xs font-semibold h-8"
           >
-            All Tariffs (3)
+            All Tariffs ({guides.length})
+          </Button>
+          <Button
+            variant={selectedTariff === "2" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("2")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "2" ? "bg-primary text-primary-foreground" : ""
+            )}
+          >
+            2 Marks · State / Define
+          </Button>
+          <Button
+            variant={selectedTariff === "4" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("4")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "4" ? "bg-primary text-primary-foreground" : ""
+            )}
+          >
+            4 Marks · Explain
+          </Button>
+          <Button
+            variant={selectedTariff === "6" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedTariff("6")}
+            className={cn(
+              "text-xs font-semibold h-8",
+              selectedTariff === "6" ? "bg-primary text-primary-foreground" : ""
+            )}
+          >
+            6 Marks · Analyse
           </Button>
           <Button
             variant={selectedTariff === "8" ? "default" : "outline"}
@@ -118,32 +151,10 @@ function ResponseStructurePage() {
             onClick={() => setSelectedTariff("8")}
             className={cn(
               "text-xs font-semibold h-8",
-              selectedTariff === "8" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
+              selectedTariff === "8" ? "bg-primary text-primary-foreground" : ""
             )}
           >
-            8 Marks · IGCSE 0455
-          </Button>
-          <Button
-            variant={selectedTariff === "12" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedTariff("12")}
-            className={cn(
-              "text-xs font-semibold h-8",
-              selectedTariff === "12" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""
-            )}
-          >
-            12 Marks · AS Evaluative
-          </Button>
-          <Button
-            variant={selectedTariff === "20" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedTariff("20")}
-            className={cn(
-              "text-xs font-semibold h-8",
-              selectedTariff === "20" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""
-            )}
-          >
-            20 Marks · IGCSE 0455 (Paper 2)
+            8 Marks · Discuss
           </Button>
         </div>
       </div>
@@ -220,8 +231,21 @@ function ResponseStructurePage() {
 }
 
 function StructureCard({ guide }: { guide: StructureGuidance }) {
-  const is8 = guide.tariff === 8;
-  const is12 = guide.tariff === 12;
+  const getTariffBadge = (tariff: number) => {
+    switch (tariff) {
+      case 2:
+        return { color: "bg-sky-600 text-white", label: "0455 Part (a) · State / Define" };
+      case 4:
+        return { color: "bg-teal-600 text-white", label: "0455 Part (b) · Explain" };
+      case 6:
+        return { color: "bg-indigo-600 text-white", label: "0455 Part (c) · Analyse (Pure AO2)" };
+      case 8:
+      default:
+        return { color: "bg-emerald-600 text-white", label: "0455 Part (d) · Discuss (AO1/AO2/AO3)" };
+    }
+  };
+
+  const badgeInfo = getTariffBadge(guide.tariff);
 
   return (
     <Card className="border border-border/80 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -230,17 +254,13 @@ function StructureCard({ guide }: { guide: StructureGuidance }) {
           <Badge
             className={cn(
               "font-bold text-xs font-mono",
-              is8
-                ? "bg-emerald-600 text-white"
-                : is12
-                ? "bg-indigo-600 text-white"
-                : "bg-amber-600 text-white"
+              badgeInfo.color
             )}
           >
             {guide.tariff} Marks
           </Badge>
           <span className="text-[11px] font-mono font-semibold text-muted-foreground uppercase">
-            {is8 ? "AS Section B" : is12 ? "AS Evaluative Essay" : "IGCSE 0455 Paper 2 Section B/C"}
+            {badgeInfo.label}
           </span>
         </div>
 

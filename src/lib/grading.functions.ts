@@ -36,7 +36,7 @@ const GradeInput = z.object({
  */
 export const gradeEssaySubmission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => GradeInput.parse(unwrapData(input)))
+  .validator((input: unknown) => GradeInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -240,7 +240,7 @@ export const listMyEssays = createServerFn({ method: "GET" })
 
 export const getEssayThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ essayId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
@@ -351,7 +351,7 @@ export const getProgress = createServerFn({ method: "GET" })
 /** Proactively check if a question matches verified Cambridge Knowledge Base materials */
 export const checkQuestionGrounding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ question: z.string().trim().max(2000) }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {

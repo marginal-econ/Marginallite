@@ -294,7 +294,7 @@ export function CommandPalette({
         iconColor: "text-rose-500",
         badge: "Past Papers",
         badgeTone: "border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/10",
-        keywords: ["question bank", "past questions", "8 mark", "12 mark", "20 mark", "browse questions"],
+        keywords: ["question bank", "past questions", "2 mark", "4 mark", "6 mark", "8 mark", "browse questions"],
         onSelect: () => {
           navigate({ to: "/question-bank" });
           onOpenChange(false);

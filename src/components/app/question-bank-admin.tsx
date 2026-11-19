@@ -783,9 +783,10 @@ function EssayReviewRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="2">2 marks</SelectItem>
+              <SelectItem value="4">4 marks</SelectItem>
+              <SelectItem value="6">6 marks</SelectItem>
               <SelectItem value="8">8 marks</SelectItem>
-              <SelectItem value="12">12 marks</SelectItem>
-              <SelectItem value="20">20 marks</SelectItem>
             </SelectContent>
           </Select>
           <Button

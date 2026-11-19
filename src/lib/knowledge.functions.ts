@@ -82,7 +82,7 @@ const IngestInput = z.object({
  */
 export const ingestDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => IngestInput.parse(unwrapData(input)))
+  .validator((input: unknown) => IngestInput.parse(unwrapData(input)))
   .handler(async ({ data, context }) => {
     await assertKnowledgeStaff(context);
     const { userId } = context;
@@ -198,7 +198,7 @@ export const listEmbeddingProviderOptions = createServerFn({ method: "GET" })
 /** Embed the next slice of a document's chunks. Call until `done` is true. */
 export const embedNextBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => {
+  .validator((input: unknown) => {
     const raw = (input && typeof input === "object" && "data" in input ? (input as any).data : input) as any;
     const documentId = raw?.documentId || raw?.id;
     if (!documentId || typeof documentId !== "string") {
@@ -307,7 +307,7 @@ export const listDocuments = createServerFn({ method: "GET" })
 
 export const deleteDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => {
+  .validator((input: unknown) => {
     if (typeof input === "string") return input;
     if (input && typeof input === "object") {
       const obj = input as any;
@@ -355,7 +355,7 @@ export const reembedAllDocuments = createServerFn({ method: "POST" })
 
 export const searchKnowledge = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ query: z.string().trim().min(2).max(500) }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {

@@ -2874,9 +2874,10 @@ function ClassworkTab({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-card border-border text-foreground">
-                              <SelectItem value="8">8 Marks (AS Part a)</SelectItem>
-                              <SelectItem value="12">12 Marks (AS Part b / Evaluate)</SelectItem>
-                              <SelectItem value="20">20 Marks (Full Section B/C Essay)</SelectItem>
+                              <SelectItem value="2">2 Marks (Part a / Identify)</SelectItem>
+                              <SelectItem value="4">4 Marks (Part b / Explain)</SelectItem>
+                              <SelectItem value="6">6 Marks (Part c / Analyse)</SelectItem>
+                              <SelectItem value="8">8 Marks (Part d / Discuss)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -5049,7 +5050,7 @@ function GradesTab({ classroom }: { classroom: Classroom }) {
                   {rec.suggestedAssignment && (
                     <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-800/40 space-y-2">
                       <div className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">
-                        Suggested Targeted Homework Question [12 Marks]:
+                        Suggested Targeted Homework Question [8 Marks]:
                       </div>
                       <p className="text-xs text-foreground italic font-medium">
                         "{rec.suggestedAssignment.question}"

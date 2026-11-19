@@ -115,12 +115,12 @@ export async function coachPoint(
     ao: AoTarget;
     question: string;
     pointText: string;
-    /** Question tariff the point belongs to (8 or 12 mark). */
+    /** Question tariff the point belongs to (4, 6, or 8 mark). */
     maxMark?: number;
   },
 ): Promise<CoachOutcome> {
   const brief = AO_BRIEF[options.ao];
-  const split = defaultSplitForMaxMark(options.maxMark ?? 12);
+  const split = defaultSplitForMaxMark(options.maxMark ?? 8);
   const maxMarks = { ao1: split.ao1_marks, ao2: split.ao2_marks, ao3: split.ao3_marks }[options.ao];
 
   // Mandatory, same as response grading — a retrieval

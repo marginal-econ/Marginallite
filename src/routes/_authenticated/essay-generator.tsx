@@ -88,7 +88,7 @@ function EssayGeneratorPage() {
   const [level, setLevel] = useState<"as" | "a2">("as");
   const [topic, setTopic] = useState("Government microeconomic intervention");
   const [question, setQuestion] = useState("");
-  const [maxMark, setMaxMark] = useState(12);
+  const [maxMark, setMaxMark] = useState(8);
   const [savedEssay, setSavedEssay] = useState<GeneratedEssay | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -164,7 +164,7 @@ function EssayGeneratorPage() {
           setLevel(draft.level);
           setTopic(draft.topic);
           setQuestion(draft.question);
-          setMaxMark(MARKS.includes(draft.maxMark) ? draft.maxMark : 12);
+          setMaxMark(MARKS.includes(draft.maxMark) ? draft.maxMark : 8);
           setQuestionSource(draft.questionSource);
           setBankTopicFilter(draft.bankTopicFilter);
           setSavedEssay(draft.essay);
@@ -359,7 +359,7 @@ function EssayGeneratorPage() {
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               rows={6}
-              placeholder="Paste the exact question, e.g. 'Assess whether an indirect tax is the best way to reduce consumption of a demerit good. [12]'"
+              placeholder="Paste the exact Cambridge 0455 question, e.g. 'Discuss whether or not an indirect tax is the best way to reduce consumption of a demerit good. [8]'"
             />
           </div>
 

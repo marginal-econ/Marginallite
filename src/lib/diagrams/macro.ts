@@ -164,7 +164,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-as-equilibrium", "keynesian-lras", "multiplier-effect"],
     examQuestions: [
       "Explain, using an AD/AS diagram, how a cut in income tax may cause demand-pull inflation. [8]",
-      "Discuss whether an increase in aggregate demand always increases real output. [12]",
+      "Discuss whether an increase in aggregate demand always increases real output. [8]",
     ],
   },
   {

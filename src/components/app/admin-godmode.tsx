@@ -1786,9 +1786,10 @@ function FailedEssaysTab() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="2" className="text-xs">2 Marks</SelectItem>
+                    <SelectItem value="4" className="text-xs">4 Marks</SelectItem>
+                    <SelectItem value="6" className="text-xs">6 Marks</SelectItem>
                     <SelectItem value="8" className="text-xs">8 Marks</SelectItem>
-                    <SelectItem value="12" className="text-xs">12 Marks</SelectItem>
-                    <SelectItem value="20" className="text-xs">20 Marks</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
