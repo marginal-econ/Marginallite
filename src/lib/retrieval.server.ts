@@ -299,6 +299,18 @@ export function deduplicateSources(sources: GroundingSource[]): GroundingSource[
   return result;
 }
 
+export function sanitizeDocTitle(title: string): string {
+  if (!title) return "Cambridge 0455 Economics Resource";
+  return title
+    .replace(/\bCambridge\s+(?:International\s+)?(?:AS(?:\/A)?|A[\s-]?Level)\s+Economics\s*\(?9708\)?/gi, "Cambridge IGCSE Economics (0455)")
+    .replace(/\b(?:Cambridge\s+(?:International\s+)?)?AS(?:\/A)?\s+Level\s+Economics/gi, "Cambridge IGCSE Economics")
+    .replace(/\bAS(?:\/A)?\s+Level\b/gi, "Cambridge IGCSE 0455")
+    .replace(/\bA-Level\b/gi, "Cambridge IGCSE 0455")
+    .replace(/\b9708\b/g, "0455")
+    .replace(/\bAS\b(?=\s+ref|\s+foundations|\s+economics)/gi, "IGCSE 0455")
+    .trim();
+}
+
 /**
  * Lexical keyword retrieval directly against document_chunks and knowledge_documents.
  * Used when vector embeddings are not yet generated, or when vector search returns 0 matches.
@@ -365,13 +377,14 @@ export async function lexicalFallback(
       const doc = Array.isArray(chunk.knowledge_documents)
         ? chunk.knowledge_documents[0]
         : chunk.knowledge_documents;
-      const docTitle = doc?.title || "Cambridge Economics Resource";
+      const rawDocTitle = doc?.title || "Cambridge 0455 Economics Resource";
+      const docTitle = sanitizeDocTitle(rawDocTitle);
       const docType = (doc?.doc_type || "notes") as DocType;
 
       const score = computeLexicalScore(
         {
           content: chunk.content,
-          heading: chunk.heading,
+          heading: chunk.heading ? sanitizeDocTitle(chunk.heading) : null,
           document_title: docTitle,
         },
         termsToQuery,
@@ -381,7 +394,7 @@ export async function lexicalFallback(
         documentId: chunk.document_id,
         documentTitle: docTitle,
         docType,
-        heading: chunk.heading,
+        heading: chunk.heading ? sanitizeDocTitle(chunk.heading) : null,
         snippet: chunk.content,
         similarity: Math.min(0.92, 0.55 + score * 0.04),
         score,
@@ -471,9 +484,9 @@ export async function retrieve(
 
   const mapped = finalRows.map((row) => ({
     documentId: row.document_id,
-    documentTitle: row.document_title,
+    documentTitle: sanitizeDocTitle(row.document_title),
     docType: row.doc_type,
-    heading: row.heading,
+    heading: row.heading ? sanitizeDocTitle(row.heading) : null,
     snippet: row.content,
     similarity: Number(row.similarity.toFixed(4)),
   }));
@@ -499,8 +512,8 @@ export function renderContext(sources: GroundingSource[]): string {
   const blocks = sources.map((source, index) => {
     const isReference =
       source.documentTitle.toLowerCase().includes("reference") ||
-      source.documentTitle.toLowerCase().includes("as level") ||
-      (source.heading && source.heading.toLowerCase().includes("as ref"));
+      source.documentTitle.toLowerCase().includes("core") ||
+      (source.heading && source.heading.toLowerCase().includes("ref"));
     const label = source.heading
       ? `${source.documentTitle} — ${source.heading}`
       : source.documentTitle;
@@ -513,7 +526,7 @@ export function renderContext(sources: GroundingSource[]): string {
   return [
     "RETRIEVED CAMBRIDGE SOURCE MATERIAL — this is the authoritative material for this assessment.",
     "Cite the sources you use with their [S#] markers.",
-    "NOTE ON REFERENCE SOURCES: Any source tagged [REFERENCE ONLY] (such as AS Level foundational chapters) provides theoretical depth and economic reasoning structure. Do NOT penalise an IGCSE candidate if higher-level AS concepts or advanced formalisms are not mentioned; evaluate the candidate strictly by Cambridge IGCSE 0455 standards.",
+    "NOTE ON REFERENCE SOURCES: Any source tagged [REFERENCE ONLY] provides theoretical depth and economic reasoning structure. Do NOT penalise an IGCSE candidate if advanced formalisms are not mentioned; evaluate the candidate strictly by Cambridge IGCSE 0455 standards.",
     "If the material below does not cover something, say so plainly rather than inventing syllabus content, mark scheme wording, or examiner report claims.",
     "",
     blocks.join("\n\n"),

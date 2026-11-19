@@ -311,7 +311,7 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
         <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300 shadow-xs">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
           <span>
-            <strong>Grounded in Knowledge Base:</strong> Verified against {sources.length} Cambridge IGCSE 0455 syllabus source{sources.length === 1 ? "" : "s"}{sources.length > 0 ? ` (${Math.round((sources[0]?.similarity ?? 0.85) * 100)}% match on ${sources[0]?.documentTitle || "Cambridge 0455 Syllabus"}).` : "."}
+            <strong>Grounded in Knowledge Base:</strong> Verified against {sources.length} Cambridge IGCSE 0455 syllabus source{sources.length === 1 ? "" : "s"}{sources.length > 0 ? ` (${Math.round((sources[0]?.similarity ?? 0.85) * 100)}% match on ${(sources[0]?.documentTitle || "Cambridge 0455 Syllabus").replace(/\bAS(?:\/A)?\s+Level\b/gi, "Cambridge IGCSE 0455").replace(/\b9708\b/g, "0455")}).` : "."}
           </span>
         </div>
       )}

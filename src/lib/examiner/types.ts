@@ -126,11 +126,13 @@ export function sanitizeIgcseFeedbackText(value: unknown): string {
   let s = stripInternalSnippetCitations(stripScoreFractionsFromText(value));
   s = s
     .replace(/\bCambridge\s+(?:International\s+)?(?:AS(?:\/A)?|A[\s-]?Level)\s+Economics\s*\(?9708\)?/gi, "Cambridge IGCSE Economics (0455)")
+    .replace(/\b(?:AS|A2|A)[- ]?Level(?:\s+Economics)?\b/gi, "Cambridge IGCSE 0455")
     .replace(/\b9708\b/g, "0455")
     .replace(/\bPaper\s*4[123]?\b/gi, "Paper 2")
     .replace(/\bPaper\s*3[123]?\b/gi, "Paper 1")
-    .replace(/\b(?:AS\s+Level|A2\s+Level|A-Level|A\s+Level)\b/gi, "IGCSE 0455")
-    .replace(/\bAO4\b/gi, "AO3");
+    .replace(/\bAO4\b/gi, "AO3")
+    .replace(/\b(?:Colin\s+)?Bamford\s*(?:&|and)?\s*(?:Susan\s+)?Grant\b/gi, "Cambridge 0455 Syllabus")
+    .replace(/\bHodder\s+Education\b/gi, "Cambridge Assessment");
   return cleanStars(s);
 }
 
