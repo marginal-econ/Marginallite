@@ -56,6 +56,31 @@ export function GoogleSignInButton({
     setLoading(true);
 
     try {
+      // Pre-check if Google provider is enabled in Supabase settings
+      // to avoid landing on an unhandled Supabase 400 JSON error page
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+        const apiKey = import.meta.env.VITE_BACKEND_PUBLISHABLE_KEY;
+        if (backendUrl && apiKey) {
+          const res = await fetch(`${backendUrl}/auth/v1/settings`, {
+            headers: { apikey: apiKey },
+          });
+          if (res.ok) {
+            const settings = await res.json();
+            if (settings?.external?.google === false) {
+              toast.error(
+                "Google Sign-In is not enabled in your Supabase project yet. Please sign in or sign up with Email & Password below (instant, zero verification required).",
+                { duration: 7000 }
+              );
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Continue if settings preflight request is blocked or offline
+      }
+
       const origin =
         typeof window !== "undefined" && window.location.origin
           ? window.location.origin
