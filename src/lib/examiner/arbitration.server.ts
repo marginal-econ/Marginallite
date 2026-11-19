@@ -248,6 +248,21 @@ export function synthesizeDualPasses(
     confidence: computeObjectiveConfidence(pass1, pass2, false),
     audited: true,
     arbitrated: false,
+    table_a_breakdown: (() => {
+      const base = pass2.table_a_breakdown ?? pass1.table_a_breakdown;
+      if (!base) return undefined;
+      const level =
+        total >= 6 ? "Level 3" : total >= 3 ? "Level 2" : total >= 1 ? "Level 1" : "Level 0";
+      const level_mark_range =
+        level === "Level 3" ? "6–8 marks" : level === "Level 2" ? "3–5 marks" : level === "Level 1" ? "1–2 marks" : "0 marks";
+      return {
+        ...base,
+        level,
+        level_mark_range,
+        knowledge_setup_awarded: Math.min(2, ao1),
+        discussion_awarded: Math.min(6, ao2 + ao3),
+      };
+    })(),
   };
 
   const purged = purgeContradictions(merged);

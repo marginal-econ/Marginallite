@@ -45,10 +45,35 @@ export type MechanismValidation = {
   error_evidence_quotes: string[];
 };
 
+export type EvaluativeConclusionStatus = "substantiated" | "generic_summary" | "missing";
+
+export type EvaluativeConclusionAudit = {
+  status: EvaluativeConclusionStatus;
+  marks_withheld: number;
+  withhold_reason?: string;
+  verdict_found: boolean;
+  criteria_used?: string[];
+};
+
+export type TableALevel = "Level 3" | "Level 2" | "Level 1" | "Level 0";
+
+export type TableABreakdown = {
+  level: TableALevel;
+  level_mark_range: string;
+  two_sided_balance: "balanced" | "one_sided" | "undeveloped";
+  side1_arguments?: string[];
+  side2_arguments?: string[];
+  one_sided_cap_applied: boolean;
+  evaluative_conclusion_audit: EvaluativeConclusionAudit;
+  knowledge_setup_awarded: number;
+  discussion_awarded: number;
+};
+
 export type Grading = {
   total_mark: number;
   max_mark: number;
   band: string;
+  table_a_breakdown?: TableABreakdown;
   mechanism_validation?: MechanismValidation;
   points?: CreditPoint[];
   missed_ms_points?: string[];
@@ -395,22 +420,144 @@ export function normaliseGrading(
   finalMark = Math.max(0, Math.min(maxMark, finalMark));
 
   // Deterministic Cambridge IGCSE 0455 Level & Table Caps:
-  // 1. On 8-mark Discuss questions: Cambridge Table A strictly caps one-sided responses in Level 2 (max 5/8).
+  let table_a_breakdown: TableABreakdown | undefined;
+
+  // 1. On 8-mark Discuss questions: Cambridge Table A strictly caps one-sided responses in Level 2 (max 5/8)
+  // and enforces the Evaluative Conclusion Withhold Rule (withholding 1 mark if conclusion is omitted or generic).
   if (maxMark === 8 && split.ao3_marks > 0) {
     const diagText = `${raw.examiner_summary || ""} ${analysis.comment || ""} ${evaluation.comment || ""} ${(Array.isArray(raw.weaknesses) ? raw.weaknesses : []).join(" ")}`;
     const isOneSided = /\b(one[- ]sided\b|only\s+(?:discusses|considers|analyses|looks\s+at)\s+(?:one\s+side|why|benefits|drawbacks)|lacks?\s+(?:a\s+)?counter[- ]argument|no\s+counter[- ]argument|fails?\s+to\s+(?:discuss|analyse|examine)\s+(?:the\s+other\s+side|both\s+sides|drawbacks|why\s+not))\b/i.test(diagText);
-    if (isOneSided && finalMark > 5) {
-      finalMark = 5;
-      if (evaluation.awarded > 1) evaluation.awarded = 1;
-      if (knowledge.awarded + analysis.awarded + evaluation.awarded > 5) {
-        analysis.awarded = Math.max(0, 5 - knowledge.awarded - evaluation.awarded);
+
+    // Scan essay text for conclusion and evaluative criteria
+    const rawEssay = typeof essayText === "string" ? essayText : "";
+    const conclusionMatch = rawEssay.match(
+      /(?:^|\n|\.\s+)(?:#{1,4}\s*conclusion|in\s+conclusion|to\s+conclude|overall,|ultimately,|on\s+balance,|in\s+summary,|to\s+summarise,|to\s+sum\s+up|in\s+the\s+final\s+analysis|taking\s+everything\s+into\s+account|therefore,\s+(?:whether|overall|in\s+the\s+end))([\s\S]*)$/i,
+    );
+    const conclusionSnippet = conclusionMatch ? conclusionMatch[0].trim() : "";
+
+    const criteriaUsed: string[] = [];
+    const textToScanForCriteria = `${conclusionSnippet} ${evaluation.comment || ""}`;
+    if (/\b(short[- ]run|long[- ]run|time\s*lag|short\s*term|long\s*term|over\s*time)\b/i.test(textToScanForCriteria)) {
+      criteriaUsed.push("Short-run vs long-run time horizon");
+    }
+    if (/\b(magnitude|scale|extent|degree|significance|how\s*much|size\s*of)\b/i.test(textToScanForCriteria)) {
+      criteriaUsed.push("Magnitude and scale of impact");
+    }
+    if (/\b(ped|pes|elastic|inelastic|price\s*elasticity)\b/i.test(textToScanForCriteria)) {
+      criteriaUsed.push("Price elasticity of demand / supply");
+    }
+    if (/\b(depends\s*on|conditional|government\s*budget|opportunity\s*cost|stakeholder|priority|provided\s*that)\b/i.test(textToScanForCriteria)) {
+      criteriaUsed.push("Policy dependency and contextual trade-offs");
+    }
+
+    const diagClaimsNoConclusion = /\b(no\s+conclusion|lacks?\s+a?\s*conclusion|missing\s+a?\s*conclusion|omitted\s+a?\s*conclusion|without\s+a?\s*conclusion|fails?\s+to\s+provide\s+a\s+conclusion|no\s+final\s+(?:evaluative\s+)?judg?ment)\b/i.test(diagText);
+    const diagClaimsWeakConclusion = /\b(conclusion\s+is\s+(?:brief|generic|descriptive|weak|light|merely\s+summaris|simplistic)|lacks?\s+(?:a\s+)?strong\s+evaluative\s+judg?ment|unsubstantiated\s+conclusion|superficial\s+conclusion)\b/i.test(diagText);
+
+    let conclusionStatus: EvaluativeConclusionStatus = "missing";
+    let marksWithheld = 0;
+    let withholdReason: string | undefined;
+    let verdictFound = false;
+
+    const hasCandidateText = rawEssay.trim().length > 0;
+    if (hasCandidateText) {
+      if (conclusionSnippet.length > 0 && !diagClaimsNoConclusion) {
+        if (criteriaUsed.length > 0 || (conclusionSnippet.length > 60 && !diagClaimsWeakConclusion)) {
+          conclusionStatus = "substantiated";
+          verdictFound = true;
+          marksWithheld = 0;
+        } else {
+          conclusionStatus = "generic_summary";
+          verdictFound = true;
+          marksWithheld = 1;
+          withholdReason = "Under Cambridge Table A, a conclusion that merely summarises or restates points without weighing conditional economic criteria (e.g. short-run vs long-run, PED, or magnitude) withholds 1 mark from the top mark bracket.";
+        }
+      } else {
+        conclusionStatus = "missing";
+        verdictFound = false;
+        marksWithheld = 1;
+        withholdReason = "Under Cambridge Table A, a reasoned two-sided discussion unlocks Level 3 (6 marks), but achieving 7–8 marks strictly requires a substantiated evaluative conclusion directly answering 'whether or not'. 1 mark withheld (held at Level 3 entry).";
+      }
+    } else {
+      if (diagClaimsNoConclusion) {
+        conclusionStatus = "missing";
+        marksWithheld = 1;
+        withholdReason = "Under Cambridge Table A, a reasoned two-sided discussion unlocks Level 3 (6 marks), but achieving 7–8 marks strictly requires a substantiated evaluative conclusion directly answering 'whether or not'. 1 mark withheld (held at Level 3 entry).";
+      } else if (diagClaimsWeakConclusion) {
+        conclusionStatus = "generic_summary";
+        marksWithheld = 1;
+        withholdReason = "Under Cambridge Table A, a conclusion that merely summarises or restates points without weighing conditional economic criteria withholds 1 mark from the top mark bracket.";
+      } else {
+        conclusionStatus = finalMark >= 7 ? "substantiated" : "missing";
+        marksWithheld = 0;
+        verdictFound = finalMark >= 7;
       }
     }
+
+    // 1. Enforce Evaluative Conclusion Withhold Rule:
+    // If conclusion is missing or generic summary and finalMark is in top bracket (>= 7), withhold mark:
+    if (conclusionStatus === "missing" && finalMark >= 7) {
+      finalMark = 6;
+      if (evaluation.awarded > 1) evaluation.awarded = 1;
+      if (knowledge.awarded + analysis.awarded + evaluation.awarded > 6) {
+        analysis.awarded = Math.max(0, 6 - knowledge.awarded - evaluation.awarded);
+      }
+    } else if (conclusionStatus === "generic_summary" && finalMark === 8) {
+      finalMark = 7;
+      if (evaluation.awarded > 2) evaluation.awarded = 2;
+    }
+
+    // 2. Enforce Table A One-Sided Discussion Cap: strictly Level 2 (max 5/8)
+    let oneSidedCapApplied = false;
+    if (isOneSided) {
+      if (finalMark > 5) {
+        finalMark = 5;
+        oneSidedCapApplied = true;
+        if (evaluation.awarded > 1) evaluation.awarded = 1;
+        if (knowledge.awarded + analysis.awarded + evaluation.awarded > 5) {
+          analysis.awarded = Math.max(0, 5 - knowledge.awarded - evaluation.awarded);
+        }
+      } else {
+        oneSidedCapApplied = true;
+      }
+    }
+
     const evalIsAbsent = /\b(evaluation\s+is\s+(?:absent|missing|non[- ]?existent)|no\s+creditable\s+evaluation|wholly\s+absent\s+evaluation)\b/i.test(diagText);
     if (evalIsAbsent && evaluation.awarded > 0) {
       evaluation.awarded = 0;
       finalMark = Math.min(finalMark, knowledge.awarded + analysis.awarded);
     }
+
+    // Determine Table A Level
+    const level: TableALevel =
+      finalMark >= 6 ? "Level 3" : finalMark >= 3 ? "Level 2" : finalMark >= 1 ? "Level 1" : "Level 0";
+    const levelMarkRange =
+      level === "Level 3" ? "6–8 marks" : level === "Level 2" ? "3–5 marks" : level === "Level 1" ? "1–2 marks" : "0 marks";
+
+    // 2 + 6 Architecture: 2 marks Knowledge setup + 6 marks Discussion (Analysis + Evaluation)
+    const knowledgeSetupAwarded = Math.min(2, knowledge.awarded);
+    const discussionAwarded = Math.min(6, analysis.awarded + evaluation.awarded);
+
+    const rawTableA = (raw.table_a_breakdown ?? {}) as Record<string, unknown>;
+    const side1 = toStringArray(rawTableA.side1_arguments, essayText);
+    const side2 = toStringArray(rawTableA.side2_arguments, essayText);
+
+    table_a_breakdown = {
+      level,
+      level_mark_range: levelMarkRange,
+      two_sided_balance: isOneSided ? "one_sided" : finalMark <= 2 ? "undeveloped" : "balanced",
+      side1_arguments: side1.length > 0 ? side1 : undefined,
+      side2_arguments: side2.length > 0 ? side2 : undefined,
+      one_sided_cap_applied: oneSidedCapApplied,
+      evaluative_conclusion_audit: {
+        status: conclusionStatus,
+        marks_withheld: marksWithheld,
+        withhold_reason: marksWithheld > 0 ? withholdReason : undefined,
+        verdict_found: verdictFound,
+        criteria_used: criteriaUsed,
+      },
+      knowledge_setup_awarded: knowledgeSetupAwarded,
+      discussion_awarded: discussionAwarded,
+    };
   }
 
   // 2. On 6-mark Analyse questions: Cambridge mark schemes strictly enforce a maximum of 3 marks for listing points without causal analysis.
@@ -438,6 +585,7 @@ export function normaliseGrading(
     total_mark: finalMark,
     max_mark: maxMark,
     band: bandFor(finalMark, maxMark),
+    table_a_breakdown,
     mechanism_validation,
     points,
     missed_ms_points: toStringArray(raw.missed_ms_points, essayText),

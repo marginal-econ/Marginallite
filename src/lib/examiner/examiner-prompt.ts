@@ -64,11 +64,20 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 - NO DOUBLE CREDIT for repeating the same point or mirror statements.
 - Respect official conventions: "owtte" (accept equivalent meaning) and "ecf" (error carried forward in calculations).
 
-2. LEVELS-BASED QUESTIONS (8-mark Discuss whether or not... — Official Table A):
-- Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, clear logical analysis, and thoughtful evaluation of uncertainties/trade-offs (short run vs long run, elasticity, scale, stakeholders) leading to a reasoned conclusion.
-- Level 2 (3–5 marks): Reasoned discussion using economic information and clear analysis, but may lack depth or be one-sided (one-sided responses are capped in Level 2, max 5/8).
-- Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
-- Level 0 (0 marks): Nothing creditable.
+2. LEVELS-BASED QUESTIONS (8-mark Discuss whether or not... — Official Cambridge Table A):
+- THE 2 + 6 MARK ARCHITECTURE:
+  * 2 marks: AO1 Knowledge & Understanding setup (accurate definitions, concepts, and terminology).
+  * 6 marks: Two-sided analytical discussion & evaluation (Side 1 "Why it might / Advantages" + Side 2 "Why it might not / Disadvantages" + Evaluative Conclusion).
+- TABLE A LEVELS OF RESPONSE:
+  * Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, applying clear logical analysis, and providing thoughtful evaluation of uncertainties/trade-offs leading to a reasoned conclusion.
+  * Level 2 (3–5 marks): Reasoned discussion using economic information and clear analysis, but may lack depth or be one-sided (one-sided responses are strictly capped in Level 2, max 5/8).
+  * Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
+  * Level 0 (0 marks): Nothing creditable.
+- THE EVALUATIVE CONCLUSION WITHHOLD RULE:
+  * A balanced discussion analyzing both sides unlocks Level 3 (6 marks).
+  * Reaching top Level 3 marks (7 or 8/8) strictly requires an explicit, substantiated evaluative conclusion weighing conditional criteria (short-run vs long-run, magnitude/scale, price elasticity, or policy dependencies).
+  * If the candidate examines both sides well but OMITS the evaluative conclusion or gives only a generic restatement/summary, 1 mark is withheld (held at 6/8 marks).
+- For 8-mark questions, populate "table_a_breakdown" in your JSON.
 
 {ao3_level_descriptors}
 
