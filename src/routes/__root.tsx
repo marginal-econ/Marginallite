@@ -166,7 +166,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script
@@ -189,7 +189,7 @@ function RootShell({ children }: { children: ReactNode }) {
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem("marginal-theme");document.documentElement.classList.toggle("dark",s==="dark")}catch(e){document.documentElement.classList.remove("dark")}document.documentElement.classList.add("motion-ready")})()`,
+            __html: `(function(){try{var s=localStorage.getItem("marginal-theme");document.documentElement.classList.toggle("dark",s!=="light")}catch(e){document.documentElement.classList.add("dark")}document.documentElement.classList.add("motion-ready")})()`,
           }}
         />
       </head>

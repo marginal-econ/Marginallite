@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/app/app-shell";
 import { GradingProgress } from "@/components/app/grading-progress";
 import { MarkBreakdown } from "@/components/app/mark-breakdown";
+import { DiagramCheckDialog } from "@/components/app/diagram-check-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +55,7 @@ export const Route = createFileRoute("/_authenticated/essay/$essayId")({
 
 function EssayPage() {
   const { essayId } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchThread = useServerFn(getEssayThread);
   const grade = useServerFn(gradeEssaySubmission);
@@ -67,6 +69,7 @@ function EssayPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [rewrite, setRewrite] = useState("");
   const [rewriting, setRewriting] = useState(false);
+  const [diagramPromptOpen, setDiagramPromptOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"split" | "report" | "script">("split");
 
   const activeIndex = selected ?? Math.max(versions.length - 1, 0);
@@ -77,6 +80,14 @@ function EssayPage() {
   useEffect(() => {
     if (active && !rewrite) setRewrite(active.essay_text);
   }, [active, rewrite]);
+
+  function handleRewriteGrade(options?: { skipDiagramCheck?: boolean }) {
+    if (!options?.skipDiagramCheck) {
+      setDiagramPromptOpen(true);
+      return;
+    }
+    mutation.mutate();
+  }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -335,7 +346,7 @@ function EssayPage() {
                 </Button>
                 <Button
                   disabled={mutation.isPending || rewrite.trim().length < 20}
-                  onClick={() => mutation.mutate()}
+                  onClick={() => handleRewriteGrade()}
                   className="gap-1.5"
                 >
                   {mutation.isPending ? (
@@ -350,6 +361,24 @@ function EssayPage() {
                 </Button>
               </div>
             </div>
+
+            <DiagramCheckDialog
+              open={diagramPromptOpen}
+              onOpenChange={setDiagramPromptOpen}
+              question={thread.data?.essay.question || ""}
+              essayText={rewrite}
+              onAddDiagram={() => {
+                navigate({
+                  to: "/grade",
+                  search: {
+                    q: thread.data?.essay.question || "",
+                    marks: (maxMark as 2 | 4 | 6 | 8) || 8,
+                  },
+                });
+                toast.info("Opened draft in Essay Grader desk where you can attach your diagram.");
+              }}
+              onProceedAnyway={() => handleRewriteGrade({ skipDiagramCheck: true })}
+            />
 
             {mutation.isPending && (
               <div className="pt-3 border-t border-border/60">

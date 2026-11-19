@@ -1704,17 +1704,24 @@ export function AppShell({
               <div className="hidden xl:block h-4 w-px bg-border/60 shrink-0" />
 
               {/* Top Navigation Menus */}
-              <nav className="flex items-center gap-1 shrink-0">
+              <nav className="flex items-center gap-1 p-1 rounded-xl bg-muted/45 border border-border/60 shadow-2xs backdrop-blur-xs shrink-0">
                 <Link
                   to="/dashboard"
                   className={cn(
-                    "flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer",
+                    "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
                     pathname === "/dashboard"
-                      ? "bg-primary/10 text-primary font-semibold border border-primary/25 shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
+                      ? "bg-background text-primary font-semibold shadow-xs border border-border/80 dark:border-border/60 ring-1 ring-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/60 font-medium",
                   )}
                 >
-                  <LayoutDashboard className="size-3.5 shrink-0 text-primary" />
+                  <LayoutDashboard
+                    className={cn(
+                      "size-3.5 shrink-0 transition-colors",
+                      pathname === "/dashboard"
+                        ? "text-primary"
+                        : "text-muted-foreground/80 group-hover:text-foreground",
+                    )}
+                  />
                   <span>Dashboard</span>
                 </Link>
 
@@ -1722,14 +1729,21 @@ export function AppShell({
                 <Link
                   to="/review"
                   className={cn(
-                    "flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer",
+                    "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
                     pathname.startsWith("/review")
-                      ? "bg-primary/10 text-primary font-semibold border border-primary/25 shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
+                      ? "bg-background text-primary font-semibold shadow-xs border border-border/80 dark:border-border/60 ring-1 ring-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/60 font-medium",
                   )}
                   title="Diagnostics, Assessment Objective Radar & Performance Review"
                 >
-                  <ClipboardCheck className="size-3.5 shrink-0 text-indigo-500" />
+                  <ClipboardCheck
+                    className={cn(
+                      "size-3.5 shrink-0 transition-colors",
+                      pathname.startsWith("/review")
+                        ? "text-primary"
+                        : "text-muted-foreground/80 group-hover:text-foreground",
+                    )}
+                  />
                   <span>Diagnostics &amp; Review</span>
                 </Link>
 
@@ -1740,15 +1754,22 @@ export function AppShell({
                       <button
                         type="button"
                         className={cn(
-                          "group flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer",
+                          "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
                           isPracticeActive
-                            ? "bg-primary/10 text-primary font-semibold border border-primary/25 shadow-2xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
+                            ? "bg-background text-primary font-semibold shadow-xs border border-border/80 dark:border-border/60 ring-1 ring-primary/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-background/60 font-medium group-data-[state=open]:bg-background/70 group-data-[state=open]:text-foreground",
                         )}
                       >
-                        <PenLine className="size-3.5 shrink-0 text-primary" />
+                        <PenLine
+                          className={cn(
+                            "size-3.5 shrink-0 transition-colors",
+                            isPracticeActive
+                              ? "text-primary"
+                              : "text-muted-foreground/80 group-hover:text-foreground",
+                          )}
+                        />
                         <span>Exam Practice</span>
-                        <ChevronDown className="size-3 opacity-50 group-data-[state=open]:rotate-180 transition-transform duration-200 shrink-0" />
+                        <ChevronDown className="size-3 text-muted-foreground/60 group-hover:text-foreground group-data-[state=open]:rotate-180 transition-all duration-200 shrink-0" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-72 p-1.5 z-50 bg-popover/95 backdrop-blur-xl border border-border/80 shadow-xl rounded-xl animate-in fade-in-0 zoom-in-95">
@@ -1756,7 +1777,7 @@ export function AppShell({
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                           Cambridge IGCSE 0455 Practice
                         </span>
-                        <span className="text-[9px] font-mono text-muted-foreground/80">AS &amp; A2 Level</span>
+                        <span className="text-[9px] font-mono text-muted-foreground/80">Paper 1 &amp; 2</span>
                       </div>
                       {practiceGroup.items
                         .filter((item) => item.to !== "/dashboard" && item.to !== "/review")
@@ -1804,15 +1825,22 @@ export function AppShell({
                       <button
                         type="button"
                         className={cn(
-                          "group flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer",
+                          "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
                           isSyllabusActive
-                            ? "bg-primary/10 text-primary font-semibold border border-primary/25 shadow-2xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
+                            ? "bg-background text-primary font-semibold shadow-xs border border-border/80 dark:border-border/60 ring-1 ring-primary/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-background/60 font-medium group-data-[state=open]:bg-background/70 group-data-[state=open]:text-foreground",
                         )}
                       >
-                        <BookOpen className="size-3.5 shrink-0 text-sky-500" />
+                        <BookOpen
+                          className={cn(
+                            "size-3.5 shrink-0 transition-colors",
+                            isSyllabusActive
+                              ? "text-primary"
+                              : "text-muted-foreground/80 group-hover:text-foreground",
+                          )}
+                        />
                         <span>Syllabus Resources</span>
-                        <ChevronDown className="size-3 opacity-50 group-data-[state=open]:rotate-180 transition-transform duration-200 shrink-0" />
+                        <ChevronDown className="size-3 text-muted-foreground/60 group-hover:text-foreground group-data-[state=open]:rotate-180 transition-all duration-200 shrink-0" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-72 p-1.5 z-50 bg-popover/95 backdrop-blur-xl border border-border/80 shadow-xl rounded-xl animate-in fade-in-0 zoom-in-95">
@@ -1858,14 +1886,21 @@ export function AppShell({
                 <Link
                   to="/classes"
                   className={cn(
-                    "flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer",
+                    "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
                     pathname.startsWith("/classes")
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/25 shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
+                      ? "bg-background text-emerald-600 dark:text-emerald-400 font-semibold shadow-xs border border-border/80 dark:border-border/60 ring-1 ring-emerald-500/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/60 font-medium",
                   )}
                   title="Classrooms, Cohorts &amp; Moderation"
                 >
-                  <UsersRound className="size-3.5 shrink-0 text-emerald-500" />
+                  <UsersRound
+                    className={cn(
+                      "size-3.5 shrink-0 transition-colors",
+                      pathname.startsWith("/classes")
+                        ? "text-emerald-500"
+                        : "text-muted-foreground/80 group-hover:text-foreground",
+                    )}
+                  />
                   <span>{classroomLabel}</span>
                 </Link>
 
@@ -1876,18 +1911,18 @@ export function AppShell({
                       <button
                         type="button"
                         className={cn(
-                          "group flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer border shadow-2xs",
-                          pathname.startsWith("/admin")
-                            ? "border-purple-500/40 bg-purple-500/20 text-purple-700 dark:text-purple-300"
-                            : "border-purple-500/25 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/15",
+                          "group relative flex items-center gap-2 h-8 px-3 rounded-lg text-xs transition-all duration-150 cursor-pointer select-none whitespace-nowrap",
+                          isAdminActive
+                            ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold shadow-xs border border-purple-500/30 ring-1 ring-purple-500/20"
+                            : "text-purple-600/80 dark:text-purple-400/80 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-500/10 font-medium group-data-[state=open]:bg-purple-500/15",
                         )}
                       >
                         <ShieldCheck className="size-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                         <span>Administration</span>
-                        <span className="text-[9px] font-mono font-bold px-1 py-0 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300">
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-purple-500/15 border border-purple-500/25 text-purple-700 dark:text-purple-300 shrink-0">
                           Root
                         </span>
-                        <ChevronDown className="size-3 opacity-60 group-data-[state=open]:rotate-180 transition-transform duration-200 shrink-0" />
+                        <ChevronDown className="size-3 text-purple-600/60 group-hover:text-purple-700 group-data-[state=open]:rotate-180 transition-all duration-200 shrink-0" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="w-60 p-1.5 z-50 bg-popover/95 backdrop-blur-xl border border-border/80 shadow-xl rounded-xl animate-in fade-in-0 zoom-in-95">

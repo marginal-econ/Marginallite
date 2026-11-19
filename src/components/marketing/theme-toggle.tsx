@@ -107,19 +107,19 @@ export function ThemeToggle({
         type="button"
         onClick={toggle}
         className={cn(
-          "inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card/60 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/80 transition-all cursor-pointer shadow-2xs shrink-0",
+          "inline-flex items-center gap-2 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/80 transition-all cursor-pointer shadow-xs shrink-0",
           className,
         )}
         aria-label={label}
         title={label}
       >
-        <span className="theme-orb-inline" data-theme={theme ?? "light"}>
+        <span className="theme-orb-inline" data-theme={theme ?? "dark"}>
           <span className="orb-coin" aria-hidden="true">
             <span className="orb-face">
-              <Sun className="size-3.5 text-amber-500" strokeWidth={2.2} />
+              <Sun className="size-4 text-amber-500" strokeWidth={2.2} />
             </span>
             <span className="orb-face orb-face-back">
-              <Moon className="size-3.5 text-primary" strokeWidth={2.2} />
+              <Moon className="size-4 text-purple-600 dark:text-purple-400" strokeWidth={2.2} />
             </span>
           </span>
         </span>
@@ -135,19 +135,19 @@ export function ThemeToggle({
       type="button"
       onClick={toggle}
       className={cn(
-        "theme-orb relative flex items-center justify-center size-8 rounded-lg border border-border/70 bg-card/60 hover:bg-muted/80 text-foreground transition-all cursor-pointer shadow-2xs group shrink-0",
+        "theme-orb relative flex items-center justify-center size-9 sm:size-9.5 rounded-2xl border border-border/80 bg-card/90 hover:bg-muted/80 text-foreground transition-all cursor-pointer shadow-xs hover:shadow-sm hover:border-amber-500/40 dark:hover:border-purple-500/40 group shrink-0",
         className,
       )}
-      data-theme={theme ?? "light"}
+      data-theme={theme ?? "dark"}
       aria-label={label}
       title={label}
     >
       <span className="orb-coin" aria-hidden="true">
         <span className="orb-face">
-          <Sun className="size-3.5 text-amber-500" strokeWidth={2.2} />
+          <Sun className="size-5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.35)] transition-transform duration-200 group-hover:scale-110" strokeWidth={2.2} />
         </span>
         <span className="orb-face orb-face-back">
-          <Moon className="size-3.5 text-primary" strokeWidth={2.2} />
+          <Moon className="size-5 text-purple-600 dark:text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.35)] transition-transform duration-200 group-hover:scale-110" strokeWidth={2.2} />
         </span>
       </span>
       {showLabel && (

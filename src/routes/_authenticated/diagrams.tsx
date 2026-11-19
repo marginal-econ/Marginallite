@@ -58,6 +58,14 @@ function DiagramLibraryPage() {
   const [selectedId, setSelectedId] = useState<string>(() => routeSearch.id ?? BUILT_IN[0]?.id ?? "");
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("marginal_0455_diagram_inspected", "true");
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
     if (routeSearch.id) {
       setSelectedId(routeSearch.id);
       const found = BUILT_IN.find((d) => d.id === routeSearch.id);

@@ -47,6 +47,7 @@ import { TIER_LIMITS } from "@/lib/usage-limits";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/backend/client";
 import { TARIFF_SPLITS } from "@/lib/examiner/config";
+import { DashboardStarterQuest, DashboardGoalLauncher } from "@/components/app/dashboard-starter-quest";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -592,6 +593,17 @@ export function DashboardPage() {
           </section>
         </div>
 
+        {/* Cambridge 0455 Flight Readiness Check (Starter Quest) */}
+        {!isTeacherUser && (
+          <DashboardStarterQuest
+            versionsCount={versions.length}
+            mcqAttemptsCount={mcqSummary.data?.totalAttempts ?? 0}
+          />
+        )}
+
+        {/* What would you like to achieve today? Intent Launcher */}
+        {!isTeacherUser && <DashboardGoalLauncher />}
+
         {/* Educator Workspace Quick Banner */}
         {isTeacherUser && (
           <div className="rounded-2xl border border-purple-500/30 bg-purple-500/[0.06] p-4 text-xs shadow-xs">
@@ -1043,16 +1055,31 @@ export function DashboardPage() {
             </div>
           ) : filteredEssays.length === 0 ? (
             <div className="px-5 py-12 text-center">
-              <GraduationCap className="mx-auto size-9 text-muted-foreground/60 mb-2" />
-              <p className="text-sm font-medium">No matching essays found</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              <div className="size-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mx-auto mb-3">
+                <GraduationCap className="size-6" />
+              </div>
+              <p className="text-sm font-bold text-foreground">
+                {essaySearch ? "No matching essays found" : "Your Cambridge Portfolio is Ready"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
                 {essaySearch
                   ? "Try adjusting your search query or clear the filter."
-                  : "Submit an essay response to start building your Cambridge portfolio."}
+                  : "You haven't marked an essay yet! Grade your first essay or test our 1-click sample to unlock your Cambridge performance curve."}
               </p>
-              <Button asChild size="sm" className="mt-4">
-                <Link to="/grade">Mark your first essay</Link>
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 mt-4">
+                <Button asChild size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-1.5 shadow-xs">
+                  <Link to="/grade" search={{ sample: 8 }}>
+                    <Wand2 className="size-3.5" />
+                    Try 1-Click Sample Essay
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm" className="text-xs">
+                  <Link to="/grade">
+                    <PenLine className="size-3.5 mr-1" />
+                    Write or Upload Essay
+                  </Link>
+                </Button>
+              </div>
             </div>
           ) : (
             <ul className="divide-y divide-border">
