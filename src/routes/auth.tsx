@@ -147,23 +147,9 @@ function AuthPage() {
   const registerStudentFn = useServerFn(registerStudent);
 
   const routeUserByRole = async () => {
-    if (search.redirect && search.redirect.startsWith("/") && true && search.redirect !== "/dashboard") {
+    if (search.redirect && search.redirect.startsWith("/") && search.redirect !== "/dashboard") {
       navigate({ to: search.redirect, replace: true });
       return;
-    }
-    try {
-      const me = await fetchMe();
-      if (me?.isAdmin) {
-        navigate({ to: "/admin", search: {}, replace: true });
-        return;
-      }
-      if (me?.role === "teacher") {
-        toast.success("Welcome back, Educator!");
-        navigate({ to: "/classes", replace: true });
-        return;
-      }
-    } catch {
-      // fallback
     }
     navigate({ to: "/dashboard", replace: true });
   };

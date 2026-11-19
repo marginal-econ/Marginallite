@@ -1325,7 +1325,7 @@ export function AppShell({
                         className="size-6 object-contain drop-shadow-xs"
                       />
                     </div>
-                    <span className="font-extrabold tracking-tight">Marginal 0455</span>
+                    <span className="font-extrabold tracking-tight">Marginalite 0455</span>
                   </SheetTitle>
                 </SheetHeader>
 
@@ -1696,7 +1696,7 @@ export function AppShell({
                   </div>
                 </div>
                 <span className="text-base font-extrabold tracking-tight text-foreground transition-colors group-hover:text-primary">
-                  Marginal
+                  Marginalite
                 </span>
               </Link>
 

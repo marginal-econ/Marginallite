@@ -1787,16 +1787,24 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         const essaysToday = stats?.todayEssayIds.size ?? 0;
         const lastEssayAt = stats?.lastAt ?? null;
 
+        const isCallingUser = p.id === context.userId;
         const pr = presenceMap.get(p.id);
         const lastSeenMs = pr?.last_seen ? new Date(pr.last_seen).getTime() : 0;
-        const isOnline = Boolean(pr && nowMs - lastSeenMs < 150_000);
+        const isOnline = Boolean(isCallingUser || (pr && nowMs - lastSeenMs < 150_000));
+        const effectiveLastSeen = isCallingUser ? new Date(nowMs).toISOString() : (pr?.last_seen ?? null);
         const role = roleMap.get(p.id) || "student";
         const lc = liveCounts.get(p.id);
         const ac = aiCounts.get(p.id);
 
-        const candidates = [pr?.last_seen, lastEssayAt, lc?.lastAt, ac?.lastAt].filter(Boolean) as string[];
+        const candidates = [
+          effectiveLastSeen,
+          lastEssayAt,
+          lc?.lastAt,
+          ac?.lastAt,
+          p.created_at,
+        ].filter(Boolean) as string[];
         candidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-        const lastActivity = candidates[0] || null;
+        const lastActivity = candidates[0] || (isCallingUser ? new Date(nowMs).toISOString() : null);
 
         return {
           userId: p.id,
@@ -1805,8 +1813,8 @@ export const adminUserActivity = createServerFn({ method: "GET" })
           school: p.school,
           role: role as UserActivityRow["role"],
           joinedAt: p.created_at || new Date().toISOString(),
-          lastSeen: pr?.last_seen ?? null,
-          currentPath: pr?.path ?? null,
+          lastSeen: effectiveLastSeen,
+          currentPath: pr?.path ?? (isCallingUser ? "/admin" : null),
           isOnline,
           essaysGraded,
           essaysToday,

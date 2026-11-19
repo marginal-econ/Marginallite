@@ -47,6 +47,7 @@ import {
   Target,
   Trash2,
   AlertTriangle,
+  LayoutDashboard,
   MessageSquare,
   Trophy,
   UploadCloud,
@@ -561,6 +562,16 @@ function AdminPage() {
         description="Master control center: platform health, user roles, syllabus curriculum, and AI infrastructure."
         action={
           <div className="flex items-center gap-2">
+            <Link to="/dashboard">
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-xs"
+              >
+                <LayoutDashboard className="size-3.5" />
+                <span>Go to App Dashboard →</span>
+              </Button>
+            </Link>
             {settingsQuery.data?.aiBackupOnly ? (
               <div className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 animate-pulse">
                 <AlertTriangle className="size-3.5" />
@@ -586,6 +597,20 @@ function AdminPage() {
           </div>
         }
       />
+
+      {/* ── Direct Return to App Dashboard Notice Bar ── */}
+      <div className="bg-primary/10 border-b border-primary/20 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2 text-foreground font-medium">
+          <ShieldCheck className="size-4 text-primary shrink-0" />
+          <span>You are currently in the <strong>Admin Command Studio</strong> (telemetry &amp; controls).</span>
+        </div>
+        <Link to="/dashboard">
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground font-semibold">
+            <LayoutDashboard className="size-3.5" />
+            <span>Open Candidate Workspace &amp; Essay Grader →</span>
+          </Button>
+        </Link>
+      </div>
 
       {/* ── Studio Layout: Left Sidebar + Right Workspace ── */}
       <div className="flex flex-1 flex-col md:flex-row min-h-[calc(100vh-140px)] border-t border-border/70">
@@ -616,6 +641,18 @@ function AdminPage() {
           {/* Ambient lighting orb */}
           <div className="pointer-events-none absolute -top-10 -left-10 size-36 rounded-full bg-gradient-to-br from-purple-500/15 to-primary/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-10 -right-10 size-36 rounded-full bg-gradient-to-tr from-indigo-500/10 to-transparent blur-2xl" />
+
+          {/* Back to Candidate Workspace Shortcut */}
+          <Link
+            to="/dashboard"
+            className="flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all shrink-0 z-10 border border-primary/20"
+          >
+            <div className="flex items-center gap-2">
+              <LayoutDashboard className="size-3.5" />
+              <span>Back to App Dashboard</span>
+            </div>
+            <ChevronRight className="size-3" />
+          </Link>
 
           {/* Module Filter Input */}
           <div className="relative shrink-0 z-10">
