@@ -238,68 +238,18 @@ export const getReviewPanel = createServerFn({ method: "POST" })
     const seriesId = normalizeSeriesId(chosenSeries);
     const targetLevel = chosenLevel || "full_a_level";
 
-    const { data: essayRows, error: essayError } = await (supabase as any).from("essays")
-      .select("id, question, max_mark, updated_at")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .limit(ESSAY_WINDOW);
-    if (essayError) throw new Error(essayError.message);
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
-    const { count: essayCount, error: countError } = await (supabase as any).from("essays")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-    if (countError) throw new Error(countError.message);
-
-    const { data: mcqRows, error: mcqError } = await supabase
-      .from("mcq_pdf_attempts")
-      .select("id, title, level, score, total, questions, completed_at")
-      .eq("user_id", userId)
-      .not("completed_at", "is", null)
-      .order("completed_at", { ascending: false })
-      .limit(MCQ_WINDOW);
-    if (mcqError) throw new Error(mcqError.message);
-
-    const { count: mcqCount, error: mcqCountError } = await supabase
-      .from("mcq_pdf_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .not("completed_at", "is", null);
-    if (mcqCountError) throw new Error(mcqCountError.message);
-
-    let subCount = 0;
-    try {
-      const { count } = await (supabase as any)
-        .from("essay_submissions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId);
-      subCount = count ?? 0;
-    } catch {}
-    const totalEssays = Math.max(essayCount ?? 0, subCount);
-    const totalMcqPapers = mcqCount ?? 0;
-
-    // Accessible gating: 3 essays + 1 MCQ paper (or 2 essays if at least 1 MCQ paper is done)
-    if (
-      totalEssays < 2 ||
-      (totalEssays < MIN_ESSAYS_FOR_REVIEW && totalMcqPapers < MIN_MCQ_PAPERS_FOR_REVIEW)
-    ) {
-      return {
-        eligible: false,
-        essayCount: totalEssays,
-        mcqPaperCount: totalMcqPapers,
-        essaysNeeded: Math.max(0, MIN_ESSAYS_FOR_REVIEW - totalEssays),
-        mcqPapersNeeded: Math.max(0, MIN_MCQ_PAPERS_FOR_REVIEW - totalMcqPapers),
-      };
-    }
-
-    // Fetch latest versions and summaries upfront to compute live empirical percentage
+    // Fetch candidate essays from essay_submissions using supabaseAdmin
     let resolvedEssaySummaries: EssaySummary[] = [];
     try {
-      const { data: subRows } = await (supabase as any)
+      const { data: subRows } = await supabaseAdmin
         .from("essay_submissions")
         .select("id, question, max_marks, awarded_marks, band, grading_result, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(ESSAY_WINDOW);
+
       if (Array.isArray(subRows) && subRows.length > 0) {
         resolvedEssaySummaries = subRows
           .map((row: any) => {
@@ -321,41 +271,38 @@ export const getReviewPanel = createServerFn({ method: "POST" })
           .filter((x: any): x is EssaySummary => x !== null);
       }
     } catch {}
-    const essayIds = ((essayRows as any[]) ?? []).map((row: any) => row.id);
-    const { data: versionRows, error: versionError } = await (supabase as any).from("essay_versions")
-      .select("essay_id, version, grading, total_mark, created_at")
-      .in("essay_id", essayIds.length > 0 ? essayIds : ["00000000-0000-0000-0000-000000000000"])
-      .order("version", { ascending: false });
-    
 
-    const latestVersionByEssay = new Map<string, any>();
-    for (const version of (versionRows as any[]) ?? []) {
-      if (!latestVersionByEssay.has(version.essay_id)) {
-        latestVersionByEssay.set(version.essay_id, version);
-      }
+    // Fetch candidate MCQ attempts using supabaseAdmin
+    let mcqRows: any[] = [];
+    try {
+      const { data: mRows } = await supabaseAdmin
+        .from("mcq_pdf_attempts")
+        .select("id, title, level, score, total, answers, completed_at")
+        .eq("user_id", userId)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(MCQ_WINDOW);
+      if (mRows) mcqRows = mRows;
+    } catch {}
+
+    const totalEssays = resolvedEssaySummaries.length;
+    const totalMcqPapers = mcqRows.length;
+
+    // Accessible gating: 3 essays + 1 MCQ paper (or 2 essays if at least 1 MCQ paper is done)
+    if (
+      totalEssays < 2 ||
+      (totalEssays < MIN_ESSAYS_FOR_REVIEW && totalMcqPapers < MIN_MCQ_PAPERS_FOR_REVIEW)
+    ) {
+      return {
+        eligible: false,
+        essayCount: totalEssays,
+        mcqPaperCount: totalMcqPapers,
+        essaysNeeded: Math.max(0, MIN_ESSAYS_FOR_REVIEW - totalEssays),
+        mcqPapersNeeded: Math.max(0, MIN_MCQ_PAPERS_FOR_REVIEW - totalMcqPapers),
+      };
     }
 
-    const legacyEssaySummaries: EssaySummary[] = ((essayRows as any[]) ?? [])
-      .map((essay) => {
-        const version = latestVersionByEssay.get(essay.id);
-        const grading = version?.grading as Grading | null | undefined;
-        if (!grading) return null;
-        const summary: EssaySummary = {
-          essayId: essay.id,
-          question: essay.question,
-          maxMark: essay.max_mark,
-          totalMark: version?.total_mark ?? grading.total_mark ?? 0,
-          band: grading.band ?? "",
-          aoBreakdown: grading.ao_breakdown,
-          strengths: grading.strengths ?? [],
-          weaknesses: grading.weaknesses ?? [],
-          missingElements: grading.missing_elements,
-          createdAt: essay.updated_at,
-        };
-        return summary;
-      })
-      .filter((item: any): item is EssaySummary => item !== null);
-    const essaySummaries: EssaySummary[] = resolvedEssaySummaries.length > 0 ? resolvedEssaySummaries : legacyEssaySummaries;
+    const essaySummaries: EssaySummary[] = resolvedEssaySummaries;
 
     // Compute live empirical average percentage from essays & MCQs
     let totalScore = 0;

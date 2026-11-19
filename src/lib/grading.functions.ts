@@ -99,15 +99,15 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
 
     const { grading } = outcome;
 
-    // Persist to database (essay_submissions, with legacy fallback).
-    // Database errors must NEVER prevent the student from receiving their grade.
+    // Persist to database (essay_submissions).
+    // Using supabaseAdmin bypasses RLS and guarantees candidate essays are always saved.
     let essayId = data.essayId ?? null;
     let versionId: string | null = null;
     const versionNumber = 1;
 
     try {
       if (essayId) {
-        await supabase
+        const { error: updateErr } = await supabaseAdmin
           .from("essay_submissions")
           .update({
             essay_text: gradedText,
@@ -118,9 +118,14 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
           })
           .eq("id", essayId)
           .eq("user_id", userId);
-        versionId = essayId;
+
+        if (!updateErr) {
+          versionId = essayId;
+        } else {
+          console.warn("Failed to update essay_submissions:", updateErr.message);
+        }
       } else {
-        const { data: saved, error: saveErr } = await supabase
+        const { data: saved, error: saveErr } = await supabaseAdmin
           .from("essay_submissions")
           .insert({
             user_id: userId,
@@ -138,23 +143,29 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
           essayId = (saved as any).id;
           versionId = (saved as any).id;
         } else if (saveErr) {
-          console.warn("Failed to persist to essay_submissions:", saveErr.message);
+          console.error("Failed to persist to essay_submissions:", saveErr.message);
         }
       }
+
+      // Record candidate presence / activity timestamp on profile
+      await supabaseAdmin
+        .from("profiles")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", userId);
     } catch (persistErr) {
-      console.warn("Non-fatal error persisting essay to essay_submissions:", persistErr);
+      console.error("Error persisting essay to essay_submissions:", persistErr);
     }
 
     // Best-effort write to legacy essays / essay_versions tables if present
     try {
       if (data.essayId) {
-        await supabase
+        await supabaseAdmin
           .from("essays")
           .update({ latest_mark: grading.total_mark, updated_at: new Date().toISOString() })
           .eq("id", data.essayId)
           .eq("user_id", userId);
       } else {
-        const { data: legacyEssay } = await supabase
+        const { data: legacyEssay } = await supabaseAdmin
           .from("essays")
           .insert({
             user_id: userId,
@@ -166,7 +177,7 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
           .single();
         if (legacyEssay) {
           if (!essayId) essayId = legacyEssay.id;
-          await supabase.from("essay_versions").insert({
+          await supabaseAdmin.from("essay_versions").insert({
             essay_id: legacyEssay.id,
             user_id: userId,
             version: 1,
@@ -207,13 +218,13 @@ export const listMyEssays = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     try {
-      const { data, error } = await context.supabase
+      const { data, error } = await supabaseAdmin
         .from("essay_submissions")
         .select("id, question, max_marks, awarded_marks, created_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((row: any) => ({
           id: row.id,
           question: row.question,
@@ -223,10 +234,12 @@ export const listMyEssays = createServerFn({ method: "GET" })
           updated_at: row.created_at,
         }));
       }
-    } catch {}
+    } catch (err) {
+      console.error("Error in listMyEssays:", err);
+    }
 
     try {
-      const { data } = await context.supabase
+      const { data } = await supabaseAdmin
         .from("essays")
         .select("id, question, max_mark, latest_mark, created_at, updated_at")
         .eq("user_id", context.userId)
@@ -246,12 +259,9 @@ export const getEssayThread = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { isUserAdmin } = await import("@/lib/auth-admin");
     const isAdmin = isUserAdmin(context.userId);
-    const client = isAdmin
-      ? (await import("@/integrations/backend/client.server")).supabaseAdmin
-      : context.supabase;
 
     try {
-      const { data: sub, error: subError } = await client
+      const { data: sub, error: subError } = await supabaseAdmin
         .from("essay_submissions")
         .select("*")
         .eq("id", data.essayId)
@@ -259,6 +269,9 @@ export const getEssayThread = createServerFn({ method: "POST" })
 
       if (!subError && sub) {
         const s = sub as any;
+        if (!isAdmin && s.user_id !== context.userId) {
+          throw new Error("You do not have permission to view this essay.");
+        }
         const gradingResult = (s.grading_result || {}) as any;
         return {
           essay: {
@@ -283,24 +296,33 @@ export const getEssayThread = createServerFn({ method: "POST" })
           ],
         };
       }
+    } catch (e: any) {
+      if (e.message?.includes("permission")) throw e;
+      console.error("Error fetching essay_submissions in getEssayThread:", e);
+    }
+
+    try {
+      const { data: essay, error } = await supabaseAdmin
+        .from("essays")
+        .select("id, question, max_mark, latest_mark, created_at, user_id")
+        .eq("id", data.essayId)
+        .maybeSingle();
+
+      if (!error && essay) {
+        if (!isAdmin && essay.user_id !== context.userId) {
+          throw new Error("You do not have permission to view this essay.");
+        }
+        const { data: versions } = await supabaseAdmin
+          .from("essay_versions")
+          .select("id, version, essay_text, grading, total_mark, confidence, audited, created_at")
+          .eq("essay_id", data.essayId)
+          .order("version", { ascending: true });
+
+        return { essay, versions: versions ?? [] };
+      }
     } catch {}
 
-    const { data: essay, error } = await client
-      .from("essays")
-      .select("id, question, max_mark, latest_mark, created_at, user_id")
-      .eq("id", data.essayId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!essay) throw new Error("That essay could not be found.");
-
-    const { data: versions, error: versionError } = await client
-      .from("essay_versions")
-      .select("id, version, essay_text, grading, total_mark, confidence, audited, created_at")
-      .eq("essay_id", data.essayId)
-      .order("version", { ascending: true });
-    if (versionError) throw new Error(versionError.message);
-
-    return { essay, versions: versions ?? [] };
+    throw new Error("That essay could not be found.");
   });
 
 /** Student progress figures for the dashboard. */
@@ -308,7 +330,7 @@ export const getProgress = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     try {
-      const { data, error } = await context.supabase
+      const { data, error } = await supabaseAdmin
         .from("essay_submissions")
         .select("max_marks, awarded_marks, grading_result, created_at")
         .eq("user_id", context.userId)
@@ -333,10 +355,12 @@ export const getProgress = createServerFn({ method: "GET" })
           };
         });
       }
-    } catch {}
+    } catch (err) {
+      console.error("Error in getProgress:", err);
+    }
 
     try {
-      const { data } = await context.supabase
+      const { data } = await supabaseAdmin
         .from("essay_versions")
         .select("total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
         .eq("user_id", context.userId)

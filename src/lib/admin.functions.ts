@@ -263,10 +263,10 @@ export const adminOverview = createServerFn({ method: "GET" })
     try {
       const results = await Promise.allSettled([
         listAcceptedAuthUsers(),
-        count("essays"),
+        count("essay_submissions"),
         count("knowledge_documents"),
         count("document_chunks"),
-        count("mcq_attempts"),
+        count("mcq_pdf_attempts"),
         count("calibration_anchors"),
       ]);
       if (results[0].status === "fulfilled") acceptedUsers = results[0].value;
@@ -1688,24 +1688,19 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - istOffsetMs;
       const todayCutoffMs = istMidnightUtcMs;
 
-      const [profilesRes, essaysRes, versionsRes, mcqRes, aiRes, liveRes, presenceRes, rolesRes, authUsers] =
+      const [profilesRes, subsRes, mcqRes, rolesRes, authUsers] =
         await Promise.all([
-          supabaseAdmin.from("profiles").select("id, full_name, school, created_at").limit(1000),
-          supabaseAdmin.from("essays").select("id, user_id, created_at").limit(3000),
-          supabaseAdmin.from("essay_versions").select("id, essay_id, user_id, created_at").limit(5000),
+          supabaseAdmin.from("profiles").select("id, full_name, school, created_at, updated_at").limit(1000),
+          supabaseAdmin.from("essay_submissions").select("id, user_id, awarded_marks, created_at").limit(5000),
           supabaseAdmin.from("mcq_pdf_attempts").select("id, user_id").limit(2000),
-          supabaseAdmin.from("ai_usage_log").select("id, user_id, created_at").limit(3000),
-          supabaseAdmin.from("live_examiner_sessions").select("id, user_id, updated_at").limit(1000),
-          supabaseAdmin.from("user_presence").select("user_id, last_seen, path").order("last_seen", { ascending: false }),
           supabaseAdmin.from("user_roles").select("user_id, role"),
           listAcceptedAuthUsers(),
         ]);
 
       const authMap = new Map(authUsers.map((u) => [u.id, u.email]));
       const roleMap = new Map((rolesRes.data ?? []).map((r: any) => [(r as any).user_id, (r as any).role]));
-      const presenceMap = new Map((presenceRes.data ?? []).map((pr: any) => [pr.user_id, pr]));
 
-      // Track unique essays (deduplicating multi-version drafts/rewrites of the same essay)
+      // Track unique essays from live essay_submissions
       const essayStats = new Map<
         string,
         {
@@ -1728,32 +1723,17 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         return stats;
       };
 
-      for (const v of versionsRes.data ?? []) {
-        if (!v.user_id) continue;
-        const stats = getStats(v.user_id);
-        const essayKey = v.essay_id || v.id;
-        stats.totalEssayIds.add(essayKey);
+      for (const s of subsRes.data ?? []) {
+        if (!s.user_id) continue;
+        const stats = getStats(s.user_id);
+        stats.totalEssayIds.add(s.id);
 
-        if (v.created_at) {
-          if (!stats.lastAt || v.created_at > stats.lastAt) stats.lastAt = v.created_at;
-          const vTime = new Date(v.created_at).getTime();
-          if (vTime >= todayCutoffMs) {
-            stats.todayEssayIds.add(essayKey);
+        if (s.created_at) {
+          if (!stats.lastAt || s.created_at > stats.lastAt) stats.lastAt = s.created_at;
+          const sTime = new Date(s.created_at).getTime();
+          if (sTime >= todayCutoffMs) {
+            stats.todayEssayIds.add(s.id);
           }
-        }
-      }
-
-      for (const e of essaysRes.data ?? []) {
-        if (!e.user_id) continue;
-        const stats = getStats(e.user_id);
-        stats.totalEssayIds.add(e.id);
-
-        const eTime = e.created_at ? new Date(e.created_at).getTime() : 0;
-        if (e.created_at && (!stats.lastAt || e.created_at > stats.lastAt)) {
-          stats.lastAt = e.created_at;
-        }
-        if (eTime >= todayCutoffMs) {
-          stats.todayEssayIds.add(e.id);
         }
       }
 
@@ -1764,22 +1744,7 @@ export const adminUserActivity = createServerFn({ method: "GET" })
       }
 
       const liveCounts = new Map<string, { count: number; lastAt: string | null }>();
-      for (const l of liveRes.data ?? []) {
-        if (!l.user_id) continue;
-        const cur = liveCounts.get(l.user_id) || { count: 0, lastAt: null };
-        cur.count += 1;
-        if (l.updated_at && (!cur.lastAt || l.updated_at > cur.lastAt)) cur.lastAt = l.updated_at;
-        liveCounts.set(l.user_id, cur);
-      }
-
       const aiCounts = new Map<string, { count: number; lastAt: string | null }>();
-      for (const a of aiRes.data ?? []) {
-        if (!a.user_id) continue;
-        const cur = aiCounts.get(a.user_id) || { count: 0, lastAt: null };
-        cur.count += 1;
-        if (a.created_at && (!cur.lastAt || a.created_at > cur.lastAt)) cur.lastAt = a.created_at;
-        aiCounts.set(a.user_id, cur);
-      }
 
       const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
       const authUserMap = new Map(authUsers.map((u) => [u.id, u]));
@@ -1798,10 +1763,12 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         const lastEssayAt = stats?.lastAt ?? null;
 
         const isCallingUser = userId === context.userId;
-        const pr = presenceMap.get(userId);
-        const lastSeenMs = pr?.last_seen ? new Date(pr.last_seen).getTime() : 0;
-        const isOnline = Boolean(isCallingUser || (pr && nowMs - lastSeenMs < 150_000));
-        const effectiveLastSeen = isCallingUser ? new Date(nowMs).toISOString() : (pr?.last_seen ?? null);
+        const profileUpdatedAtMs = p?.updated_at ? new Date(p.updated_at).getTime() : 0;
+        const lastSeenMs = profileUpdatedAtMs;
+        const isOnline = Boolean(isCallingUser || (lastSeenMs > 0 && nowMs - lastSeenMs < 150_000));
+        const effectiveLastSeen = isCallingUser
+          ? new Date(nowMs).toISOString()
+          : (lastSeenMs > 0 ? new Date(lastSeenMs).toISOString() : null);
         const role = roleMap.get(userId) || (u?.email === "marginal.econ.ai@gmail.com" ? "admin" : "student");
         const lc = liveCounts.get(userId);
         const ac = aiCounts.get(userId);
@@ -1819,8 +1786,7 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         const candidates = [
           effectiveLastSeen,
           lastEssayAt,
-          lc?.lastAt,
-          ac?.lastAt,
+          p?.updated_at,
           joinedAt,
         ].filter(Boolean) as string[];
         candidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
@@ -1834,7 +1800,7 @@ export const adminUserActivity = createServerFn({ method: "GET" })
           role: role as UserActivityRow["role"],
           joinedAt,
           lastSeen: effectiveLastSeen,
-          currentPath: pr?.path ?? (isCallingUser ? "/admin" : null),
+          currentPath: isCallingUser ? "/admin" : null,
           isOnline,
           essaysGraded,
           essaysToday,
@@ -1865,7 +1831,7 @@ export const adminListAllEssays = createServerFn({ method: "GET" })
     const [subsRes, essaysRes, versionsRes, profilesRes, authUsers] = await Promise.all([
       supabaseAdmin
         .from("essay_submissions")
-        .select("id, user_id, question, max_mark, total_mark, ao1_mark, ao2_mark, ao3_mark, created_at")
+        .select("id, user_id, question, max_marks, awarded_marks, band, grading_result, created_at")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabaseAdmin
@@ -1898,6 +1864,7 @@ export const adminListAllEssays = createServerFn({ method: "GET" })
     const fromSubmissions = (subsRes.data ?? []).map((s: any) => {
       const profile: any = profileMap.get(s.user_id);
       const email = authMap.get(s.user_id);
+      const g = (s.grading_result || {}) as any;
       return {
         id: s.id,
         userId: s.user_id,
@@ -1905,12 +1872,12 @@ export const adminListAllEssays = createServerFn({ method: "GET" })
         studentEmail: email || null,
         school: profile?.school || null,
         question: s.question || "Untitled IGCSE Question",
-        maxMark: s.max_mark || 8,
-        latestMark: s.total_mark ?? null,
+        maxMark: s.max_marks || g?.max_mark || 8,
+        latestMark: s.awarded_marks ?? g?.total_mark ?? null,
         versionsCount: 1,
-        latestAo1: s.ao1_mark ?? null,
-        latestAo2: s.ao2_mark ?? null,
-        latestAo3: s.ao3_mark ?? null,
+        latestAo1: g?.ao_breakdown?.knowledge?.awarded ?? null,
+        latestAo2: g?.ao_breakdown?.analysis?.awarded ?? null,
+        latestAo3: g?.ao_breakdown?.evaluation?.awarded ?? null,
         createdAt: s.created_at || new Date().toISOString(),
         updatedAt: s.created_at || new Date().toISOString(),
       };
@@ -1972,19 +1939,24 @@ export const adminGetEssayDetail = createServerFn({ method: "POST" })
         listAcceptedAuthUsers(),
       ]);
       const authorEmail = authUsers.find((u) => u.id === subRow.user_id)?.email || null;
-      let grading = subRow.result_json;
+      let grading = subRow.grading_result || subRow.result_json;
       if (typeof grading === "string") {
         try {
           grading = JSON.parse(grading);
         } catch {}
       }
+      const totalMark = subRow.awarded_marks ?? subRow.total_mark ?? (grading as any)?.total_mark ?? null;
+      const maxMark = subRow.max_marks ?? subRow.max_mark ?? (grading as any)?.max_mark ?? 8;
+      const ao1 = (grading as any)?.ao_breakdown?.knowledge?.awarded ?? subRow.ao1_mark ?? null;
+      const ao2 = (grading as any)?.ao_breakdown?.analysis?.awarded ?? subRow.ao2_mark ?? null;
+      const ao3 = (grading as any)?.ao_breakdown?.evaluation?.awarded ?? subRow.ao3_mark ?? null;
       return {
         essay: {
           id: subRow.id,
           user_id: subRow.user_id,
           question: subRow.question,
-          max_mark: subRow.max_mark,
-          latest_mark: subRow.total_mark,
+          max_mark: maxMark,
+          latest_mark: totalMark,
           created_at: subRow.created_at,
           updated_at: subRow.created_at,
         },
@@ -1994,11 +1966,11 @@ export const adminGetEssayDetail = createServerFn({ method: "POST" })
             version: 1,
             essay_text: subRow.essay_text,
             grading,
-            total_mark: subRow.total_mark,
-            ao1_awarded: subRow.ao1_mark,
-            ao2_awarded: subRow.ao2_mark,
-            ao3_awarded: subRow.ao3_mark,
-            confidence: (grading as any)?.confidence ?? null,
+            total_mark: totalMark,
+            ao1_awarded: ao1,
+            ao2_awarded: ao2,
+            ao3_awarded: ao3,
+            confidence: (grading as any)?.confidence ?? 0.95,
             audited: Boolean((grading as any)?.audited),
             created_at: subRow.created_at,
           },
@@ -3030,7 +3002,7 @@ export const adminGetPlatformDiagnostics = createServerFn({ method: "GET" })
       listAcceptedAuthUsers(),
       supabaseAdmin.from("profiles").select("*"),
       supabaseAdmin.from("user_roles").select("*"),
-      supabaseAdmin.from("essays").select("id, user_id, latest_mark, max_mark, created_at, question"),
+      supabaseAdmin.from("essay_submissions").select("id, user_id, awarded_marks, max_marks, created_at, question"),
       supabaseAdmin.from("classrooms").select("*"),
       supabaseAdmin.from("classroom_members").select("*"),
       supabaseAdmin.from("mcq_attempts").select("id, user_id, score, total, created_at"),
@@ -3048,7 +3020,14 @@ export const adminGetPlatformDiagnostics = createServerFn({ method: "GET" })
     const users = authUsers;
     const profiles = profilesRes.data ?? [];
     const roles = rolesRes.data ?? [];
-    const essays = essaysRes.data ?? [];
+    const essays = (essaysRes.data ?? []).map((s: any) => ({
+      id: s.id,
+      user_id: s.user_id,
+      latest_mark: s.awarded_marks ?? null,
+      max_mark: s.max_marks ?? 8,
+      created_at: s.created_at,
+      question: s.question,
+    }));
     const classrooms = classroomsRes.data ?? [];
     const classMembers = classMembersRes.data ?? [];
     const mcqAttempts = mcqRes.data ?? [];

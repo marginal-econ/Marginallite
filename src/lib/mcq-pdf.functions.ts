@@ -175,23 +175,31 @@ export const submitPdfMcqAttempt = createServerFn({ method: "POST" })
     });
     const score = graded.filter((question) => question.correct).length;
 
-    const { data: row, error } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+
+    const { data: row, error } = await supabaseAdmin
       .from("mcq_pdf_attempts")
       .insert({
         user_id: userId,
         title: resolvedTitle,
-        filename: topicalPaper ? topicalPaper.id : (data.filename ?? null),
         level: data.level,
         paper_id: resolvedDbPaperId,
-        questions: graded,
         score,
         total: questionCount,
+        answers: graded as unknown as never,
         completed_at: new Date().toISOString(),
       })
       .select("id, score, total")
       .single();
 
     if (error || !row) throw new Error(error?.message ?? "Could not save that attempt.");
+
+    // Update candidate presence timestamp
+    await supabaseAdmin
+      .from("profiles")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", userId);
+
     return { attemptId: row.id, score: row.score, total: row.total };
   });
 
@@ -204,22 +212,17 @@ export const submitPdfMcqAttempt = createServerFn({ method: "POST" })
 export const getMcqTopicPerformance = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const [pdfRes, genRes] = await Promise.all([
-      supabase
-        .from("mcq_pdf_attempts")
-        .select("id, paper_id, title, level, questions, completed_at")
-        .eq("user_id", userId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false }),
-      (supabase as any).from("mcq_attempts")
-        .select("id, level, questions, answers, completed_at")
-        .eq("user_id", userId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false }),
-    ]);
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
-    if (pdfRes.error) throw new Error(pdfRes.error.message);
+    const { data: pdfAttempts, error } = await supabaseAdmin
+      .from("mcq_pdf_attempts")
+      .select("id, paper_id, title, level, answers, completed_at")
+      .eq("user_id", userId)
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
 
     const buckets = new Map<
       string,
@@ -244,7 +247,7 @@ export const getMcqTopicPerformance = createServerFn({ method: "GET" })
     // Deduplicate by paper key using the latest completed attempt per paper
     // so retaking a paper reflects current mastery without double-counting.
     const seenPaperKeys = new Set<string>();
-    for (const row of pdfRes.data ?? []) {
+    for (const row of pdfAttempts ?? []) {
       const key =
         row.paper_id ??
         (typeof row.title === "string" && row.title.startsWith("Topical Past Paper:")
@@ -254,7 +257,11 @@ export const getMcqTopicPerformance = createServerFn({ method: "GET" })
       seenPaperKeys.add(key);
 
       const levelUpper = row.level === "a2" ? "A2" : "AS";
-      const questions = Array.isArray(row.questions) ? row.questions : [];
+      const questions = Array.isArray((row as any).answers)
+        ? (row as any).answers
+        : Array.isArray((row as any).questions)
+          ? (row as any).questions
+          : [];
       for (const rawQ of questions) {
         if (!rawQ || typeof rawQ !== "object") continue;
         const q = rawQ as Record<string, unknown>;
@@ -285,7 +292,8 @@ export const getMcqTopicPerformance = createServerFn({ method: "GET" })
       }
     }
 
-    for (const row of genRes.data ?? []) {
+    const genResData: any[] = [];
+    for (const row of genResData) {
       const levelUpper =
         typeof row.level === "string" && row.level.toUpperCase() === "A2" ? "A2" : "AS";
       const questions = Array.isArray(row.questions) ? row.questions : [];
@@ -356,8 +364,9 @@ export const getMcqTopicPerformance = createServerFn({ method: "GET" })
 export const getMyPaperHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+    const { data, error } = await supabaseAdmin
       .from("mcq_pdf_attempts")
       .select("id, title, level, paper_id, score, total, completed_at, created_at")
       .eq("user_id", userId)
@@ -399,23 +408,16 @@ export type MyMcqSummary = {
 export const getMyMcqSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyMcqSummary> => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
-    const [pdfRes, genRes] = await Promise.all([
-      supabase
-        .from("mcq_pdf_attempts")
-        .select("id, title, level, paper_id, score, total, completed_at")
-        .eq("user_id", userId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(20),
-      (supabase as any).from("mcq_attempts")
-        .select("id, title, level, score, total, completed_at")
-        .eq("user_id", userId)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(20),
-    ]);
+    const pdfRes = await supabaseAdmin
+      .from("mcq_pdf_attempts")
+      .select("id, title, level, paper_id, score, total, completed_at")
+      .eq("user_id", userId)
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false })
+      .limit(20);
 
     const items: McqAttemptItem[] = [];
 
@@ -436,7 +438,8 @@ export const getMyMcqSummary = createServerFn({ method: "GET" })
       }
     }
 
-    for (const r of genRes.data ?? []) {
+    const genResData: any[] = [];
+    for (const r of genResData) {
       if (r.score !== null && r.total && r.total > 0) {
         const pct = Math.round((r.score / r.total) * 100);
         items.push({

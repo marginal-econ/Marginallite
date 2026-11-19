@@ -201,13 +201,13 @@ export const getCommunityPulse = createServerFn({ method: "GET" })
 
       let onlineCount = 0;
       try {
-        const { count, error } = await (supabaseAdmin as any)
-          .from("user_presence")
-          .select("user_id", { count: "exact", head: true })
-          .gte("last_seen", onlineSince);
+        const { count, error } = await supabaseAdmin
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .gte("updated_at", onlineSince);
         if (!error && count != null) onlineCount = count;
       } catch {
-        // user_presence table might not be present yet
+        // Safe fallback
       }
 
       let memberCount = 0;

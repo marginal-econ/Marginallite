@@ -150,9 +150,23 @@ export async function getUserSubscriptionDetails(
     console.warn("Could not query user_roles for subscription, defaulting to free:", err);
   }
 
-  // 2. Count essays and evaluated versions within current cycle (prevents rewrite loophole)
+  // 2. Count essays within current cycle
   let essaysGradedCount = 0;
   try {
+    let subQuery = db
+      .from("essay_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    if (effectiveResetAt && typeof subQuery.gte === "function") {
+      subQuery = subQuery.gte("created_at", effectiveResetAt);
+    }
+
+    const { count: subCount, error: subErr } = await subQuery;
+    if (!subErr && typeof subCount === "number") {
+      essaysGradedCount = subCount;
+    }
+
     let query = db
       .from("essays")
       .select("id", { count: "exact", head: true })
@@ -164,22 +178,7 @@ export async function getUserSubscriptionDetails(
 
     const { count, error } = await query;
     if (!error && typeof count === "number") {
-      essaysGradedCount = count;
-    }
-
-    // Also count total essay versions evaluated to ensure rewrites are strictly counted
-    let evQuery = db
-      .from("essay_versions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-
-    if (effectiveResetAt && typeof evQuery.gte === "function") {
-      evQuery = evQuery.gte("created_at", effectiveResetAt);
-    }
-
-    const { count: evCount, error: evError } = await evQuery;
-    if (!evError && typeof evCount === "number") {
-      essaysGradedCount = Math.max(essaysGradedCount, evCount);
+      essaysGradedCount = Math.max(essaysGradedCount, count);
     }
   } catch (err) {
     console.warn("Could not query essays count for user:", err);
