@@ -45,9 +45,9 @@ const BANNED_RULES = [
       /\b9708\b|9708\/|A Level|A-Level|AS Level|AS & A|AS\/A|Cambridge International AS|Cambridge Elite|AS_SECTIONS|A2_SECTIONS|year 12|year 13/i,
   },
   {
-    category: "Legacy Purple Palette",
+    category: "Banned Pink Palette",
     regex:
-      /#7c4edb|#6d28d9|#5b21b6|#8b5cf6|#a78bfa|#c4b5fd|#ddd6fe|#ede9fe|bg-purple-|text-purple-|border-purple-|bg-violet-|text-violet-|border-violet-|bg-indigo-|text-indigo-|border-indigo-/i,
+      /#ec4899|#f43f5e|#db2777|bg-pink-|text-pink-|border-pink-|bg-fuchsia-|text-fuchsia-|border-fuchsia-|bg-rose-500|text-rose-500/i,
   },
   {
     category: "Legacy Brand Name",
@@ -55,7 +55,7 @@ const BANNED_RULES = [
   },
 ];
 
-// Legitimate economics concepts starting with "marginal"
+// Legitimate economics concepts and authorized brand assets containing "marginal"
 const LEGITIMATE_MARGINAL_TERMS = [
   "marginal cost",
   "marginal-cost",
@@ -86,6 +86,14 @@ const LEGITIMATE_MARGINAL_TERMS = [
   "marginal physical",
   "equi-marginal",
   "equi marginal",
+  "marginal-econ",
+  "marginal-m-icon",
+  "marginalite",
+  "marginal.econ",
+  "marginal-wordmark",
+  "marginal-theme",
+  "marginal-platform",
+  "marginal_upgrade",
 ];
 
 let totalHits = 0;

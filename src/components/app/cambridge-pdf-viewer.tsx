@@ -30,6 +30,7 @@ interface CambridgePdfViewerProps {
   height?: string;
   className?: string;
   onFullScreenToggle?: () => void;
+  onSwitchToText?: () => void;
 }
 
 // In-memory cache for downloaded paper base64 data to avoid redundant network requests
@@ -153,6 +154,7 @@ export function CambridgePdfViewer({
   height = "720px",
   className,
   onFullScreenToggle,
+  onSwitchToText,
 }: CambridgePdfViewerProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -371,7 +373,7 @@ export function CambridgePdfViewer({
           {examCode && (
             <Badge
               variant="outline"
-              className="text-[11px] font-mono font-bold border-rose-500/40 text-rose-600 dark:text-rose-400 bg-rose-500/5"
+              className="text-[11px] font-mono font-bold border-primary/40 text-primary bg-primary/10"
             >
               {examCode}
             </Badge>
@@ -585,37 +587,48 @@ export function CambridgePdfViewer({
 
         {error && !loading && (
           <div className="flex flex-col items-center justify-center p-8 space-y-4 text-center max-w-md mx-auto h-full">
-            <div className="p-3 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-              <AlertCircle className="h-8 w-8" />
+            <div className="p-3.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-xs">
+              <FileText className="h-8 w-8" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <h4 className="text-sm font-bold text-foreground">
-                Past Paper PDF Direct Access
+                Official Examination Paper Insert
               </h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {error}
+                This authentic Cambridge paper is fully typeset with interactive tables, quotes, and search in the Text Transcript view. You can also view the original document in a new tab.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {onSwitchToText && (
+                <Button
+                  size="sm"
+                  onClick={onSwitchToText}
+                  className="bg-primary text-primary-foreground text-xs gap-1.5 font-bold shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  View Typeset Transcript
+                </Button>
+              )}
+              {pdfUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(pdfUrl, "_blank")}
+                  className="text-xs gap-1.5 border-border/80 text-foreground hover:bg-muted"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in New Tab
+                </Button>
+              )}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={fetchPdf}
-                className="text-xs gap-1.5"
+                className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Retry
               </Button>
-              {pdfUrl && (
-                <Button
-                  size="sm"
-                  onClick={() => window.open(pdfUrl, "_blank")}
-                  className="bg-primary text-primary-foreground text-xs gap-1.5 font-bold"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Open Authentic Cambridge PDF
-                </Button>
-              )}
             </div>
           </div>
         )}

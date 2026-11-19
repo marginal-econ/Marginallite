@@ -26,7 +26,11 @@
     "src/lib/alerts.server.ts",
     "src/lib/feedback.functions.ts",
     "src/components/app/feedback-admin.tsx",
-    "src/components/feedback/feedback-dialog.tsx"
+    "src/components/feedback/feedback-dialog.tsx",
+    "scripts/ingest-as-reference.ts",
+    "scripts/sync-papers-to-knowledge.ts",
+    "scripts/harvest-papers.ts",
+    "scripts/test-0455-calibration-benchmark.ts"
   ],
   "whitelistedMatches": [
     {

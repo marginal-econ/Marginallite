@@ -24,6 +24,10 @@ import {
   Timer as TimerIcon,
   Trash2,
   TrendingUp,
+  Users,
+  Landmark,
+  Globe,
+  ArrowRightLeft,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1910,13 +1914,13 @@ function fillMissingQuestionPages(
                 <span>Topical Past Papers</span>
                 <span
                   className={cn(
-                    "rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold",
+                    "rounded-full px-2 py-0.5 text-[10px] font-mono font-bold",
                     libraryTab === "topical"
                       ? "bg-primary-foreground/20 text-primary-foreground"
                       : "bg-primary/15 text-primary",
                   )}
                 >
-                  {TOPICAL_MCQ_PAPERS.length}
+                  Coming Soon
                 </span>
               </button>
               <button
@@ -2088,6 +2092,7 @@ function fillMissingQuestionPages(
               onToggleExamMode={setStartInExamMode}
               practiceMode={practiceMode}
               onChangePracticeMode={setPracticeMode}
+              onSwitchToPastPapers={() => setLibraryTab("past_papers")}
             />
           ) : null}
 
@@ -4034,6 +4039,7 @@ function TopicalPaperShowcase({
   onToggleExamMode,
   practiceMode = "full_paper",
   onChangePracticeMode,
+  onSwitchToPastPapers,
 }: {
   topicalPapers: TopicalMcqPaper[];
   busy: boolean;
@@ -4045,6 +4051,7 @@ function TopicalPaperShowcase({
   onToggleExamMode?: (enabled: boolean) => void;
   practiceMode?: PracticeMode;
   onChangePracticeMode?: (mode: PracticeMode) => void;
+  onSwitchToPastPapers?: () => void;
 }) {
   const [selectedLevel, setSelectedLevel] = useState<"as" | "a2">("as");
   const [selectedDomain, setSelectedDomain] = useState<"all" | "micro" | "macro">("all");
@@ -4069,7 +4076,102 @@ function TopicalPaperShowcase({
     );
   }, [filteredPapers, selectedId, topicalPapers]);
 
-  if (topicalPapers.length === 0 || !activeTopic) return null;
+  if (topicalPapers.length === 0 || !activeTopic) {
+    const UNITS = [
+      {
+        unit: "Unit 1",
+        title: "The Basic Economic Problem",
+        topics: "Scarcity, Factors of Production, Opportunity Cost, Production Possibility Curves (PPC)",
+        icon: Target,
+      },
+      {
+        unit: "Unit 2",
+        title: "The Allocation of Resources",
+        topics: "Microeconomics, Demand & Supply, Price Elasticity (PED/PES), Market Failure & Externalities",
+        icon: TrendingUp,
+      },
+      {
+        unit: "Unit 3",
+        title: "Microeconomic Decision Makers",
+        topics: "Money & Banking, Households, Workers & Wages, Trade Unions, Production & Cost Theory",
+        icon: Users,
+      },
+      {
+        unit: "Unit 4",
+        title: "Government & Macroeconomy",
+        topics: "Macro Objectives, Fiscal Policy, Monetary Policy, Supply-Side Policy, Inflation & Unemployment",
+        icon: Landmark,
+      },
+      {
+        unit: "Unit 5",
+        title: "Economic Development",
+        topics: "Living Standards, Human Development Index (HDI), Poverty Traps, Population Demographics",
+        icon: Globe,
+      },
+      {
+        unit: "Unit 6",
+        title: "Trade & Globalisation",
+        topics: "International Specialisation, Free Trade & Tariffs, Fixed vs Floating Exchange Rates, Current Account BOP",
+        icon: ArrowRightLeft,
+      },
+    ];
+
+    return (
+      <div className="rounded-2xl border-2 border-primary/20 bg-card p-6 sm:p-10 shadow-xs space-y-8 animate-in fade-in duration-200">
+        <div className="max-w-2xl space-y-3 text-center sm:text-left">
+          <UiBadge className="border-primary/40 bg-primary/10 text-primary font-semibold text-xs px-3 py-1">
+            <Sparkles className="size-3.5 mr-1.5" /> Cambridge IGCSE Economics (0455)
+          </UiBadge>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            Topical MCQ Practice Coming Soon
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            We are currently curating and verifying 600+ authentic Cambridge 0455 multiple-choice questions with vector diagram slices, step-by-step examiner explanations, and subtopic mastery tracking across all 6 syllabus units.
+          </p>
+          {onSwitchToPastPapers && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onSwitchToPastPapers}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all"
+              >
+                <BookOpen className="size-3.5" />
+                Practice Full Past Papers (2018–2026)
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {UNITS.map((u) => {
+            const Icon = u.icon;
+            return (
+              <div
+                key={u.unit}
+                className="rounded-xl border border-border/80 bg-background/60 p-4 space-y-2 hover:border-primary/40 transition-colors shadow-2xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono font-bold text-primary uppercase">
+                    {u.unit}
+                  </span>
+                  <UiBadge variant="outline" className="text-[9px] font-mono py-0 px-1.5 border-primary/30 text-primary bg-primary/5">
+                    Curating
+                  </UiBadge>
+                </div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Icon className="size-4 text-primary shrink-0" />
+                  <span>{u.title}</span>
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {u.topics}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   const isBusyActive = busy && busyPaperId === activeTopic.id;
   const isDraftActive = activeDraftPaperId === activeTopic.id;

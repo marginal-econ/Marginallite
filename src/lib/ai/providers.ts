@@ -51,6 +51,8 @@ export const AI_PROVIDERS = [
     baseUrl: "https://openrouter.ai/api/v1",
     keyHint: "sk-or-...",
     models: [
+      "qwen/qwen-2.5-72b-instruct",
+      "mistralai/mistral-large",
       "meta-llama/llama-3.3-70b-instruct",
       "deepseek/deepseek-chat",
       "deepseek/deepseek-r1",

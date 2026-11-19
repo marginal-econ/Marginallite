@@ -120,8 +120,8 @@ export function DataResponseStudio() {
   // Selected Paper State (default to authentic Feb/March 2026 0455/22 Senegal paper)
   const [selectedPaperId, setSelectedPaperId] = useState<string>("0455_22_2026_fm");
 
-  // Extract View Mode: "pdf" (Past Paper PDF / Insert) | "text" (Transcript reference)
-  const [extractViewMode, setExtractViewMode] = useState<"pdf" | "text">("pdf");
+  // Extract View Mode: "text" (Typeset Cambridge insert reference) | "pdf" (Original PDF)
+  const [extractViewMode, setExtractViewMode] = useState<"pdf" | "text">("text");
   const [pdfModalOpen, setPdfModalOpen] = useState<boolean>(false);
 
   // Answering State (questionId/number -> text)
@@ -765,7 +765,7 @@ export function DataResponseStudio() {
                       className={cn(
                         "h-7 text-xs font-semibold px-2.5 gap-1.5 transition-all",
                         extractViewMode === "pdf"
-                          ? "bg-background shadow-xs text-rose-600 dark:text-rose-400 font-bold"
+                          ? "bg-background shadow-xs text-primary font-bold"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
@@ -832,6 +832,7 @@ export function DataResponseStudio() {
                     height="calc(100vh - 175px)"
                     className="min-h-[560px] max-h-[860px]"
                     onFullScreenToggle={() => setPdfModalOpen(true)}
+                    onSwitchToText={() => setExtractViewMode("text")}
                   />
                 )}
               </div>
@@ -1950,6 +1951,10 @@ export function DataResponseStudio() {
                 paperTitle={currentPaper.title}
                 examCode={currentPaper.originalExamCode}
                 height="calc(94vh - 110px)"
+                onSwitchToText={() => {
+                  setExtractViewMode("text");
+                  setPdfModalOpen(false);
+                }}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">

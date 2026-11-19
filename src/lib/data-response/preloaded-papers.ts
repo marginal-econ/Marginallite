@@ -19,6 +19,8 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "originalExamCode": "0455/22/F/M/26",
+    "pdfUrl": "/papers/0455_22_2026_fm.pdf",
     "extract": {
       "title": "1 Will Senegal escape poverty?",
       "paragraphs": [
@@ -286,8 +288,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
         "extractLinkageExpected": true,
         "syllabusTopic": "2.6 Price elasticity of demand (PED)"
       }
-    ],
-    "originalExamCode": "0455/22/F/M/26"
+    ]
   },
   {
     "id": "0455_22_2025_mj",
@@ -302,6 +303,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_s24_qp_22.pdf",
     "extract": {
       "title": "1 The future of the economy of St. Kitts and Nevis",
       "paragraphs": [
@@ -582,6 +584,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_m24_qp_22.pdf",
     "extract": {
       "title": "1 Population, household spending and poverty in Romania",
       "paragraphs": [
@@ -866,6 +869,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_w24_qp_22.pdf",
     "extract": {
       "title": "1 Changes in Jordan’s economy and population",
       "paragraphs": [
@@ -1128,6 +1132,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_s24_qp_22.pdf",
     "extract": {
       "title": "1 The challenges facing the Tunisian government",
       "paragraphs": [
@@ -1387,6 +1392,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_m24_qp_22.pdf",
     "extract": {
       "title": "1 Changes in the Danish economy",
       "paragraphs": [
@@ -1667,6 +1673,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_w23_qp_22.pdf",
     "extract": {
       "title": "1 Will Honduras become a more successful economy?",
       "paragraphs": [
@@ -1946,6 +1953,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_s23_qp_22.pdf",
     "extract": {
       "title": "1 How will oil change Guyana?",
       "paragraphs": [
@@ -2221,6 +2229,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_m23_qp_22.pdf",
     "extract": {
       "title": "1 Changes in US macroeconomic performance and policies",
       "paragraphs": [
@@ -2497,6 +2506,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_w22_qp_22.pdf",
     "extract": {
       "title": "1 Bank mergers in Nigeria and the US",
       "paragraphs": [
@@ -2803,6 +2813,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
     "totalMarks": 30,
     "durationMinutes": 45,
     "isOfficial": true,
+    "pdfUrl": "https://pastpapers.papacambridge.com/directories/CAIE/CAIE-pastpapers/upload/0455_s22_qp_22.pdf",
     "extract": {
       "title": "1 Happiness in Bhutan",
       "paragraphs": [

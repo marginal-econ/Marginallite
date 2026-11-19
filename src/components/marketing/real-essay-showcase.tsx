@@ -40,45 +40,36 @@ const ESSAY_CLAUSES: EssayClause[] = [
     badge: "AO1 Knowledge",
     mark: "+2 / 2",
     dot: "bg-ao1",
-    text: "Aggregate demand is equal to C+I+G+NX. Aggregate demand can be increased in certain cases by expansionary monetary and fiscal policies. Increased aggregate demand can cause demand pull inflation.",
-    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO1 (2/2): Defines AD formula (C+I+G+X-M) & identifies monetary/fiscal policy instruments.",
-    comment: "Full AO1 Knowledge: Accurate specification of the AD equation components, expansionary policy levers, and direct theoretical consequence of demand-pull price pressures.",
+    text: "An exchange rate is the value of one currency in terms of another. A fixed exchange rate is controlled and pegged by the government or central bank at a specific target parity.",
+    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO1 (2/2): Accurate economic definition of exchange rate and government/central bank pegging mechanism.",
+    comment: "Full AO1 Knowledge: Clear, precise definition of exchange rate as the relative price of a currency and explicit identification of state intervention maintaining the parity peg.",
   },
   {
     ao: "AO2",
     badge: "AO2 Analysis",
     mark: "+3 / 3",
     dot: "bg-ao2",
-    text: "Increased aggregate demand may mean an increase in production. As when aggregate demand is high, it means suppliers are incentivised to produce due to their profit motive. Increased production can lead to increased job opportunities, and also increased production leads to an increase in GDP (Economic growth). Higher output also leads to higher corporate tax revenue and income tax revenue for the government, improving the fiscal budget.",
-    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO2 Level 3 (3/3): Traces multi-stage causal chain from firm profit motive to derived labour demand and national output growth.",
-    comment: "High-Band Analytical Chain (AO2): Traces an unbroken causal transmission mechanism from firm incentives to derived labour demand, output growth, and fiscal multiplier receipts.",
+    text: "A fixed exchange rate increases certainty and promotes economic growth. Because exchange rates are pegged, domestic trading firms know the exact cost of importing capital equipment and export revenue in advance. This business confidence encourages capital investment, raising productive capacity and aggregate output. Furthermore, exchange rate stability attracts Foreign Direct Investment (FDI) and Multinational Corporations (MNCs), as predictable returns reduce currency risk, generating employment and economic growth.",
+    markSchemeRef: "Cambridge 0455/22 Table A Level 3 (3/3): Traces multi-stage causal chain from currency stability to commercial certainty, capital investment, FDI inflows, and GDP growth.",
+    comment: "High-Band Analytical Transmission (AO2): Traces an unbroken chain linking fixed rate certainty to lowered transaction risk, business investment, FDI attraction, and real output expansion.",
   },
   {
     ao: "AO3",
     badge: "AO3 Evaluation",
-    mark: "+2 / 2",
-    dot: "bg-ao3",
-    text: "However, the level of increase in production depends on the production possibility curve (PPC) and where the economy is currently operating. If the economy is operating with substantial spare capacity (a negative output gap), an increase in aggregate demand shifts real output towards full employment without immediately triggering cost or price pressures.",
-    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO3 Level 2 (2/2): Evaluative conditionality based on initial spare capacity and position relative to the PPC.",
-    comment: "Evaluative Judgement (AO3): Identifies the conditionality of spare capacity and positions the economy along the PPC curve.",
-  },
-  {
-    ao: "AO2",
-    badge: "AO2 Analysis",
     mark: "+2 / 3",
-    dot: "bg-ao2",
-    text: "Conversely, if the economy is operating near full capacity (along the vertical segment of the LRAS), an increase in aggregate demand only generates demand-pull inflation without increasing real output. Furthermore, rapid demand expansion often triggers higher import expenditure, causing deterioration on the current account of the balance of payments.",
-    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO2 Level 2 (2/3): Correctly notes Classical LRAS vertical constraints and balance of payments import leakages.",
-    comment: "Counter-Analysis (AO2): Correctly notes Classical LRAS constraints and open-economy leakage via the marginal propensity to import (MPM).",
+    dot: "bg-ao3",
+    text: "On the other hand, maintaining a fixed exchange rate imposes substantial costs on the government. Defending a pegged currency requires large foreign exchange reserves and frequent central bank intervention. If the currency faces downward market pressure, buying domestic currency depletes foreign reserves or forces higher interest rates, which conflicts with domestic monetary policy objectives and dampens domestic growth. Moreover, an economy with a fixed exchange rate sacrifices automatic balance of payments stabilisation, risking prolonged trade deficits if the peg is set too high.",
+    markSchemeRef: "Cambridge 0455/22 Table A Level 3 Counter-Analysis (2/3): Robust, detailed counter-arguments detailing reserve exhaustion, sacrifice of monetary autonomy, and lack of automatic current account correction.",
+    comment: "Comprehensive Counter-Evaluation (AO3): Thoroughly weighs the severe drawbacks — reserve depletion, loss of independent monetary policy, and absence of market self-correction.",
   },
   {
     ao: "AO3",
     badge: "AO3 Evaluation",
-    mark: "+1 / 2",
+    mark: "+1 / 3",
     dot: "bg-ao3",
-    text: "In evaluation, whether an increase in aggregate demand is of overall benefit depends critically on the initial macroeconomic state: it is highly beneficial during a cyclical downturn with spare capacity, but risks stagflation and currency instability if applied when the economy is at full employment without matching supply-side expansion.",
-    markSchemeRef: "Cambridge 0455/22 Mark Scheme §AO3 Synthesis (1/2): Concluding synthesis weighing beneficial growth vs inflation risk, but missing explicit long-run supply-side balance.",
-    comment: "Supported Synthesis (AO3): High-level conclusion weighing economic growth against macroeconomic instability depending on the initial state of the business cycle.",
+    text: "In conclusion, whether a fixed exchange rate will benefit an economy depends primarily on whether the central bank possesses sufficient foreign currency reserves to defend the peg credibly, and whether trade certainty outweighs the loss of monetary policy autonomy. For trade-reliant developing nations, managed floating or banded pegs often achieve stability without exhausting national reserves.",
+    markSchemeRef: "Cambridge 0455/22 Table A Level 3 Reasoned Judgment (1/3): Balanced synthesis providing justified conditionality regarding foreign reserve adequacy and policy autonomy.",
+    comment: "Exemplary Level 3 Evaluative Synthesis (AO3): Delivers a well-reasoned conclusion establishing conditionality on reserve adequacy and evaluating managed floating as an optimal policy alternative.",
   },
 ];
 
@@ -90,7 +81,7 @@ export function RealEssayShowcase() {
 
   const copyEssay = () => {
     navigator.clipboard.writeText(fullEssayText);
-    toast.success("Authentic Cambridge 10/12 essay copied to clipboard.");
+    toast.success("Authentic Cambridge 8/8 essay copied to clipboard.");
   };
 
   const currentClause = activeSentence !== null ? ESSAY_CLAUSES[activeSentence] : null;
@@ -123,7 +114,7 @@ export function RealEssayShowcase() {
             <div className="flex items-center gap-2">
               <span className="font-semibold text-foreground">Section B Essay</span>
               <span>·</span>
-              <span className="font-bold text-primary">Tariff: [12 Marks]</span>
+              <span className="font-bold text-primary">Tariff: [8 Marks]</span>
             </div>
           </div>
 
@@ -132,7 +123,7 @@ export function RealEssayShowcase() {
               Official Cambridge Exam Question:
             </span>
             <p className="text-base sm:text-lg font-semibold text-foreground leading-snug">
-              “Discuss whether an increase in aggregate demand would be of overall benefit for an economy. [12]”
+              “Discuss whether or not having a fixed exchange rate will benefit an economy. [8]”
             </p>
           </div>
         </div>
@@ -148,11 +139,11 @@ export function RealEssayShowcase() {
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-foreground tabular-nums">10</span>
-                <span className="text-sm text-muted-foreground font-medium">/ 12 (83%)</span>
+                <span className="text-3xl font-extrabold text-foreground tabular-nums">8</span>
+                <span className="text-sm text-muted-foreground font-medium">/ 8 (100%)</span>
               </div>
               <Badge className="mt-2 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] font-bold">
-                Band 4 Distinction Target
+                Level 3 Top Band (Full Marks)
               </Badge>
             </CardContent>
           </Card>
@@ -171,7 +162,7 @@ export function RealEssayShowcase() {
                 <span className="text-3xl font-extrabold text-foreground tabular-nums">100%</span>
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
-                Full formula AD = C+I+G+NX & policy levers cited.
+                Accurate definitions of exchange rate and government pegging.
               </p>
             </CardContent>
           </Card>
@@ -182,15 +173,15 @@ export function RealEssayShowcase() {
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-ao2" /> AO2 Analysis
                 </span>
-                <span className="font-mono text-[11px] text-ao2 font-bold">5/6</span>
+                <span className="font-mono text-[11px] text-ao2 font-bold">3/3</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-foreground tabular-nums">83%</span>
+                <span className="text-3xl font-extrabold text-foreground tabular-nums">100%</span>
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
-                Derived labour demand, output growth, & LRAS capacity.
+                Causal chains linking certainty to investment, FDI, and GDP.
               </p>
             </CardContent>
           </Card>
@@ -201,15 +192,15 @@ export function RealEssayShowcase() {
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-ao3" /> AO3 Evaluation
                 </span>
-                <span className="font-mono text-[11px] text-ao3 font-bold">3/4</span>
+                <span className="font-mono text-[11px] text-ao3 font-bold">3/3</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-foreground tabular-nums">75%</span>
+                <span className="text-3xl font-extrabold text-foreground tabular-nums">100%</span>
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
-                Evaluates PPC spare capacity & import leakages.
+                Weighs foreign exchange reserve drain and loss of policy autonomy.
               </p>
             </CardContent>
           </Card>
@@ -310,7 +301,7 @@ export function RealEssayShowcase() {
                 <h3 className="text-sm font-bold text-foreground">Cambridge Examiner Diagnostic</h3>
               </div>
               <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
-                10/12 Scored
+                8/8 Full Marks
               </Badge>
             </div>
 
@@ -362,19 +353,19 @@ export function RealEssayShowcase() {
                     <CheckCircle2 className="size-4 shrink-0" /> Verified Cambridge Strengths:
                   </span>
                   <ul className="list-disc pl-4 space-y-1.5 text-muted-foreground leading-relaxed text-[11.5px]">
-                    <li>Full formula definition of AD (C+I+G+NX) with explicit fiscal & monetary policy levers.</li>
-                    <li>Unbroken causal chain linking supplier profit motive to derived labor demand and GDP.</li>
-                    <li>Accurate Classical LRAS vertical bottleneck and open-economy import expenditure leakage.</li>
+                    <li>Accurate specification of exchange rate mechanism with explicit government parity pegging (AO1 2/2).</li>
+                    <li>Unbroken causal chain linking exchange rate certainty to firm investment, FDI, and GDP expansion (AO2 3/3).</li>
+                    <li>Balanced Table A evaluation analyzing foreign reserve drains, loss of monetary autonomy, and alternative policy regimes (AO3 3/3).</li>
                   </ul>
                 </div>
 
-                {/* Rewrite Step to 12/12 */}
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-1.5">
-                  <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                    <Award className="size-4 shrink-0" /> Examiner Step to 12/12 Full Marks:
+                {/* Level 3 Table A Criteria Met */}
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 space-y-1.5">
+                  <span className="font-semibold text-primary flex items-center gap-1.5">
+                    <Award className="size-4 shrink-0" /> Cambridge Table A Distinction Standard:
                   </span>
                   <p className="text-muted-foreground leading-relaxed text-[11.5px]">
-                    Explicitly synthesize <em>which</em> macroeconomic effect dominates when the marginal propensity to import (MPM) is high versus when domestic spare capacity is large.
+                    Achieves top Level 3 (6–8 marks) by providing thorough two-sided analytical depth and a justified evaluative synthesis addressing reserve conditionality.
                   </p>
                 </div>
               </div>

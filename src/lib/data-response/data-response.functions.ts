@@ -222,13 +222,44 @@ export const getPaperPdfBase64 = createServerFn({ method: "GET" })
     }
 
     try {
-      const res = await fetch(paper.pdfUrl, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-      });
-      if (!res.ok) {
-        throw new Error(`Remote repository returned HTTP ${res.status}`);
+      let arrayBuffer: ArrayBuffer | null = null;
+
+      // Handle local/relative paths (e.g. /papers/0455_22_2026_fm.pdf)
+      if (paper.pdfUrl.startsWith("/")) {
+        try {
+          const fs = await import("node:fs");
+          const path = await import("node:path");
+          const localPath = path.resolve(process.cwd(), "public", paper.pdfUrl.replace(/^\//, ""));
+          if (fs.existsSync(localPath)) {
+            const buf = fs.readFileSync(localPath);
+            arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+          }
+        } catch {
+          // Fall through to fetch in worker runtime
+        }
+
+        if (!arrayBuffer) {
+          const fetchUrl = `https://lite.marginal-econ.com${paper.pdfUrl}`;
+          const res = await fetch(fetchUrl, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+          });
+          if (res.ok) {
+            arrayBuffer = await res.arrayBuffer();
+          }
+        }
+      } else {
+        const res = await fetch(paper.pdfUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+        });
+        if (res.ok) {
+          arrayBuffer = await res.arrayBuffer();
+        }
       }
-      const arrayBuffer = await res.arrayBuffer();
+
+      if (!arrayBuffer) {
+        throw new Error(`Could not retrieve PDF data from source.`);
+      }
+
       const base64 = Buffer.from(arrayBuffer).toString("base64");
       return {
         base64,
@@ -236,7 +267,7 @@ export const getPaperPdfBase64 = createServerFn({ method: "GET" })
         byteLength: arrayBuffer.byteLength,
       };
     } catch (err: any) {
-      console.error(`Could not fetch PDF for paper ${data.paperId}:`, err);
-      throw new Error(`Failed to load authentic PDF: ${err.message}`);
+      console.warn(`Could not fetch PDF for paper ${data.paperId}:`, err?.message || err);
+      throw new Error(`Failed to load authentic PDF: ${err?.message || "Source unavailable"}`);
     }
   });

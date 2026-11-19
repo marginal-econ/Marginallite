@@ -43,6 +43,10 @@ import {
   type MatrixArchiveEssay,
   type MatrixArchivePaper,
 } from "@/lib/paper-matrix/matrix.functions";
+import {
+  FALLBACK_0455_MCQ_PAPERS,
+  FALLBACK_0455_ESSAY_QUESTIONS,
+} from "@/lib/paper-matrix/fallback-archive";
 import { getMe } from "@/lib/account.functions";
 
 export const Route = createFileRoute("/_authenticated/paper-matrix")({
@@ -91,9 +95,13 @@ function PaperMatrixPage() {
   const [archiveSearch, setArchiveSearch] = useState<string>("");
   const [visibleEssayLimit, setVisibleEssayLimit] = useState(30);
 
-  const mcqPapers = archiveQuery.data?.mcqPapers ?? [];
-  const essayQuestions = archiveQuery.data?.essayQuestions ?? [];
-  const archiveYears = archiveQuery.data?.years ?? [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
+  const mcqPapers = (archiveQuery.data?.mcqPapers && archiveQuery.data.mcqPapers.length > 0)
+    ? archiveQuery.data.mcqPapers
+    : FALLBACK_0455_MCQ_PAPERS;
+  const essayQuestions = (archiveQuery.data?.essayQuestions && archiveQuery.data.essayQuestions.length > 0)
+    ? archiveQuery.data.essayQuestions
+    : FALLBACK_0455_ESSAY_QUESTIONS;
+  const archiveYears = archiveQuery.data?.years ?? [2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
   const filteredMcq = useMemo(() => {
     return mcqPapers.filter((p) => {
@@ -577,7 +585,7 @@ function PaperMatrixPage() {
             </div>
 
             {/* ARCHIVE CONTENT */}
-            {archiveQuery.isLoading ? (
+            {archiveQuery.isLoading && mcqPapers.length === 0 ? (
               <div className="space-y-4">
                 <Skeleton className="h-8 w-48" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -586,7 +594,7 @@ function PaperMatrixPage() {
                   ))}
                 </div>
               </div>
-            ) : archiveQuery.isError ? (
+            ) : archiveQuery.isError && mcqPapers.length === 0 && essayQuestions.length === 0 ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center space-y-3">
                 <AlertTriangle className="size-8 text-destructive mx-auto" />
                 <h3 className="text-sm font-bold text-foreground">Failed to Load Past Papers Archive</h3>
