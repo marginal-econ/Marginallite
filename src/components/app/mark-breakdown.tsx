@@ -153,9 +153,21 @@ function getBandTheme(band: string, totalMark?: number, maxMark?: number) {
 }
 
 export function MarkBreakdown({ grading: rawGrading, question }: { grading: Grading; question?: string }) {
-  const maxMark = rawGrading?.max_mark ?? 8;
-  const totalMark = rawGrading?.total_mark ?? 0;
-  const rawAo = rawGrading?.ao_breakdown ?? {};
+  let parsedGrading: any = rawGrading;
+  if (typeof parsedGrading === "string") {
+    try {
+      parsedGrading = JSON.parse(parsedGrading);
+    } catch {
+      parsedGrading = {};
+    }
+  }
+  if (!parsedGrading || typeof parsedGrading !== "object") {
+    parsedGrading = {};
+  }
+
+  const maxMark = parsedGrading.max_mark ?? 8;
+  const totalMark = parsedGrading.total_mark ?? 0;
+  const rawAo = parsedGrading.ao_breakdown ?? {};
   const aoBreakdown = {
     knowledge: {
       awarded: rawAo.knowledge?.awarded ?? Math.min(2, Math.round(totalMark * 0.25)),
@@ -174,16 +186,16 @@ export function MarkBreakdown({ grading: rawGrading, question }: { grading: Grad
     },
   };
 
-  const sources = Array.isArray(rawGrading?.sources) ? rawGrading.sources : [];
-  const suggestedPractice = Array.isArray(rawGrading?.suggested_practice) ? rawGrading.suggested_practice : [];
-  const suggestedResources = Array.isArray(rawGrading?.suggested_resources) ? rawGrading.suggested_resources : [];
-  const strengthsList = Array.isArray(rawGrading?.strengths) ? rawGrading.strengths : [];
-  const weaknessesList = Array.isArray(rawGrading?.weaknesses) ? rawGrading.weaknesses : [];
-  const actionableFeedbackList = Array.isArray(rawGrading?.actionable_feedback) ? rawGrading.actionable_feedback : [];
-  const pointsList = Array.isArray(rawGrading?.points) ? rawGrading.points : [];
+  const sources = Array.isArray(parsedGrading.sources) ? parsedGrading.sources : [];
+  const suggestedPractice = Array.isArray(parsedGrading.suggested_practice) ? parsedGrading.suggested_practice : [];
+  const suggestedResources = Array.isArray(parsedGrading.suggested_resources) ? parsedGrading.suggested_resources : [];
+  const strengthsList = Array.isArray(parsedGrading.strengths) ? parsedGrading.strengths : [];
+  const weaknessesList = Array.isArray(parsedGrading.weaknesses) ? parsedGrading.weaknesses : [];
+  const actionableFeedbackList = Array.isArray(parsedGrading.actionable_feedback) ? parsedGrading.actionable_feedback : [];
+  const pointsList = Array.isArray(parsedGrading.points) ? parsedGrading.points : [];
 
   const grading: Grading = {
-    ...rawGrading,
+    ...parsedGrading,
     max_mark: maxMark,
     total_mark: totalMark,
     ao_breakdown: aoBreakdown,
@@ -644,14 +656,14 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
 
 function PointList({
   title,
-  items,
+  items = [],
   tone,
 }: {
   title: string;
-  items: string[];
+  items?: string[];
   tone: "good" | "bad" | "neutral";
 }) {
-  if (items.length === 0) return null;
+  if (!items || !Array.isArray(items) || items.length === 0) return null;
   const isGood = tone === "good";
   const isNeutral = tone === "neutral";
   const Icon = isGood ? Check : isNeutral ? Sparkles : X;
@@ -709,6 +721,7 @@ function PointList({
 }
 
 function MissingElements({ grading }: { grading: Grading }) {
+  if (!grading) return null;
   const isFullMarks = grading.max_mark > 0 && grading.total_mark >= grading.max_mark;
   const me = (grading.missing_elements || {}) as any;
   const defs: string[] = Array.isArray(me.definitions) ? me.definitions : [];
@@ -726,7 +739,7 @@ function MissingElements({ grading }: { grading: Grading }) {
     },
     { label: "Examples & Application", items: ex },
     { label: "Diagrams", items: dg },
-  ].filter((group) => group.items.length > 0);
+  ].filter((group) => Array.isArray(group.items) && group.items.length > 0);
 
   if (groups.length === 0) return null;
 

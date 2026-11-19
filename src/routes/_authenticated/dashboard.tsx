@@ -204,7 +204,6 @@ export function DashboardPage() {
       }
       const mark = v.total_mark ?? 0;
       if (mark > 12) return 20;
-      if (mark > 8) return 12;
       return 8;
     },
     [essayMap],
@@ -340,7 +339,8 @@ export function DashboardPage() {
       if (!matchesSearch) return false;
       if (bandFilter === "all") return true;
       const mark = essay.latest_mark ?? 0;
-      const max = essay.max_mark ?? 12;
+      const rawMax = essay.max_mark;
+      const max = rawMax === 12 ? 8 : (rawMax ?? 8);
       const pct = max > 0 ? (mark / max) * 100 : 0;
       if (bandFilter === "band1") return pct >= 75;
       if (bandFilter === "band2") return pct >= 50 && pct < 75;
@@ -1085,7 +1085,8 @@ export function DashboardPage() {
             <ul className="divide-y divide-border">
               {visibleEssays.map((essay) => {
                 const mark = essay.latest_mark ?? 0;
-                const max = essay.max_mark ?? 12;
+                const rawMax = essay.max_mark;
+                const max = rawMax === 12 ? 8 : (rawMax ?? 8);
                 const pct = max > 0 ? Math.round((mark / max) * 100) : 0;
                 const isTopBand = pct >= 75;
                 const isMidBand = pct >= 50 && pct < 75;
@@ -1605,7 +1606,8 @@ function PerformanceChart({
     return list.map((v, i) => {
       const mark = v.total_mark ?? 0;
       const essayObj = Array.isArray(v.essays) ? v.essays[0] : v.essays;
-      const maxMark = Number(essayObj?.max_mark) || (mark > 12 ? 20 : 12);
+      const rawMax = essayObj?.max_mark ?? v.max_mark;
+      const maxMark = Number(rawMax === 12 ? 8 : (rawMax ?? 8)) || (mark > 12 ? 20 : 8);
       const pct = maxMark > 0 ? Math.min(1, Math.max(0, mark / maxMark)) : 0;
       const x = padding.left + (i / Math.max(1, list.length - 1)) * chartWidth;
       const y = padding.top + chartHeight - pct * chartHeight;
@@ -1788,7 +1790,7 @@ function PerformanceChart({
               textAnchor="middle"
               className="text-[11px] font-bold fill-foreground"
             >
-              {hoveredPoint.mark}/{hoveredPoint.maxMark ?? 12} awarded
+              {hoveredPoint.mark}/{hoveredPoint.maxMark === 12 ? 8 : (hoveredPoint.maxMark ?? 8)} awarded
             </text>
           </g>
         ) : null}

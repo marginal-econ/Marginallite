@@ -1936,14 +1936,20 @@ export const adminGetEssayDetail = createServerFn({ method: "POST" })
           .select("id, full_name, school")
           .eq("id", subRow.user_id)
           .maybeSingle(),
-        listAcceptedAuthUsers(),
+        listAcceptedAuthUsers().catch(() => []),
       ]);
-      const authorEmail = authUsers.find((u) => u.id === subRow.user_id)?.email || null;
+      const userList = Array.isArray(authUsers) ? authUsers : [];
+      const authorEmail = userList.find((u) => u.id === subRow.user_id)?.email || null;
       let grading = subRow.grading_result || subRow.result_json;
       if (typeof grading === "string") {
         try {
           grading = JSON.parse(grading);
-        } catch {}
+        } catch {
+          grading = {};
+        }
+      }
+      if (!grading || typeof grading !== "object") {
+        grading = {};
       }
       const totalMark = subRow.awarded_marks ?? subRow.total_mark ?? (grading as any)?.total_mark ?? null;
       const maxMark = subRow.max_marks ?? subRow.max_mark ?? (grading as any)?.max_mark ?? 8;
@@ -1977,58 +1983,66 @@ export const adminGetEssayDetail = createServerFn({ method: "POST" })
         ],
         author: {
           id: subRow.user_id,
-          name: (profileRes.data as any)?.full_name || authorEmail || "Student",
+          name: (profileRes?.data as any)?.full_name || authorEmail || "Student",
           email: authorEmail,
-          school: (profileRes.data as any)?.school || null,
+          school: (profileRes?.data as any)?.school || null,
         },
       };
     }
 
-    const { data: essay, error: essayErr } = await supabaseAdmin
-      .from("essays")
-      .select("id, user_id, question, max_mark, latest_mark, created_at, updated_at")
-      .eq("id", data.essayId)
-      .maybeSingle();
+    try {
+      const { data: essay, error: essayErr } = await supabaseAdmin
+        .from("essays")
+        .select("id, user_id, question, max_mark, latest_mark, created_at, updated_at")
+        .eq("id", data.essayId)
+        .maybeSingle();
 
-    if (essayErr) throw new Error(essayErr.message);
-    if (!essay) throw new Error("Essay not found");
+      if (!essayErr && essay) {
+        const [versionsRes, profileRes, authUsers] = await Promise.all([
+          supabaseAdmin
+            .from("essay_versions")
+            .select("id, version, essay_text, grading, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, audited, created_at")
+            .eq("essay_id", data.essayId)
+            .order("version", { ascending: true }),
+          supabaseAdmin
+            .from("profiles")
+            .select("id, full_name, school")
+            .eq("id", essay.user_id)
+            .maybeSingle(),
+          listAcceptedAuthUsers().catch(() => []),
+        ]);
 
-    const [versionsRes, profileRes, authUsers] = await Promise.all([
-      supabaseAdmin
-        .from("essay_versions")
-        .select("id, version, essay_text, grading, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, audited, created_at")
-        .eq("essay_id", data.essayId)
-        .order("version", { ascending: true }),
-      supabaseAdmin
-        .from("profiles")
-        .select("id, full_name, school")
-        .eq("id", essay.user_id)
-        .maybeSingle(),
-      listAcceptedAuthUsers(),
-    ]);
+        const userList = Array.isArray(authUsers) ? authUsers : [];
+        const authorEmail = userList.find((u) => u.id === essay.user_id)?.email || null;
+        const authorName = (profileRes?.data as any)?.full_name || authorEmail || "Student";
+        const authorSchool = (profileRes?.data as any)?.school || null;
 
-    const authorEmail = authUsers.find((u) => u.id === essay.user_id)?.email || null;
+        const versions = (versionsRes?.data ?? []).map((v: any) => {
+          let g = v.grading;
+          if (typeof g === "string") {
+            try {
+              g = JSON.parse(g);
+            } catch {
+              g = {};
+            }
+          }
+          return { ...v, grading: g ?? {} };
+        });
 
-    const versions = (versionsRes.data ?? []).map((v: any) => {
-      let g = v.grading;
-      if (typeof g === "string") {
-        try {
-          g = JSON.parse(g);
-        } catch {}
+        return {
+          essay,
+          versions,
+          author: {
+            id: essay.user_id,
+            name: authorName,
+            email: authorEmail,
+            school: authorSchool,
+          },
+        };
       }
-      return { ...v, grading: g };
-    });
+    } catch {}
 
-    return {
-      essay,
-      versions,
-      author: {
-        id: essay.user_id,
-        name: profileRes.data?.full_name || authorEmail || "Student",
-        email: authorEmail,
-        school: profileRes.data?.school || null,
-      },
-    };
+    throw new Error("Essay not found");
   });
 
 export const adminListAllMcqAttempts = createServerFn({ method: "GET" })

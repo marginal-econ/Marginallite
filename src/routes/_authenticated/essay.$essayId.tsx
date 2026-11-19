@@ -74,11 +74,11 @@ function EssayPage() {
 
   const activeIndex = selected ?? Math.max(versions.length - 1, 0);
   const active = versions[activeIndex];
-  const rawMax = thread.data?.essay.max_mark;
+  const rawMax = thread.data?.essay?.max_mark;
   const maxMark = rawMax === 12 ? 8 : (rawMax ?? 8);
 
   useEffect(() => {
-    if (active && !rewrite) setRewrite(active.essay_text);
+    if (active?.essay_text && !rewrite) setRewrite(active.essay_text);
   }, [active, rewrite]);
 
   function handleRewriteGrade(options?: { skipDiagramCheck?: boolean }) {
@@ -93,7 +93,7 @@ function EssayPage() {
     mutationFn: () =>
       grade({
         data: {
-          question: thread.data!.essay.question,
+          question: thread.data?.essay?.question || "",
           essayText: rewrite,
           maxMark,
           essayId,
@@ -149,7 +149,7 @@ function EssayPage() {
     );
   }
 
-  if (thread.isError || !thread.data) {
+  if (thread.isError || !thread.data || !thread.data.essay) {
     return (
       <div className="p-8">
         <p className="text-sm text-muted-foreground">That essay could not be loaded.</p>
@@ -163,7 +163,7 @@ function EssayPage() {
   return (
     <>
       <PageHeader
-        title={thread.data.essay.question}
+        title={thread.data.essay.question || "Cambridge IGCSE Essay"}
         description={`${versions.length} attempt${versions.length === 1 ? "" : "s"} · ${maxMark} marks available`}
         action={
           <div className="flex flex-wrap items-center gap-2">

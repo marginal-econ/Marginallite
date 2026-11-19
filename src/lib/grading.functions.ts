@@ -263,8 +263,15 @@ export const getEssayThread = createServerFn({ method: "POST" })
     z.object({ essayId: z.string().uuid() }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
-    const { isUserAdmin } = await import("@/lib/auth-admin");
-    const isAdmin = isUserAdmin(context.userId);
+    const { isAdmin: checkAdmin } = await import("@/lib/auth-admin");
+    const isAdmin = Boolean(
+      context.isAdmin ||
+        checkAdmin({
+          userId: context.userId,
+          email: (context as any).email,
+          claims: (context as any).claims,
+        }),
+    );
 
     try {
       const { data: sub, error: subError } = await supabaseAdmin
@@ -278,13 +285,30 @@ export const getEssayThread = createServerFn({ method: "POST" })
         if (!isAdmin && s.user_id !== context.userId) {
           throw new Error("You do not have permission to view this essay.");
         }
-        const gradingResult = (s.grading_result || {}) as any;
+        let gradingResult = s.grading_result || {};
+        if (typeof gradingResult === "string") {
+          try {
+            gradingResult = JSON.parse(gradingResult);
+          } catch {
+            gradingResult = {};
+          }
+        }
+        if (!gradingResult || typeof gradingResult !== "object") {
+          gradingResult = {};
+        }
+
+        const maxMark = s.max_marks ?? gradingResult?.max_mark ?? 8;
+        const totalMark = s.awarded_marks ?? gradingResult?.total_mark ?? 0;
+        const ao1 = gradingResult?.ao_breakdown?.knowledge?.awarded ?? s.ao1_mark ?? null;
+        const ao2 = gradingResult?.ao_breakdown?.analysis?.awarded ?? s.ao2_mark ?? null;
+        const ao3 = gradingResult?.ao_breakdown?.evaluation?.awarded ?? s.ao3_mark ?? null;
+
         return {
           essay: {
             id: s.id,
             question: s.question,
-            max_mark: s.max_marks ?? 8,
-            latest_mark: s.awarded_marks,
+            max_mark: maxMark,
+            latest_mark: totalMark,
             created_at: s.created_at,
             user_id: s.user_id,
           },
@@ -294,9 +318,12 @@ export const getEssayThread = createServerFn({ method: "POST" })
               version: 1,
               essay_text: s.essay_text,
               grading: gradingResult,
-              total_mark: s.awarded_marks,
-              confidence: gradingResult?.confidence ?? 0.9,
-              audited: gradingResult?.audited ?? false,
+              total_mark: totalMark,
+              ao1_awarded: ao1,
+              ao2_awarded: ao2,
+              ao3_awarded: ao3,
+              confidence: gradingResult?.confidence ?? 0.95,
+              audited: Boolean(gradingResult?.audited),
               created_at: s.created_at,
             },
           ],
@@ -324,7 +351,19 @@ export const getEssayThread = createServerFn({ method: "POST" })
           .eq("essay_id", data.essayId)
           .order("version", { ascending: true });
 
-        return { essay, versions: versions ?? [] };
+        const safeVersions = (versions ?? []).map((ver: any) => {
+          let g = ver.grading;
+          if (typeof g === "string") {
+            try {
+              g = JSON.parse(g);
+            } catch {
+              g = {};
+            }
+          }
+          return { ...ver, grading: g ?? {} };
+        });
+
+        return { essay, versions: safeVersions };
       }
     } catch {}
 

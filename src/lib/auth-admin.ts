@@ -1,7 +1,19 @@
 /**
  * Centralized authorization rules for Marginalite administrator privileges.
- * Admin identity is configured via ADMIN_EMAILS (comma-separated) and/or user_roles.
+ * marginal.econ.ai@gmail.com is the ONE and ONLY administrator of the platform.
  */
+
+export const MARGINAL_ADMIN_USER_ID = "b22b0880-7903-4504-b12c-bfb955b1024b";
+export const MARGINAL_ADMIN_EMAIL = "marginal.econ.ai@gmail.com";
+
+export const AUTHORIZED_ADMIN_IDS = new Set([
+  "b22b0880-7903-4504-b12c-bfb955b1024b", // marginal.econ.ai@gmail.com (Marginalite Supabase)
+  "00296414-0221-4d5b-aa1c-04dc9366a218", // marginal.econ.ai@gmail.com (Marginal legacy)
+]);
+
+export const AUTHORIZED_ADMIN_EMAILS = new Set([
+  "marginal.econ.ai@gmail.com", // Marginalite ONLY
+]);
 
 export function getAdminEmails(): Set<string> {
   const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env : undefined;
@@ -48,11 +60,21 @@ export function isAdmin(
   const adminEmails = getAdminEmails();
 
   if (typeof opts === "string") {
-    const trimmed = opts.trim().toLowerCase();
-    if (adminEmails.has(trimmed)) {
+    const trimmed = opts.trim();
+    if (AUTHORIZED_ADMIN_IDS.has(trimmed)) {
+      return true;
+    }
+    const lower = trimmed.toLowerCase();
+    if (AUTHORIZED_ADMIN_EMAILS.has(lower) || adminEmails.has(lower)) {
       return true;
     }
     return false;
+  }
+
+  // Check user ID directly
+  const candidateId = opts.userId || opts.claims?.sub || opts.claims?.user?.id;
+  if (candidateId && AUTHORIZED_ADMIN_IDS.has(candidateId)) {
+    return true;
   }
 
   // Check role claim if explicitly provided
@@ -79,7 +101,10 @@ export function isAdmin(
     .toLowerCase()
     .trim();
 
-  if (candidateEmail && adminEmails.has(candidateEmail)) {
+  if (
+    candidateEmail &&
+    (adminEmails.has(candidateEmail) || AUTHORIZED_ADMIN_EMAILS.has(candidateEmail))
+  ) {
     return true;
   }
 
@@ -89,17 +114,39 @@ export function isAdmin(
 // Backwards-compatible aliases
 export const isMarginalAdmin = isAdmin;
 export const isMarginaliteAdmin = isAdmin;
-export const MARGINAL_ADMIN_USER_ID = "";
-export const MARGINAL_ADMIN_EMAIL = "marginal.econ.ai@gmail.com";
-export const isUserAdmin = (userId?: string | null) => isAdmin({ userId });
+export const isUserAdmin = (
+  opts?:
+    | {
+        userId?: string | null;
+        email?: string | null;
+        claims?: any;
+      }
+    | string
+    | null,
+): boolean => {
+  if (!opts) return false;
+  if (typeof opts === "string") {
+    return isAdmin({ userId: opts });
+  }
+  return isAdmin(opts);
+};
 
 export function assertAdmin(context: {
   userId?: string | null;
   claims?: any;
   email?: string | null;
+  user?: any;
 }): void {
-  if (!isAdmin(context)) {
-    throw new Error("Forbidden: Administrator access required.");
+  const isMarginal = isAdmin({
+    userId: context?.userId ?? context?.user?.id,
+    claims: context?.claims,
+    email: context?.email ?? context?.user?.email,
+  });
+
+  if (isMarginal) {
+    return;
   }
+
+  throw new Error("Admin access is restricted. Marginalite is the sole administrator of this platform.");
 }
 
