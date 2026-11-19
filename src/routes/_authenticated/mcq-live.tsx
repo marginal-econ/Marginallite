@@ -1042,7 +1042,7 @@ function fillMissingQuestionPages(
         ? paper.answerKey
         : (paper as any).answer_key && Object.keys((paper as any).answer_key).length > 0
           ? (paper as any).answer_key
-          : papersQuery.data?.papers.find((p) => p.id === paper.id)?.answerKey ??
+          : papersQuery.data?.papers?.find((p) => p.id === paper.id)?.answerKey ??
             getTopicalPaperById(paper.id)?.answerKey ??
             {};
     setAnswerKey(resolvedInitialKey as Record<number, Letter>);
@@ -1364,7 +1364,7 @@ function fillMissingQuestionPages(
       beginPractice(toMcqPaperSummaryFromTopical(matchedTopical));
       return;
     }
-    const paper = papersQuery.data?.papers.find((p) => p.id === search.paperId);
+    const paper = papersQuery.data?.papers?.find((p) => p.id === search.paperId);
     if (!paper) return;
     autoStartedRef.current = true;
     beginPractice(paper);
@@ -1375,7 +1375,7 @@ function fillMissingQuestionPages(
   useEffect(() => {
     if (stage !== "practice" || !selectedPaperId) return;
     if (Object.keys(answerKey).length > 0) return;
-    const dbMatch = papersQuery.data?.papers.find((p) => p.id === selectedPaperId);
+    const dbMatch = papersQuery.data?.papers?.find((p) => p.id === selectedPaperId);
     if (dbMatch?.answerKey && Object.keys(dbMatch.answerKey).length > 0) {
       setAnswerKey(dbMatch.answerKey as Record<number, Letter>);
       if (dbMatch.questionCount && dbMatch.questionCount > 0) {
@@ -1643,7 +1643,7 @@ function fillMissingQuestionPages(
   async function gradeAndSave() {
     let effectiveKey = answerKey;
     if (Object.keys(effectiveKey).length === 0 && selectedPaperId) {
-      const dbMatch = papersQuery.data?.papers.find((p) => p.id === selectedPaperId);
+      const dbMatch = papersQuery.data?.papers?.find((p) => p.id === selectedPaperId);
       if (dbMatch?.answerKey && Object.keys(dbMatch.answerKey).length > 0) {
         effectiveKey = dbMatch.answerKey as Record<number, Letter>;
         setAnswerKey(effectiveKey);
@@ -1851,7 +1851,7 @@ function fillMissingQuestionPages(
       null;
     const paper = matchedTopical
       ? toMcqPaperSummaryFromTopical(matchedTopical)
-      : papersQuery.data?.papers.find((entry) => entry.id === attempt.paperId);
+      : papersQuery.data?.papers?.find((entry) => entry.id === attempt.paperId);
     if (!paper) {
       toast.error("That paper is no longer available in the library.");
       return;
@@ -2041,7 +2041,7 @@ function fillMissingQuestionPages(
               <div className="min-w-0">
                 {papersQuery.isLoading ? (
                   <p className="text-sm text-muted-foreground">Loading the library…</p>
-                ) : (papersQuery.data?.papers.length ?? 0) === 0 ? (
+                ) : (papersQuery.data?.papers?.length ?? 0) === 0 ? (
                   <Card>
                     <CardContent className="py-8 text-center text-sm text-muted-foreground">
                       No papers are published in the library yet.
@@ -2049,7 +2049,7 @@ function fillMissingQuestionPages(
                   </Card>
                 ) : (
                   <PastPaperSelector
-                    papers={papersQuery.data!.papers}
+                    papers={papersQuery.data?.papers ?? []}
                     busy={!!busyLabel}
                     busyPaperId={selectedPaperId}
                     onStart={(paper) => beginPractice(paper, undefined, practiceMode)}
@@ -2100,7 +2100,7 @@ function fillMissingQuestionPages(
           {libraryTab === "analytics" ? (
             <div className="grid gap-6 lg:grid-cols-[1fr_19rem]">
               <div className="min-w-0 space-y-4">
-                {topicPerformance.data && topicPerformance.data.topics.length > 0 ? (
+                {topicPerformance.data?.topics && topicPerformance.data.topics.length > 0 ? (
                   <>
                     {topicPerformance.data.totalTaggedMistakes &&
                     topicPerformance.data.totalTaggedMistakes > 0 &&
@@ -2112,7 +2112,7 @@ function fillMissingQuestionPages(
                     ) : null}
                     <McqDomainBreakdown
                       domains={aggregateMcqDomainsFromTopicStats(
-                        topicPerformance.data.topics.map((t) => ({
+                        (topicPerformance.data?.topics ?? []).map((t) => ({
                           topic: t.topic,
                           attempted: t.attempted,
                           correct: t.correct,
@@ -2120,7 +2120,7 @@ function fillMissingQuestionPages(
                       )}
                       title="Overall Performance: Microeconomics vs Macroeconomics"
                     />
-                    <McqReviewPanel topics={topicPerformance.data.topics} />
+                    <McqReviewPanel topics={topicPerformance.data?.topics ?? []} />
                   </>
                 ) : (
                   <Card className="border-border/80">

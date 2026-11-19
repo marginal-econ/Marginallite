@@ -549,7 +549,7 @@ function McqPapersAdminPage() {
 
         <div>
           <h2 className="mb-3 text-sm font-semibold">
-            In the library ({papersQuery.data?.papers.length ?? 0})
+            In the library ({papersQuery.data?.papers?.length ?? 0})
           </h2>
           <div className="space-y-2">
             {(papersQuery.data?.papers ?? []).map((p) => (

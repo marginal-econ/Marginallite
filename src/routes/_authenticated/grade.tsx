@@ -882,10 +882,10 @@ function WritingCheckPanel({ check, onAccept }: { check: WritingCheck; onAccept:
     <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
         <AlertCircle className="size-4 shrink-0" />
-        {check.issues.length} spelling/grammar issue{check.issues.length === 1 ? "" : "s"} found
+        {check.issues?.length ?? 0} spelling/grammar issue{check.issues.length === 1 ? "" : "s"} found
       </div>
       <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
-        {check.issues.map((issue, index) => (
+        {(check.issues ?? []).map((issue, index) => (
           <li key={index} className="rounded-md border border-border bg-background p-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge variant="outline" className="text-[10px] capitalize">

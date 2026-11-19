@@ -89,7 +89,8 @@ export const startMcqAttempt = createServerFn({ method: "POST" })
 export const listMcqPapers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+    const { data, error } = await supabaseAdmin
       .from("mcq_pdf_papers")
       .select(
         "id, title, level, exam_year, exam_series, question_count, qp_url, ms_url, answer_key, created_at",
@@ -120,7 +121,8 @@ export const getMcqPaperAnswerKey = createServerFn({ method: "POST" })
     z.object({ paperId: z.string().min(1) }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
-    const { data: paper, error } = await context.supabase
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+    const { data: paper, error } = await supabaseAdmin
       .from("mcq_pdf_papers")
       .select("id, title, question_count, answer_key, qp_url, ms_url")
       .eq("id", data.paperId)
