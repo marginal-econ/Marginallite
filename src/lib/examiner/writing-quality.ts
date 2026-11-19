@@ -245,7 +245,7 @@ export function applyMisconceptionCeilingGuardrail(
   split: AoSplit,
 ): Grading {
   const mv = grading.mechanism_validation;
-  if (!mv || !mv.fatal_misconceptions_found || mv.error_evidence_quotes.length === 0) {
+  if (!mv || !mv.fatal_misconceptions_found || (mv.error_evidence_quotes?.length ?? 0) === 0) {
     return grading;
   }
 

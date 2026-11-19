@@ -177,6 +177,9 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
           .single();
         if (legacyEssay) {
           if (!essayId) essayId = legacyEssay.id;
+          const ao1Val = grading.ao_breakdown?.knowledge?.awarded ?? Math.min(2, Math.round(grading.total_mark * 0.25));
+          const ao2Val = grading.ao_breakdown?.analysis?.awarded ?? Math.min(3, Math.round(grading.total_mark * 0.40));
+          const ao3Val = grading.ao_breakdown?.evaluation?.awarded ?? (data.maxMark <= 6 ? 0 : Math.max(0, grading.total_mark - ao1Val - ao2Val));
           await supabaseAdmin.from("essay_versions").insert({
             essay_id: legacyEssay.id,
             user_id: userId,
@@ -186,6 +189,9 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
             total_mark: grading.total_mark,
             confidence: grading.confidence,
             audited: grading.audited,
+            ao1_awarded: ao1Val,
+            ao2_awarded: ao2Val,
+            ao3_awarded: ao3Val,
           });
         }
       }
@@ -387,18 +393,38 @@ export const getProgress = createServerFn({ method: "GET" })
     try {
       const { data } = await supabaseAdmin
         .from("essay_versions")
-        .select("id, essay_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
+        .select("id, essay_id, total_mark, grading, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true })
         .limit(200);
       if (data) {
-        return data.map((v: any) => ({
-          ...v,
-          max_mark: v.max_mark ?? 8,
-          ao1_out_of: 2,
-          ao2_out_of: 3,
-          ao3_out_of: 3,
-        }));
+        return data.map((v: any) => {
+          const g = (v.grading || {}) as any;
+          const awarded = v.total_mark ?? g?.total_mark ?? 0;
+          const rawMax = g?.max_mark ?? v.max_mark;
+          const maxM = rawMax === 12 ? 8 : (rawMax ?? 8);
+          let ao1 = v.ao1_awarded ?? g?.ao_breakdown?.knowledge?.awarded;
+          let ao2 = v.ao2_awarded ?? g?.ao_breakdown?.analysis?.awarded;
+          let ao3 = v.ao3_awarded ?? g?.ao_breakdown?.evaluation?.awarded;
+
+          if (ao1 == null && ao2 == null && ao3 == null && awarded > 0) {
+            ao1 = Math.min(2, Math.round(awarded * 0.25));
+            ao2 = Math.min(3, Math.round(awarded * 0.40));
+            ao3 = Math.max(0, awarded - ao1 - ao2);
+          }
+
+          return {
+            ...v,
+            total_mark: awarded,
+            max_mark: maxM,
+            ao1_awarded: ao1 ?? 0,
+            ao2_awarded: ao2 ?? 0,
+            ao3_awarded: ao3 ?? 0,
+            ao1_out_of: 2,
+            ao2_out_of: 3,
+            ao3_out_of: 3,
+          };
+        });
       }
     } catch {}
 

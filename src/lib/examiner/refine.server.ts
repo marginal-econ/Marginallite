@@ -112,10 +112,10 @@ export async function refineExaminerReport(options: RefineReportOptions): Promis
     if (!refined.command_word_check && draftGrading.command_word_check) {
       refined.command_word_check = draftGrading.command_word_check;
     }
-    if (!refined.suggested_resources.length && draftGrading.suggested_resources.length) {
+    if (!refined.suggested_resources?.length && draftGrading.suggested_resources?.length) {
       refined.suggested_resources = draftGrading.suggested_resources;
     }
-    if (!refined.suggested_practice.length && draftGrading.suggested_practice.length) {
+    if (!refined.suggested_practice?.length && draftGrading.suggested_practice?.length) {
       refined.suggested_practice = draftGrading.suggested_practice;
     }
 

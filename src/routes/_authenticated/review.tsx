@@ -159,7 +159,7 @@ export function ReviewPanelPage() {
   const essayAvgPct = useMemo(() => {
     if (essayList.length === 0) return null;
     const percentages = essayList.map((e) => {
-      const max = e.max_mark ?? 12;
+      const max = e.max_mark === 12 ? 8 : (e.max_mark ?? 8);
       return max > 0 ? ((e.latest_mark ?? 0) / max) * 100 : 0;
     });
     return Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length);
@@ -190,7 +190,7 @@ export function ReviewPanelPage() {
       if (!matchesSearch) return false;
       if (essayBandFilter === "all") return true;
       const mark = e.latest_mark ?? 0;
-      const max = e.max_mark ?? 12;
+      const max = e.max_mark === 12 ? 8 : (e.max_mark ?? 8);
       const pct = max > 0 ? (mark / max) * 100 : 0;
       if (essayBandFilter === "band1") return pct >= 80;
       if (essayBandFilter === "band2") return pct >= 55 && pct < 80;
@@ -664,7 +664,7 @@ export function ReviewPanelPage() {
                 <div className="grid gap-2.5">
                   {paginatedEssays.map((essay) => {
                     const mark = essay.latest_mark ?? 0;
-                    const max = essay.max_mark ?? 12;
+                    const max = essay.max_mark === 12 ? 8 : (essay.max_mark ?? 8);
                     const pct = max > 0 ? Math.round((mark / max) * 100) : 0;
                     const bandLabel =
                       pct >= 75 ? "Band 1" : pct >= 50 ? "Band 2" : "Band 3";

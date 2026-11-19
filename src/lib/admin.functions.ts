@@ -2763,8 +2763,8 @@ export const adminFixFailedEssay = createServerFn({ method: "POST" })
         },
         confidence: 100,
         audited: true,
-        strengths: mg.strengths.length > 0 ? mg.strengths : ["Clear articulation of economic principles."],
-        improvements: mg.improvements.length > 0 ? mg.improvements : ["Deepen evaluation with real-world context."],
+        strengths: (mg.strengths?.length ?? 0) > 0 ? mg.strengths : ["Clear articulation of economic principles."],
+        improvements: (mg.improvements?.length ?? 0) > 0 ? mg.improvements : ["Deepen evaluation with real-world context."],
       };
       model = "admin-manual-examiner";
     }

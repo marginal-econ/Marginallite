@@ -71,7 +71,8 @@ function EssayPage() {
 
   const activeIndex = selected ?? Math.max(versions.length - 1, 0);
   const active = versions[activeIndex];
-  const maxMark = thread.data?.essay.max_mark ?? 12;
+  const rawMax = thread.data?.essay.max_mark;
+  const maxMark = rawMax === 12 ? 8 : (rawMax ?? 8);
 
   useEffect(() => {
     if (active && !rewrite) setRewrite(active.essay_text);

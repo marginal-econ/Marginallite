@@ -189,14 +189,17 @@ export function DashboardPage() {
       essays?: { max_mark?: number | null; question?: string | null } | { max_mark?: number | null; question?: string | null }[] | null;
     }) => {
       if (typeof (v as any).max_mark === "number" && (v as any).max_mark > 0) {
-        return Number((v as any).max_mark);
+        const m = Number((v as any).max_mark);
+        return m === 12 ? 8 : m;
       }
       const essayObj = Array.isArray(v.essays) ? v.essays[0] : v.essays;
       if (essayObj?.max_mark && Number(essayObj.max_mark) > 0) {
-        return Number(essayObj.max_mark);
+        const m = Number(essayObj.max_mark);
+        return m === 12 ? 8 : m;
       }
       if (v.essay_id && essayMap.has(v.essay_id)) {
-        return essayMap.get(v.essay_id)!;
+        const m = essayMap.get(v.essay_id)!;
+        return m === 12 ? 8 : m;
       }
       const mark = v.total_mark ?? 0;
       if (mark > 12) return 20;
@@ -1413,7 +1416,7 @@ function AoCard({
 
   const aoMeta = {
     ao1: {
-      targetBadge: "2 Marks Max",
+      targetBadge: `${maxScore} Marks Max`,
       pillBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
       accentBorder: "border-sky-500/25 hover:border-sky-500/45",
       accentBg: "bg-gradient-to-br from-sky-500/[0.04] via-card to-card",
@@ -1421,7 +1424,7 @@ function AoCard({
       actionText: "Practise AO1 Knowledge →",
     },
     ao2: {
-      targetBadge: "50% Mark Share (6m)",
+      targetBadge: maxScore === 6 ? "100% Mark Share (6m)" : `Analysis (${maxScore}m)`,
       pillBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
       accentBorder: "border-indigo-500/25 hover:border-indigo-500/45",
       accentBg: "bg-gradient-to-br from-indigo-500/[0.04] via-card to-card",
@@ -1429,7 +1432,7 @@ function AoCard({
       actionText: "Practise AO2 Analysis →",
     },
     ao3: {
-      targetBadge: "Band 1 Decider (4m)",
+      targetBadge: maxScore <= 0 ? "Not Required (0m)" : `Level 3 Decider (${maxScore}m)`,
       pillBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
       accentBorder: "border-amber-500/25 hover:border-amber-500/45",
       accentBg: "bg-gradient-to-br from-amber-500/[0.04] via-card to-card",

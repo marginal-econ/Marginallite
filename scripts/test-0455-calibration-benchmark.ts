@@ -398,6 +398,20 @@ export const CAMBRIDGE_BOUNDARY_CASES: EssayBenchmarkCase[] = [
     cambridgeNotes:
       "5/8 (Top of Level 2): Touches both sides accurately with clear basic analysis, but lacks depth, extended multi-step development, and evaluative judgement needed to enter Level 3 (6–8).",
   },
+  {
+    id: "ecr_8m_max_price_housing_misconception",
+    source: "CAMBRIDGE_BOUNDARY_ECR",
+    questionNumber: "4(d)",
+    question: "Discuss whether or not a government should introduce a maximum price on housing.",
+    maxMark: 8,
+    actualMark: 4,
+    tolerance: 1,
+    band: "middle",
+    candidateAnswer:
+      "A maximum price below the market equilibrium can help make housing more affordable and improve living standards. A maximum price below a market equilibrium decreases the cost of housing, leading to more consumers able to afford and buy houses. As shelter is a basic necessity, absolute poverty may decrease as more poor people can afford housing.\n\nLow housing prices mean more immigration, increased supply of skilled labour and increased economic growth. More skilled labour may increase productivity and quality of products, increasing production and causing economic growth, while also lowering labour cost, as supply of labour is high.\n\nA maximum price above the market equilibrium can help incentivise workers to produce more housing and increase GDP. If maximum prices are above the market equilibrium, suppliers may produce more housing as revenue is increased, as housing has an inelastic PED (necessity).\n\nOn the other hand, the maximum price on housing can disincentivise suppliers and lead to housing shortages. When a maximum price is introduced below the market equilibrium, workers may be disincentivised to produce as it lowers profit margins and revenue. This may cause them to produce less housing and shelter, which may cause supply shortages, causing people to lose shelter and lead to more poverty.\n\nTherefore, whether a government should introduce a maximum price on housing depends on whether it is above or below market equilibrium. If it is below market equilibrium, people may afford more housing, which increases living standards. However, if maximum price is set above market equilibrium, housing prices are high and may lead to inflation.",
+    cambridgeNotes:
+      "3-4/8 (Strict Level 2 Cap): Asserting that setting a maximum price above equilibrium incentivises production, increases revenue, and causes inflation is a fatal economic misconception in Cambridge IGCSE 0455 Unit 4.3 (price ceilings above equilibrium are non-binding/ineffective). Must be disqualified from Level 3 (max 4/8).",
+  },
 ];
 
 async function runBenchmark() {

@@ -101,7 +101,7 @@ export async function classifyPdfMcqTopics(options: {
   level?: string;
   items: { number: number; text: string }[];
 }): Promise<TopicTag[]> {
-  if (options.items.length === 0) return [];
+  if (!options?.items || options.items.length === 0) return [];
   const sections = IGCSE_0455_SECTIONS;
 
   const systemPrompt = [

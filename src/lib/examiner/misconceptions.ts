@@ -117,14 +117,14 @@ export function applyMisconceptionGuardrail(
 ): Grading {
   const explicitErrors = detectExplicitMisconceptions(essayText);
   const mv = grading.mechanism_validation;
-  const aiFlaggedError = Boolean(mv && mv.fatal_misconceptions_found && mv.error_evidence_quotes.length > 0);
+  const aiFlaggedError = Boolean(mv && mv.fatal_misconceptions_found && (mv.error_evidence_quotes?.length ?? 0) > 0);
 
   if (explicitErrors.length === 0 && !aiFlaggedError) {
     return grading;
   }
 
   // Compile unique error evidence quotes
-  const allQuotes = new Set<string>(mv?.error_evidence_quotes || []);
+  const allQuotes = new Set<string>(Array.isArray(mv?.error_evidence_quotes) ? mv.error_evidence_quotes : []);
   const allCorrections: string[] = [];
 
   for (const err of explicitErrors) {
