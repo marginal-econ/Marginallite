@@ -15,6 +15,7 @@
 
 import { cleanStars } from "@/lib/utils";
 import type { AoSplit } from "./config";
+import { applyMisconceptionGuardrail } from "./misconceptions";
 import { bandFor, stripScoreFractionsFromText, type Grading } from "./types";
 
 export type EssayQualityAnalysis = {
@@ -279,10 +280,10 @@ export function applyWritingQualityGuardrail(
   quality: EssayQualityAnalysis,
   maxMark: number,
   split: AoSplit,
-  _essayText?: string,
+  essayText?: string,
 ): Grading {
-  // First apply verified misconception ceiling (if examiner proved a fatal error)
-  let updated = applyMisconceptionCeilingGuardrail(grading, maxMark, split);
+  // 1. Scrutinise text for verified fatal economic misconceptions and inverted mechanisms
+  let updated = applyMisconceptionGuardrail(grading, maxMark, split, essayText || "");
 
   // Never artificially penalize concise 2-mark / 4-mark answers that aren't severely undersized
   if (maxMark <= 4 && !quality.isSeverelyUndersized) {

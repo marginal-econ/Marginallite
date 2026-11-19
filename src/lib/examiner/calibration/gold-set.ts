@@ -802,6 +802,42 @@ export const IGCSE_0455_GOLD_CALIBRATION_SET: GoldCalibrationItem[] = [
       "Candidate correctly defines inflation (1m), but inverts the fundamental monetary policy mechanism by claiming higher interest rates make borrowing cheaper and reduce savings. Capped in Level 1 (2/8).",
   },
   {
+    id: "0455-u4-8m-max-price-housing-top",
+    topic: "Unit 4: Government and the Macroeconomy (Price controls)",
+    paper: "0455/22/M/J/23",
+    questionNumber: "2(d)",
+    commandWord: "Discuss",
+    question: "Discuss whether or not a government should introduce a maximum price on housing.",
+    maxMark: 8,
+    expectedMark: 8,
+    expectedLevel: "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
+    band: "top",
+    candidateAnswer:
+      "A maximum price (price ceiling) is a legally imposed maximum price above which landlords cannot charge, set below the free market equilibrium price to make housing affordable.\n\nOn the one hand, introducing a maximum price on housing below equilibrium decreases rental costs for tenants. Because shelter is an essential basic necessity with low price elasticity of demand, lower rent frees up disposable income for low-income households to spend on nutrition and education, directly reducing absolute poverty and improving living standards. In addition, affordable urban housing increases labour mobility, allowing skilled workers to relocate closer to industrial clusters, which boosts national productivity and economic growth.\n\nOn the other hand, setting a maximum price below equilibrium distorts the market by reducing the profitability of renting and constructing homes. This causes a contraction in supply from landlords and property developers (Qs < Qe). Simultaneously, lower rents encourage an extension in demand (Qd > Qe), generating an excess demand and persistent housing shortages. Furthermore, because landlords cannot legally raise rents, they face little incentive to maintain properties, causing living conditions to deteriorate over time. Unofficial black markets may also develop where landlords demand illegal 'key money' or off-the-books cash supplements, undermining the policy.\n\nIn conclusion, while a maximum price provides immediate short-run relief for existing low-income tenants, it worsens long-run housing shortages if supply is price-elastic. A government should only introduce a price cap if accompanied by supply-side measures, such as subsidising construction or building state-owned social housing to directly clear the shortage.",
+    markingGuide:
+      "Level 3 (6–8 marks): Accurate, reasoned two-sided analysis with evaluation. Side 1: affordability, poverty reduction, living standards. Side 2: contraction in supply, excess demand/shortage, deterioration in housing quality, black markets. Reasoned conclusion weighing short run vs long run and alternative policies (subsidies/social housing).",
+    reason:
+      "Accurate Cambridge 0455 economics throughout: correctly identifies that a maximum price must be below equilibrium to be effective, analyzes both affordability gains and supply-side shortages, and provides a justified evaluative verdict.",
+  },
+  {
+    id: "0455-u4-8m-max-price-housing-misconception-cap",
+    topic: "Unit 4: Government and the Macroeconomy (Price controls)",
+    paper: "0455/22/M/J/23",
+    questionNumber: "2(d)",
+    commandWord: "Discuss",
+    question: "Discuss whether or not a government should introduce a maximum price on housing.",
+    maxMark: 8,
+    expectedMark: 4,
+    expectedLevel: "Level 2 (Misconception Cap — Max 4/8)",
+    band: "middle",
+    candidateAnswer:
+      "A maximum price is a government price control that can be set above or below equilibrium. When set below equilibrium it makes housing cheaper for poor people, helping to reduce poverty and raising living standards because shelter is a necessity. But landlords make less profit so they supply fewer houses, which causes a shortage.\n\nHowever, if the government sets the maximum price above the market equilibrium, housing becomes more expensive and suppliers make more revenue because demand is inelastic. This incentivises builders to produce more housing and increases GDP. But high prices can also cause inflation for poor consumers.\n\nIn conclusion it depends on whether the maximum price is set above or below equilibrium.",
+    markingGuide:
+      "Level 2 (3–5 marks). FATAL MISCONCEPTION RULE: Claiming a maximum price above equilibrium raises prices, increases supply, or causes inflation is an economic fallacy. Non-binding price controls have zero market effect. Capped at Level 2 (max 4 marks).",
+    reason:
+      "Enforces Cambridge Table A Level 2 cap (4/8: AO1=1, AO2=2, AO3=1): the candidate understands affordability and shortage below equilibrium, but asserts that a maximum price above equilibrium raises prices and boosts supply. In official Cambridge economics, a ceiling above equilibrium is non-binding and ineffective. Capped strictly at 4/8.",
+  },
+  {
     id: "0455-ecr-8m-l2-static",
     topic: "Unit 3: Microeconomic Decision Makers (Trade unions)",
     paper: "0455/22/F/M/26",

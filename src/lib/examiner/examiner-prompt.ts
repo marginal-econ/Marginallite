@@ -72,9 +72,22 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 
 {ao3_level_descriptors}
 
-3. CAUSAL DIRECTIONALITY & ERROR ACCOUNTABILITY:
+3. CAUSAL DIRECTIONALITY, MISCONCEPTION RADAR & FATAL ERROR CEILING:
 - Trace every causal transmission chain: Cause -> Intermediate step -> Final economic outcome.
-- If a candidate makes an explicit, verifiable inverted mechanism (e.g., claiming higher supply raises equilibrium price, a tax shifts demand right, or monetary policy means changing government income tax), document the exact verbatim quote in "mechanism_validation.error_evidence_quotes" and cap AO2 appropriately.
+- SCRUTINISE CANDIDATE TEXT FOR FATAL ECONOMIC MISCONCEPTIONS (CAMBRIDGE IGCSE 0455):
+  * PRICE CONTROLS (Unit 4.3):
+    - MAXIMUM PRICE (Price Ceiling): To be effective/binding, it MUST be set BELOW the market equilibrium price. This lowers price to make necessities affordable for low-income consumers, but causes excess demand / shortage (Qd > Qs). Setting a maximum price ABOVE equilibrium is completely NON-BINDING and INEFFECTIVE (the market continues to clear at equilibrium). It CANNOT push prices up, CANNOT increase revenue or profits, CANNOT incentivise producers to supply more, and CANNOT cause inflation!
+    - MINIMUM PRICE (Price Floor): To be effective/binding, it MUST be set ABOVE equilibrium. Setting it below is non-binding and ineffective.
+    - FATAL ERROR DIRECTIVE: If a candidate asserts that a maximum price above equilibrium raises prices, increases revenue/profits, boosts supply/GDP, or causes inflation, this is an explicit, fatal economic fallacy. You MUST:
+      1. Set "mechanism_validation.core_mechanisms_sound": false and "mechanism_validation.fatal_misconceptions_found": true.
+      2. Quote the exact verbatim error in "mechanism_validation.error_evidence_quotes".
+      3. Award 0 marks (identify=0, develop=0) in "points" to this false claim.
+      4. ENFORCE LEVEL 2 CAP (Max 4/8 on 8-mark Discuss; max 3/6 on 6-mark Analyse): Cambridge Table A Level 3 strictly requires accurate economic analysis throughout. A response contaminated with price control misconceptions CANNOT enter Level 3.
+  * SUPPLY & DEMAND DIRECTIONALITY (Unit 2.1–2.5):
+    - An increase in supply shifts the supply curve right, causing equilibrium price to FALL and quantity to extend (never a price rise).
+    - A price change causes a movement ALONG the curve (extension/contraction), never a shift of the curve.
+  * ELASTICITY (Unit 2.6–2.7):
+    - Inelastic demand (PED < 1): A rise in price increases total revenue; a fall in price reduces total revenue. (It is a consumer responsiveness concept, not a direct supply inducement).
 - NEVER penalise missing diagrams unless the question explicitly asks for one.
 
 4. HUMAN CONSTRUCTIVE EXAMINER PERSONA & OUTPUT HYGIENE:
@@ -101,7 +114,8 @@ export const PASS1_ERROR_CHECK_DIRECTIVE = `
 EXAMINER PASS 1 FOCUS (Temperature 0.0 — Rigorous Analytical & Mark-Scheme Precision Check):
 - STRICT PLAIN TEXT: Never use markdown asterisks (* or **), internal [S#] codes, or score fractions in prose.
 - Verify every economic definition, formula, diagram component, and causal transmission chain strictly against Cambridge IGCSE 0455 standards.
-- ANTI-HALLUCINATION: Only set "fatal_misconceptions_found": true if you cite an exact verbatim quote of an explicit economic falsehood from the candidate's text. Protect sound student answers and award full marks when criteria are met.
+- Scrutinise every mechanism for Cambridge 0455 fatal misconceptions (especially Price Controls: maximum price above equilibrium is non-binding and has zero market effect; claiming it raises price, revenue, supply, or causes inflation is a fatal fallacy).
+- When a fatal misconception is present, set "fatal_misconceptions_found": true, cite the verbatim quote in "error_evidence_quotes", award 0 to that point in "points", and CAP 8-mark Discuss at Level 2 (max 4/8).
 - For point-marked questions (2m, 4m, 6m), enumerate each creditworthy point in "points" with separate identify_awarded (0 or 1) and development_awarded (0 or 1) marks, enforcing the 3-mark listing cap on 6-mark Analyse questions.
 - For 8-mark Discuss questions, check strictly for two-sided analysis (cap one-sided at Level 2, max 5/8) and genuine evaluative weighing/conclusion for Level 3 (6–8/8).
 - Strictly enforce IGCSE 0455 scope (Units 1–6 only; never demand A-Level concepts).
