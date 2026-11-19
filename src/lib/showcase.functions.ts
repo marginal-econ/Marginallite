@@ -177,8 +177,10 @@ async function saveShowcaseModeration(client: any, data: ShowcaseModerationData)
   }
 }
 
-// Built-in Cambridge exemplar storage (AI model answers removed in favor of real student distinction submissions)
-const CAMBRIDGE_SHOWCASE_EXEMPLARS: ShowcaseEssayItem[] = [];
+import { OFFICIAL_0455_SHOWCASE_EXEMPLARS } from "./showcase-exemplars";
+
+// Built-in Cambridge exemplar storage (authentic student distinction scripts and official Cambridge benchmark models)
+const CAMBRIDGE_SHOWCASE_EXEMPLARS: ShowcaseEssayItem[] = OFFICIAL_0455_SHOWCASE_EXEMPLARS;
 
 function formatAuthorInitials(fullName: string | null | undefined): string {
   if (!fullName || !fullName.trim()) return "Anonymous";
@@ -193,16 +195,18 @@ function formatAuthorInitials(fullName: string | null | undefined): string {
 }
 
 /**
- * Checks whether an essay qualifies for automatic showcase display:
+ * Checks whether an essay qualifies for automatic showcase display in Cambridge IGCSE 0455:
  * - 8-marker: >= 7 marks (7 or 8)
- * - 12-marker: >= 10 marks (10, 11, 12)
- * - 20-marker: >= 15 marks (15 to 20)
+ * - 6-marker: >= 5 marks (5 or 6)
+ * - 4-marker: >= 3 marks (3 or 4)
+ * - 2-marker: >= 2 marks (2)
  * - Any other tariff: >= 75% of max marks
  */
 export function isShowcaseScore(totalMark: number, maxMark: number): boolean {
   if (maxMark === 8) return totalMark >= 7;
-  if (maxMark === 12) return totalMark >= 10;
-  if (maxMark === 20) return totalMark >= 15;
+  if (maxMark === 6) return totalMark >= 5;
+  if (maxMark === 4) return totalMark >= 3;
+  if (maxMark === 2) return totalMark >= 2;
   return totalMark >= Math.round(maxMark * 0.75);
 }
 
@@ -611,7 +615,7 @@ export const adminListShowcaseEssays = createServerFn({ method: "GET" })
           ...ex,
           is_hidden: isHidden,
           is_removed: isRemoved,
-          source: "cambridge_model",
+          source: ex.source || "cambridge_model",
         });
       }
 

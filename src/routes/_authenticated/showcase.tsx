@@ -369,9 +369,10 @@ function ShowcasePage() {
             {(
               [
                 { label: "All Tariffs", value: "all" },
-                { label: "8-mark (8/8)", value: 8 },
-                { label: "12-mark (>10)", value: 12 },
-                { label: "20-mark (>15)", value: 20 },
+                { label: "8-mark Discuss (8/8)", value: 8 },
+                { label: "6-mark Analyse (6/6)", value: 6 },
+                { label: "4-mark Explain (4/4)", value: 4 },
+                { label: "2-mark Identify (2/2)", value: 2 },
               ] as const
             ).map((tab) => (
               <Button
@@ -413,7 +414,7 @@ function ShowcasePage() {
             <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
               {searchQuery
                 ? "Try clearing your search query or switching tariff filter."
-                : "Essays scoring 8/8 (8-mark), >10 (12-mark), or >15 (20-mark) written by students, teachers, or admins will automatically populate here."}
+                : "Essays scoring 8/8 (8-mark Discuss), 6/6 (6-mark Analyse), or 4/4 (4-mark Explain) written by students, teachers, or Cambridge examiners will automatically populate here."}
             </p>
           </div>
         ) : (
