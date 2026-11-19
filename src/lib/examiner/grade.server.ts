@@ -68,21 +68,6 @@ Return ONLY a single JSON object with exactly this shape:
   },
   "total_mark": number,
   "band": string,
-  "table_a_breakdown": {
-    "level": "Level 3 | Level 2 | Level 1 | Level 0",
-    "level_mark_range": string,
-    "two_sided_balance": "balanced | one_sided | undeveloped",
-    "one_sided_cap_applied": boolean,
-    "evaluative_conclusion_audit": {
-      "status": "substantiated | generic_summary | missing",
-      "marks_withheld": number,
-      "withhold_reason": string,
-      "verdict_found": boolean,
-      "criteria_used": string[]
-    },
-    "knowledge_setup_awarded": number,
-    "discussion_awarded": number
-  },
   "points": [
     {
       "quote": string,

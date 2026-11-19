@@ -194,16 +194,10 @@ export function buildAoEvaluationDirective(
 
   if (maxMark === 8) {
     return `SPECIAL DIRECTIVE FOR CAMBRIDGE IGCSE 0455 8-MARK DISCUSS QUESTIONS (AO1: ${split.ao1_marks}, AO2: ${split.ao2_marks}, AO3: ${split.ao3_marks}):
-- Marked using the 2 + 6 Mark Architecture and Official Cambridge 0455 Table A Levels of Response:
-  * 2 marks Knowledge Setup (AO1) + 6 marks Two-Sided Discussion (AO2 Analysis & AO3 Evaluation).
-  * Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides with clear logical analysis and thoughtful evaluative weighing.
-  * Level 2 (3–5 marks): Reasoned discussion using economic analysis; one-sided responses are strictly capped at Level 2 (max 5/8).
-  * Level 1 (1–2 marks): Simple attempt using definitions/terminology.
-  * Level 0 (0 marks): Nothing creditable.
-- CRITICAL EVALUATIVE CONCLUSION WITHHOLD RULE:
-  * Two-sided analysis unlocks Level 3 (6 marks).
-  * Marks 7 and 8 strictly require a substantiated, reasoned evaluative conclusion weighing conditional criteria (e.g. short-run vs long-run, magnitude, elasticity, or policy dependencies).
-  * If the candidate examines both sides well but omits the evaluative conclusion or provides a bare summary, 1 mark is withheld (held at 6/8 marks).
+- Marked using Official Cambridge 0455 Table A Levels of Response (Levels 1–3):
+  * Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, applying clear logical analysis, and providing thoughtful evaluation of uncertainties/conditions and a reasoned verdict.
+  * Level 2 (3–5 marks): Reasoned discussion making use of economic information and clear analysis, but may lack depth or be one-sided (one-sided responses are capped in Level 2, max 5/8).
+  * Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
 - EVALUATION IS MANDATORY. Grade AO3 out of exactly ${split.ao3_marks} marks.`;
   }
 
@@ -338,27 +332,23 @@ export const STRUCTURE_GUIDANCE: Record<number, StructureGuidance> = {
   8: {
     tariff: 8,
     label: "8-mark evaluative essay (Discuss)",
-    questionType: "Official Cambridge Table A Levels-of-Response (2 marks Knowledge + 6 marks Two-Sided Discussion & Evaluation).",
-    aoSummary: "Knowledge Setup: 2 marks · Two-Sided Discussion: 6 marks (Total 8 marks)",
+    questionType: "Levels-based discussion with two-sided analysis and reasoned evaluation.",
+    aoSummary: "AO1 Knowledge: 2 marks · AO2 Analysis: 3 marks · AO3 Evaluation: 3 marks",
     steps: [
       {
-        title: "Step 1: Introduction & Knowledge Setup (AO1: 2 marks)",
-        detail: "Define key economic terms and establish accurate syllabus terminology (e.g., fiscal policy, inflation, exchange rate).",
+        title: "Side 1 Analysis (Why it might / Advantages)",
+        detail: "Develop 2 logical economic arguments supporting one side of the discussion using economic terminology.",
       },
       {
-        title: "Step 2: Side 1 Analysis — Why it might / In favour (AO2: 2–3 marks)",
-        detail: "Develop 2 logical economic arguments supporting one side with multi-link causal chains (Cause -> Mechanism -> Economic outcome).",
+        title: "Side 2 Analysis (Why it might not / Disadvantages)",
+        detail: "Develop 2 counter-arguments or opposing economic factors with clear causal mechanisms.",
       },
       {
-        title: "Step 3: Side 2 Analysis — Why it might not / Against (AO2/AO3: 2–3 marks)",
-        detail: "Develop 2 counter-arguments or opposing economic factors with clear causal mechanisms. (Note: One-sided responses are capped at max 5/8).",
-      },
-      {
-        title: "Step 4: Evaluative Conclusion & Conditional Verdict (AO3: Level 3 Gate)",
-        detail: "Directly answer 'whether or not' by weighing conditional criteria (short-run vs long-run, magnitude/scale, price elasticity, or policy dependency). 1 mark is withheld (held at 6/8) if omitted.",
+        title: "Evaluation & Reasoned Conclusion (AO3)",
+        detail: "Weigh short-run vs long-run effects, dependencies on economic conditions (e.g., PED, budget size), and reach a justified conclusion.",
       },
     ],
-    note: "Level 3 entry (6 marks) requires balanced two-sided analysis. Top marks (7–8 marks) require an explicit, reasoned evaluative conclusion weighing conditions.",
+    note: "Level 3 (6–8 marks) requires a reasoned discussion examining both sides with thoughtful evaluation and uncertainty consideration.",
   },
 };
 

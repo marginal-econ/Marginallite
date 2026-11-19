@@ -152,263 +152,6 @@ function getBandTheme(band: string, totalMark?: number, maxMark?: number) {
   };
 }
 
-function TableABreakdownCard({ grading }: { grading: Grading }) {
-  const [gridOpen, setGridOpen] = useState(false);
-  const tableA = grading.table_a_breakdown;
-  const audit = tableA?.evaluative_conclusion_audit;
-  const marksWithheld = audit?.marks_withheld ?? 0;
-  const isOneSided = tableA?.one_sided_cap_applied || tableA?.two_sided_balance === "one_sided";
-  const level =
-    tableA?.level ??
-    (grading.total_mark >= 6 ? "Level 3" : grading.total_mark >= 3 ? "Level 2" : grading.total_mark >= 1 ? "Level 1" : "Level 0");
-  const knowledgeAwarded =
-    tableA?.knowledge_setup_awarded ?? Math.min(2, grading.ao_breakdown?.knowledge?.awarded ?? 0);
-  const discussionAwarded =
-    tableA?.discussion_awarded ??
-    Math.min(6, (grading.ao_breakdown?.analysis?.awarded ?? 0) + (grading.ao_breakdown?.evaluation?.awarded ?? 0));
-
-  const levelColor =
-    level === "Level 3"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-      : level === "Level 2"
-        ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-        : level === "Level 1"
-          ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
-          : "border-muted bg-muted/20 text-muted-foreground";
-
-  return (
-    <div className="rounded-2xl border border-border/80 bg-card/90 p-5 shadow-xs space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-2">
-            <Scale className="size-4 text-primary" />
-            <h3 className="text-sm font-bold tracking-tight text-foreground">
-              Cambridge IGCSE 0455 Table A Levels & Evaluative Conclusion Audit
-            </h3>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            Official Table A Levels-of-Response for Section B 8-mark Discuss questions (2m AO1 + 6m AO2/AO3).
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Badge variant="outline" className={cn("text-xs font-bold px-2.5 py-0.5 shadow-2xs", levelColor)}>
-            {level} ({level === "Level 3" ? "6–8m" : level === "Level 2" ? "3–5m" : level === "Level 1" ? "1–2m" : "0m"})
-          </Badge>
-          {grading.command_word_check && (
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-xs font-semibold px-2 py-0.5",
-                grading.command_word_check.satisfied
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-400",
-              )}
-            >
-              Command word ({grading.command_word_check.command_word || "Discuss"}):{" "}
-              {grading.command_word_check.satisfied ? "Satisfied" : "Needs sharper focus"}
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* The 2 + 6 Mark Architecture Meter */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-foreground/90 flex items-center gap-1.5">
-            <Sparkles className="size-3 text-primary" /> The 2 + 6 Mark Architecture
-          </span>
-          <span className="font-bold tabular-nums text-foreground">
-            {knowledgeAwarded + discussionAwarded} / 8 marks awarded
-          </span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* 2 marks Knowledge Setup */}
-          <div className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-sky-400 flex items-center gap-1.5">
-                <BookOpen className="size-3.5" /> AO1 Knowledge Setup
-              </span>
-              <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-300 font-bold text-[11px]">
-                {knowledgeAwarded} / 2 marks
-              </Badge>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-              <div
-                className="h-full bg-sky-500 transition-all duration-500 rounded-full"
-                style={{ width: `${(knowledgeAwarded / 2) * 100}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Establishes core syllabus definitions, concepts, and accurate economic terminology.
-            </p>
-          </div>
-
-          {/* 6 marks Two-Sided Discussion */}
-          <div className="rounded-xl border border-border/60 bg-background/60 p-3 space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
-                <Layers className="size-3.5" /> AO2 & AO3 Two-Sided Discussion
-              </span>
-              <Badge
-                variant="outline"
-                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-bold text-[11px]"
-              >
-                {discussionAwarded} / 6 marks
-              </Badge>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-              <div
-                className="h-full bg-emerald-500 transition-all duration-500 rounded-full"
-                style={{ width: `${(discussionAwarded / 6) * 100}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Two-sided causal arguments (Why it might + Why it might not) and evaluative conclusion.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Evaluative Conclusion & Withholding Audit Card */}
-      <div className="space-y-2">
-        {marksWithheld > 0 ? (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-                <AlertTriangle className="size-4 shrink-0 text-amber-400" />
-                <span>Cambridge Table A Mark Withheld: -1 Mark (Held at {grading.total_mark}/8)</span>
-              </div>
-              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/20 text-amber-300 text-[10px] font-bold">
-                Evaluative Conclusion Withheld
-              </Badge>
-            </div>
-            <p className="text-xs text-amber-200/90 leading-relaxed">
-              {audit?.withhold_reason ||
-                "Under Cambridge Table A, a reasoned two-sided discussion reaches Level 3 (6 marks), but marks 7–8 strictly require a substantiated evaluative conclusion weighing conditional criteria. 1 mark was withheld from the top band."}
-            </p>
-            <div className="rounded-lg bg-background/50 border border-amber-500/20 p-2.5 text-[11px] text-amber-200/80 leading-relaxed">
-              <strong className="text-amber-100 font-semibold">Senior Examiner Tip:</strong> To unlock 7–8/8 marks, formulate an explicit concluding paragraph that answers &ldquo;whether or not&rdquo; by weighing decisive conditional criteria: short-run vs long-run time horizons, price elasticity (PED/PES), magnitude of impact, or policy dependencies (e.g. government budget size or macroeconomic context).
-            </div>
-          </div>
-        ) : isOneSided ? (
-          <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
-                <AlertTriangle className="size-4 shrink-0 text-rose-400" />
-                <span>Table A One-Sided Cap Applied: Level 2 Maximum 5/8</span>
-              </div>
-              <Badge variant="outline" className="border-rose-500/40 bg-rose-500/20 text-rose-300 text-[10px] font-bold">
-                One-Sided Cap
-              </Badge>
-            </div>
-            <p className="text-xs text-rose-200/90 leading-relaxed">
-              This essay only examined one perspective of the economic argument. Official Cambridge 0455 mark schemes strictly mandate that one-sided responses cannot exceed Level 2 (max 5/8), regardless of analytical quality.
-            </p>
-            <div className="rounded-lg bg-background/50 border border-rose-500/20 p-2.5 text-[11px] text-rose-200/80 leading-relaxed">
-              <strong className="text-rose-100 font-semibold">How to fix:</strong> Introduce opposing arguments using phrases such as &ldquo;On the other hand...&rdquo;, &ldquo;However, this may not occur if...&rdquo;, or analysing trade-offs before concluding.
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-                <span>Evaluative Conclusion Satisfied (+1 Mark Awarded)</span>
-              </div>
-              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                Level 3 Complete
-              </Badge>
-            </div>
-            <p className="text-xs text-emerald-200/90 leading-relaxed">
-              The essay includes a reasoned, substantiated evaluative conclusion directly addressing &ldquo;whether or not&rdquo; with conditional economic criteria, qualifying for top Level 3 marks.
-            </p>
-            {audit?.criteria_used && audit.criteria_used.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {audit.criteria_used.map((crit, idx) => (
-                  <Badge
-                    key={idx}
-                    variant="secondary"
-                    className="text-[10px] bg-background/60 border border-emerald-500/30 text-emerald-300"
-                  >
-                    ✓ {crit}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Official Cambridge 0455 Table A Reference Grid */}
-      <div className="pt-1 border-t border-border/50">
-        <button
-          type="button"
-          onClick={() => setGridOpen(!gridOpen)}
-          className="w-full flex items-center justify-between py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <span className="font-medium flex items-center gap-1.5">
-            <BookOpen className="size-3.5 text-primary" /> View Official Cambridge 0455 Table A Levels Grid
-          </span>
-          {gridOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        </button>
-        {gridOpen && (
-          <div className="mt-2 overflow-x-auto rounded-lg border border-border/60 text-xs">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border/60 text-[11px] text-muted-foreground">
-                  <th className="py-2 px-3 font-semibold">Level</th>
-                  <th className="py-2 px-3 font-semibold">Marks</th>
-                  <th className="py-2 px-3 font-semibold">Official Cambridge 0455 Criteria</th>
-                  <th className="py-2 px-3 font-semibold">Evaluative Conclusion Rule</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40 text-[11px]">
-                <tr className={cn(level === "Level 3" ? "bg-emerald-500/10 font-medium" : "")}>
-                  <td className="py-2 px-3 text-emerald-400 font-bold whitespace-nowrap">Level 3</td>
-                  <td className="py-2 px-3 whitespace-nowrap">6–8 marks</td>
-                  <td className="py-2 px-3 leading-relaxed">
-                    Reasoned discussion accurately examining both sides of the argument with clear, logical analysis and thoughtful evaluation.
-                  </td>
-                  <td className="py-2 px-3 text-muted-foreground leading-relaxed">
-                    7–8 marks requires a substantiated conclusion weighing conditional criteria. 1 mark is withheld (held at 6) if omitted.
-                  </td>
-                </tr>
-                <tr className={cn(level === "Level 2" ? "bg-amber-500/10 font-medium" : "")}>
-                  <td className="py-2 px-3 text-amber-400 font-bold whitespace-nowrap">Level 2</td>
-                  <td className="py-2 px-3 whitespace-nowrap">3–5 marks</td>
-                  <td className="py-2 px-3 leading-relaxed">
-                    Reasoned discussion using economic information and analysis; may lack depth or be one-sided.
-                  </td>
-                  <td className="py-2 px-3 text-muted-foreground leading-relaxed">
-                    One-sided responses are strictly capped at max 5/8.
-                  </td>
-                </tr>
-                <tr className={cn(level === "Level 1" ? "bg-rose-500/10 font-medium" : "")}>
-                  <td className="py-2 px-3 text-rose-400 font-bold whitespace-nowrap">Level 1</td>
-                  <td className="py-2 px-3 whitespace-nowrap">1–2 marks</td>
-                  <td className="py-2 px-3 leading-relaxed">
-                    Simple attempt using economic definitions/terminology with occasional understanding.
-                  </td>
-                  <td className="py-2 px-3 text-muted-foreground leading-relaxed">
-                    No evaluative weighing required.
-                  </td>
-                </tr>
-                <tr className={cn(level === "Level 0" ? "bg-muted/30 font-medium" : "")}>
-                  <td className="py-2 px-3 text-muted-foreground font-bold whitespace-nowrap">Level 0</td>
-                  <td className="py-2 px-3 whitespace-nowrap">0 marks</td>
-                  <td className="py-2 px-3 leading-relaxed">No creditable response.</td>
-                  <td className="py-2 px-3 text-muted-foreground leading-relaxed">—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function MarkBreakdown({ grading, question }: { grading: Grading; question?: string }) {
   const percent = grading.max_mark > 0 ? (grading.total_mark / grading.max_mark) * 100 : 0;
   const isFullMarks = grading.max_mark > 0 && grading.total_mark >= grading.max_mark;
@@ -427,15 +170,11 @@ export function MarkBreakdown({ grading, question }: { grading: Grading; questio
     grade: cal.grade,
   };
 
-  const ao1OutOf = grading.ao_breakdown?.knowledge?.out_of ?? 2;
-  const ao2OutOf = grading.ao_breakdown?.analysis?.out_of ?? (grading.max_mark === 8 ? 3 : 6);
-  const ao3OutOf = grading.ao_breakdown?.evaluation?.out_of ?? (grading.max_mark === 8 ? 3 : 0);
-
   // Fallbacks to ensure full-fledged feedback is ALWAYS visible for every essay
   let summary =
     grading.examiner_summary && grading.examiner_summary.trim().length > 10
       ? stripStars(grading.examiner_summary)
-      : `This submission achieves ${grading.total_mark}/${grading.max_mark} marks (${resolvedBand}). Knowledge and terminology are established (${grading.ao_breakdown?.knowledge?.awarded ?? 0}/${ao1OutOf}) alongside clear analytical progression (${grading.ao_breakdown?.analysis?.awarded ?? 0}/${ao2OutOf}) and balanced evaluation (${grading.ao_breakdown?.evaluation?.awarded ?? 0}/${ao3OutOf}).`;
+      : `This submission achieves ${grading.total_mark}/${grading.max_mark} marks (${resolvedBand}). Knowledge and terminology are established (${grading.ao_breakdown?.knowledge?.awarded ?? 0}/${grading.ao_breakdown?.knowledge?.out_of ?? 2}) alongside clear analytical progression (${grading.ao_breakdown?.analysis?.awarded ?? 0}/${grading.ao_breakdown?.analysis?.out_of ?? 6}) and balanced evaluation (${grading.ao_breakdown?.evaluation?.awarded ?? 0}/${grading.ao_breakdown?.evaluation?.out_of ?? 4}).`;
 
   if (resolvedBand === "Top Band") {
     summary = summary.replace(/upper middle band/gi, "Top Band");
@@ -445,9 +184,9 @@ export function MarkBreakdown({ grading, question }: { grading: Grading; questio
     grading.strengths && grading.strengths.length > 0
       ? grading.strengths
       : [
-          `Accurate and appropriate use of economic terminology contextually applied (${grading.ao_breakdown?.knowledge?.awarded ?? 0}/${ao1OutOf} on AO1).`,
-          `Logical analytical structure with reasoning chains on the examined topic (${grading.ao_breakdown?.analysis?.awarded ?? 0}/${ao2OutOf} on AO2).`,
-          `Presents balanced perspectives addressing multiple dimensions of the prompt (${grading.ao_breakdown?.evaluation?.awarded ?? 0}/${ao3OutOf} on AO3).`,
+          `Accurate and appropriate use of economic terminology contextually applied (${grading.ao_breakdown?.knowledge?.awarded ?? 0}/${grading.ao_breakdown?.knowledge?.out_of ?? 2} on AO1).`,
+          `Logical analytical structure with reasoning chains on the examined topic (${grading.ao_breakdown?.analysis?.awarded ?? 0}/${grading.ao_breakdown?.analysis?.out_of ?? 6} on AO2).`,
+          `Presents balanced perspectives addressing multiple dimensions of the prompt (${grading.ao_breakdown?.evaluation?.awarded ?? 0}/${grading.ao_breakdown?.evaluation?.out_of ?? 4} on AO3).`,
         ];
 
   const weaknesses =
@@ -672,11 +411,8 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
       </div>
 
       
-      {/* 8-Mark Discuss Questions: Official Cambridge Table A Levels & Evaluative Conclusion Audit */}
-      {grading.max_mark === 8 && <TableABreakdownCard grading={grading} />}
-
-      {/* Point-Marked Questions (1m to 6m): Cambridge IGCSE 0455 Point-by-Point Mark Scheme Evidence & Command Word Check */}
-      {grading.max_mark <= 6 && (grading.command_word_check || (grading.points && grading.points.length > 0)) && (
+      {/* Cambridge IGCSE 0455 Point-by-Point Mark Scheme Evidence & Command Word Check */}
+      {(grading.command_word_check || (grading.points && grading.points.length > 0)) && (
         <div className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-xs space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
