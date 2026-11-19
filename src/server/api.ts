@@ -26,7 +26,7 @@ import { readEnv } from "./env";
 import { safeEqual } from "./referral";
 import * as rateLimit from "./rate-limit";
 import { validateSignup } from "./validation";
-import { deleteSignup, getReferralStatus, getReferralTally, getWaitlistCount } from "./waitlist";
+import { createSignup, deleteSignup, getReferralStatus, getReferralTally, getWaitlistCount } from "./waitlist";
 import { requestWaitlistCode, verifyWaitlistCode } from "./waitlist-otp";
 import { contactMessageSchema, sendContactMessage } from "./contact";
 import { sendPasswordResetEmail } from "./password-reset";
@@ -357,61 +357,18 @@ async function postWaitlist(request: Request): Promise<Response> {
         },
         400,
       );
-    if (!body.challengeId && !body.otp) {
-      const challengeId = await requestWaitlistCode(
-        {
-          ...validated.value,
-          source: typeof body.source === "string" ? body.source.slice(0, 40) : "website",
-        },
-        requester,
-      );
-      if (!challengeId)
-        return json(
-          {
-            success: false,
-            code: "RATE_LIMITED",
-            message:
-              "Please wait at least a minute before requesting another code. You can request up to five per hour.",
-          },
-          429,
-        );
-      return json({
-        success: true,
-        code: "VERIFICATION_REQUIRED",
-        challengeId,
-        message:
-          "We sent a six-digit verification code to your email. Please check your inbox and spam or junk folder. The code expires in 10 minutes.",
-      });
-    }
-    if (
-      typeof body.challengeId !== "string" ||
-      !UUID_PATTERN.test(body.challengeId) ||
-      typeof body.otp !== "string" ||
-      !/^\d{6}$/.test(body.otp)
-    ) {
-      return json(
-        {
-          success: false,
-          code: "INVALID_CODE",
-          message: "Enter the six-digit code from your email.",
-        },
-        400,
-      );
-    }
-    const outcome = await verifyWaitlistCode(body.challengeId, body.otp);
-    if (!outcome)
-      return json(
-        {
-          success: false,
-          code: "INVALID_CODE",
-          message:
-            "That code is incorrect, expired or already used. After five incorrect attempts, request a new code.",
-        },
-        400,
-      );
+    // Direct waitlist registration with zero verification needed — anyone can join immediately!
+    const outcome = await createSignup(
+      {
+        ...validated.value,
+      },
+      {
+        source: typeof body.source === "string" ? body.source.slice(0, 40) : "website",
+      },
+    );
     invalidateWaitlistCount();
 
-    if (outcome.duplicate) {
+    if (outcome.kind === "duplicate") {
       return json(
         {
           success: false,
@@ -426,7 +383,7 @@ async function postWaitlist(request: Request): Promise<Response> {
 
     return json({
       success: true,
-      message: settings.successMessage,
+      message: settings.successMessage || "You're on the waitlist! Welcome to Marginalite.",
       referralCode: outcome.referralCode,
       position: outcome.position,
     });

@@ -13,7 +13,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { captureReferralCode } from "@/lib/waitlist-client";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/backend/client";
-import { getMe } from "@/lib/account.functions";
+import { getMe, registerStudent } from "@/lib/account.functions";
 import { registerTeacher, getTeacherProfileStatus } from "@/lib/teacher.functions";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { ThemeToggle } from "@/components/marketing/theme-toggle";
@@ -144,6 +144,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
   const fetchMe = useServerFn(getMe);
+  const registerStudentFn = useServerFn(registerStudent);
 
   const routeUserByRole = async () => {
     if (search.redirect && search.redirect.startsWith("/") && true && search.redirect !== "/dashboard") {
@@ -510,25 +511,61 @@ function AuthPage() {
     }
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim() || email.split("@")[0],
-            school: school.trim() || undefined,
-          },
+      // 1. Direct registration with pre-confirmed email (zero email verification needed)
+      await registerStudentFn({
+        data: {
+          email: email.trim(),
+          password,
+          fullName: fullName.trim() || undefined,
+          school: school.trim() || undefined,
         },
       });
-      if (error) throw error;
-      if (data.session) {
-        toast.success("Account created! Welcome to Marginalite.");
-        navigate({ to: targetRedirect, replace: true });
+
+      // 2. Immediate sign in
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (signInErr) {
+        toast.success("Account created! Please enter your password to sign in.");
       } else {
-        toast.success("Account created. You can now sign in.");
+        toast.success("Account created! Welcome to Marginalite.");
+        await routeUserByRole();
       }
     } catch (err: any) {
-      toast.error(err?.message || "Could not create your account.");
+      // Fallback to client-side auth if admin createUser is unavailable
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              full_name: fullName.trim() || email.split("@")[0],
+              school: school.trim() || undefined,
+            },
+          },
+        });
+        if (error) throw error;
+        if (data.session) {
+          toast.success("Account created! Welcome to Marginalite.");
+          await routeUserByRole();
+        } else {
+          // Attempt sign in directly
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (!signInErr) {
+            toast.success("Account created! Welcome to Marginalite.");
+            await routeUserByRole();
+          } else {
+            toast.success("Account created. Welcome to Marginalite!");
+          }
+        }
+      } catch (innerErr: any) {
+        toast.error(err?.message || innerErr?.message || "Could not create your account.");
+      }
     } finally {
       setBusy(false);
     }
@@ -605,53 +642,17 @@ function AuthPage() {
 
               {accountType === "teacher" ? (
                 /* ── Teacher & School Workspace Auth ── */
-                teacherSubmittedSuccess ? (
-                  <div className="text-center py-5 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                    <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
-                      <Clock className="size-6" />
+                <div>
+                  <div className="mb-5">
+                    <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                      <School className="size-3.5" />
+                      Cambridge IGCSE 0455 Educators
                     </div>
-                    <h2 className="text-lg font-bold">Teacher Application Under Review</h2>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                      Thank you, <strong>{teacherFullName}</strong>. Your teacher account for <strong>{teacherSchoolName}</strong> ({teacherSignUpEmail}) has been registered and submitted for administrative verification.
+                    <h1 className="text-2xl font-bold">Teacher Portal</h1>
+                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                      Sign in to manage classes and moderate essays, or register your school. Instant educator access.
                     </p>
-                    <div className="rounded-xl border border-border bg-muted/50 p-3.5 text-xs text-left space-y-1.5 text-muted-foreground">
-                      <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                        <ShieldCheck className="size-4 text-purple-500" />
-                        Why is verification required?
-                      </div>
-                      <p>
-                        To protect confidential Cambridge IGCSE 0455 mark schemes, examination anchor calibrations, and student classwork, all teacher privileges require one-time institutional verification.
-                      </p>
-                      <p className="text-purple-600 dark:text-purple-400 font-medium">
-                        You will receive an email confirmation once your account is verified.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setTeacherSubmittedSuccess(false);
-                          setTeacherTab("signin");
-                          setTeacherEmail(teacherSignUpEmail);
-                        }}
-                      >
-                        Return to Teacher Sign In
-                      </Button>
-                    </div>
                   </div>
-                ) : (
-                  <div>
-                    <div className="mb-5">
-                      <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-semibold uppercase tracking-wider mb-1">
-                        <School className="size-3.5" />
-                        Cambridge IGCSE 0455 Educators
-                      </div>
-                      <h1 className="text-2xl font-bold">Teacher Portal</h1>
-                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                        Sign in to manage classes and moderate essays, or register your school.
-                      </p>
-                    </div>
 
                     {teacherPendingWarning && (
                       <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
@@ -855,7 +856,6 @@ function AuthPage() {
                       </TabsContent>
                     </Tabs>
                   </div>
-                )
               ) : (
                 /* ── Student Workspace Auth ── */
                 <div>

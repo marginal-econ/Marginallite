@@ -350,40 +350,7 @@ export function TeacherAuthPage() {
 
         {/* Auth Card */}
         <div className="panel border-2 border-border shadow-xl p-6 sm:p-8 rounded-2xl bg-card">
-          {submittedSuccess ? (
-            <div className="text-center py-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
-                <Clock className="size-7" />
-              </div>
-              <h2 className="text-xl font-bold">Teacher Application Under Review</h2>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                Thank you, <strong>{fullName}</strong>. Your teacher account for <strong>{schoolName}</strong> ({schoolEmail}) has been registered and submitted to the Marginalite administration team.
-              </p>
-              <div className="rounded-xl border border-border bg-muted/50 p-4 text-xs text-left space-y-2 text-muted-foreground">
-                <div className="flex items-center gap-2 font-semibold text-foreground">
-                  <ShieldCheck className="size-4 text-purple-500" />
-                  Why is verification required?
-                </div>
-                <p>
-                  To protect confidential Cambridge IGCSE 0455 mark schemes, examination anchor calibrations, and student classwork, all teacher privileges require one-time manual verification of institutional affiliation.
-                </p>
-                <p className="text-purple-600 dark:text-purple-400 font-medium">
-                  You will receive an email confirmation once your account is verified.
-                </p>
-              </div>
-              <div className="pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSubmittedSuccess(false);
-                    setSignInEmail(schoolEmail);
-                  }}
-                >
-                  Return to Sign In
-                </Button>
-              </div>
-            </div>
-          ) : view === "verifying" ? (
+          {view === "verifying" ? (
             <div className="text-center py-8 space-y-4 animate-in fade-in duration-300">
               <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 border border-purple-500/30">
                 <KeyRound className="size-7 animate-pulse" />
@@ -573,19 +540,9 @@ export function TeacherAuthPage() {
                 </div>
                 <h1 className="text-2xl font-bold">Teacher &amp; Department Workspace</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Organize Cambridge classrooms, issue essay homework, review student diagnostic heatmaps, and calibrate department standards.
+                  Organize Cambridge classrooms, issue essay homework, review student diagnostic heatmaps, and calibrate department standards. Instant access.
                 </p>
               </div>
-
-              {pendingAccountWarning && (
-                <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-3">
-                  <Clock className="size-5 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block font-semibold mb-0.5">Account Pending Verification</strong>
-                    {pendingAccountWarning}
-                  </div>
-                </div>
-              )}
 
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">

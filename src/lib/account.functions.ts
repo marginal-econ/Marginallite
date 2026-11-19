@@ -405,3 +405,65 @@ export const saveUserAcademicPreferences = createServerFn({ method: "POST" })
 
     return { ok: true, preferences: payload };
   });
+
+const RegisterStudentInput = z.object({
+  fullName: z.string().optional(),
+  school: z.string().optional(),
+  email: z.string().email("A valid email address is required."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+});
+
+/**
+ * Direct registration endpoint for Cambridge IGCSE 0455 candidates.
+ * Creates an account with email_confirm: true (instant access, zero verification gate).
+ */
+export const registerStudent = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => RegisterStudentInput.parse(unwrapData(input)))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+
+    const email = data.email.trim().toLowerCase();
+    const fullName = data.fullName?.trim() || email.split("@")[0];
+    const school = data.school?.trim();
+
+    // 1. Create candidate user in Auth with pre-confirmed email (zero verification requirement)
+    const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        school: school || undefined,
+        role: "student",
+      },
+    });
+
+    if (createError) {
+      if (
+        createError.message.includes("already registered") ||
+        createError.message.includes("already exists")
+      ) {
+        throw new Error(
+          "An account with this email already exists. Please sign in or reset your password.",
+        );
+      }
+      throw new Error(createError.message);
+    }
+
+    const userId = createData.user.id;
+
+    // 2. Set profile with student details
+    await supabaseAdmin.from("profiles").upsert({
+      id: userId,
+      full_name: fullName,
+      school: school || null,
+    });
+
+    // 3. Mark role directly as student
+    await (supabaseAdmin.from("user_roles") as any).upsert({
+      user_id: userId,
+      role: "student",
+    });
+
+    return { success: true, userId };
+  });

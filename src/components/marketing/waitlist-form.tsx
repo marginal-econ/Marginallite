@@ -703,7 +703,7 @@ export function WaitlistForm({
               or junk folder. The code expires in 10 minutes.
             </>
           ) : (
-            "We’ll verify your email before adding you to the waitlist."
+            "Instant access. Anyone can join immediately with zero verification required."
           )}
         </p>
         {challengeId ? (
