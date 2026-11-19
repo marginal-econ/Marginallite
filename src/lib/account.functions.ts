@@ -137,6 +137,29 @@ export const getMe = createServerFn({ method: "GET" })
         (context as any).claims?.user_metadata?.avatar_url ||
         null;
 
+      if (!profile) {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+          await supabaseAdmin.from("profiles").upsert({
+            id: userId,
+            full_name: resolvedName,
+            school: (context as any).claims?.user_metadata?.school || null,
+            avatar_url: resolvedAvatar,
+          });
+          if (!roleList || roleList.length === 0) {
+            await (supabaseAdmin.from("user_roles") as any).upsert(
+              {
+                user_id: userId,
+                role: role,
+              },
+              { onConflict: "user_id,role" },
+            );
+          }
+        } catch {
+          /* best effort */
+        }
+      }
+
       return {
         userId,
         fullName: resolvedName,

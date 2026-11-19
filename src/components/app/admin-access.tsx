@@ -210,10 +210,11 @@ export function ActivityOverview({ search }: { search: string }) {
   const s = settings.data;
   const currentSeats = s?.currentUsers ?? rows.length;
   const maxSeats = s?.maxUsers && s.maxUsers > 0 ? s.maxUsers : 100;
+  const totalRegisteredAccounts = Math.max(rows.length, currentSeats);
   const tiles = [
     { label: "Online now", value: online.length, tone: online.length > 0 },
     { label: "Active seats", value: `${currentSeats} / ${maxSeats}` },
-    { label: "Registered accounts", value: rows.length },
+    { label: "Registered accounts", value: totalRegisteredAccounts },
     { label: "Essays graded today", value: gradedToday },
   ];
 

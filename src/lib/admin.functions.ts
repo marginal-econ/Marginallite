@@ -1781,45 +1781,65 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         aiCounts.set(a.user_id, cur);
       }
 
-      return (profilesRes.data ?? []).map((p: any) => {
-        const stats = essayStats.get(p.id);
+      const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
+      const authUserMap = new Map(authUsers.map((u) => [u.id, u]));
+
+      // Gather all distinct user IDs from both authUsers and profiles to ensure every registered account is displayed
+      const allUserIds = new Set<string>();
+      for (const u of authUsers) allUserIds.add(u.id);
+      for (const p of profilesRes.data ?? []) allUserIds.add(p.id);
+
+      return Array.from(allUserIds).map((userId) => {
+        const p = profileMap.get(userId);
+        const u = authUserMap.get(userId);
+        const stats = essayStats.get(userId);
         const essaysGraded = stats?.totalEssayIds.size ?? 0;
         const essaysToday = stats?.todayEssayIds.size ?? 0;
         const lastEssayAt = stats?.lastAt ?? null;
 
-        const isCallingUser = p.id === context.userId;
-        const pr = presenceMap.get(p.id);
+        const isCallingUser = userId === context.userId;
+        const pr = presenceMap.get(userId);
         const lastSeenMs = pr?.last_seen ? new Date(pr.last_seen).getTime() : 0;
         const isOnline = Boolean(isCallingUser || (pr && nowMs - lastSeenMs < 150_000));
         const effectiveLastSeen = isCallingUser ? new Date(nowMs).toISOString() : (pr?.last_seen ?? null);
-        const role = roleMap.get(p.id) || "student";
-        const lc = liveCounts.get(p.id);
-        const ac = aiCounts.get(p.id);
+        const role = roleMap.get(userId) || (u?.email === "marginal.econ.ai@gmail.com" ? "admin" : "student");
+        const lc = liveCounts.get(userId);
+        const ac = aiCounts.get(userId);
+
+        const email = u?.email ?? authMap.get(userId) ?? null;
+        const fullName =
+          p?.full_name ||
+          (u?.user_metadata as any)?.full_name ||
+          (u?.user_metadata as any)?.name ||
+          email?.split("@")[0] ||
+          (userId === MARGINAL_ADMIN_USER_ID ? "Marginal Admin" : "Candidate");
+        const school = p?.school || (u?.user_metadata as any)?.school || null;
+        const joinedAt = p?.created_at || u?.created_at || new Date().toISOString();
 
         const candidates = [
           effectiveLastSeen,
           lastEssayAt,
           lc?.lastAt,
           ac?.lastAt,
-          p.created_at,
+          joinedAt,
         ].filter(Boolean) as string[];
         candidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
         const lastActivity = candidates[0] || (isCallingUser ? new Date(nowMs).toISOString() : null);
 
         return {
-          userId: p.id,
-          email: authMap.get(p.id) ?? null,
-          fullName: p.full_name || authMap.get(p.id)?.split("@")[0] || "Student",
-          school: p.school,
+          userId,
+          email,
+          fullName,
+          school,
           role: role as UserActivityRow["role"],
-          joinedAt: p.created_at || new Date().toISOString(),
+          joinedAt,
           lastSeen: effectiveLastSeen,
           currentPath: pr?.path ?? (isCallingUser ? "/admin" : null),
           isOnline,
           essaysGraded,
           essaysToday,
           liveExaminerSessions: lc?.count || 0,
-          mcqAttempts: mcqCounts.get(p.id) || 0,
+          mcqAttempts: mcqCounts.get(userId) || 0,
           aiCalls: ac?.count || 0,
           lastActivity,
         };
