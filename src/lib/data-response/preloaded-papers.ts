@@ -241,7 +241,7 @@ const RAW_PRELOADED_DATA_RESPONSE_PAPERS: DataResponsePaper[] = [
           "Explanation of normal relationship (up to 2m): Higher GDP/head means higher average income to afford necessities and higher tax revenue to alleviate poverty",
           "Explanation of exception (1m): Income may be more evenly distributed in Senegal, or Senegal receives higher remittances / informal output"
         ],
-        "markingGuide": "Award 1 mark for identifying inverse/negative relationship. Up to 2 marks for supporting data from Table 1.1. Up to 2 marks for identifying and quantifying the exception (Papua New Guinea vs Senegal). Up to 2 marks for explaining why higher GDP/head reduces poverty, plus 1 mark for explaining the exception. Maximum 5 marks.",
+        "markingGuide": "Award 1 mark for identifying inverse/negative relationship. Supporting data (up to 2 marks): must compare both ends of the table (e.g. Iceland highest GDP $73,500/lowest poverty 0% AND Senegal lowest GDP $1,600/high poverty 75.6%). Quoting only high-income countries without contrasting low-income countries earns 0 evidence marks. Identifying the exception (up to 2 marks): Papua New Guinea has higher GDP per head than Senegal ($3,010 vs $1,600) but higher poverty (80.0% vs 75.6%). Romania is NOT an exception (0 marks for false exception and 0 for explaining a false exception). Explanation of normal relationship (up to 2 marks): higher GDP/head enables households to afford necessities / higher living standards. Maximum 5 marks.",
         "extractLinkageExpected": true,
         "syllabusTopic": "5.1 Living standards & 5.2 Poverty"
       },

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/marketing/theme-toggle";
 
 const NAV_SECTIONS: ReadonlyArray<{ id: string; label: string; to?: string }> = [
+  { id: "examiner-accuracy", label: "Accuracy" },
   { id: "graded-exemplar", label: "Graded Essays" },
   { id: "tools", label: "Features" },
   { id: "teachers-section", label: "For Teachers" },

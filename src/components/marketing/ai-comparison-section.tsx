@@ -32,7 +32,7 @@ export function AiComparisonSection({ className }: { className?: string }) {
 
   return (
     <section
-      id="why-marginal"
+      id="why-marginalite"
       className={cn(
         "relative scroll-mt-20 border-b-[1.5px] border-ink bg-surface-raised px-4 py-16 sm:px-6 md:px-8 lg:py-24 overflow-hidden",
         className

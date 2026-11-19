@@ -394,6 +394,35 @@ export function normaliseGrading(
   }
   finalMark = Math.max(0, Math.min(maxMark, finalMark));
 
+  // Deterministic Cambridge IGCSE 0455 Level & Table Caps:
+  // 1. On 8-mark Discuss questions: Cambridge Table A strictly caps one-sided responses in Level 2 (max 5/8).
+  if (maxMark === 8 && split.ao3_marks > 0) {
+    const diagText = `${raw.examiner_summary || ""} ${analysis.comment || ""} ${evaluation.comment || ""} ${(Array.isArray(raw.weaknesses) ? raw.weaknesses : []).join(" ")}`;
+    const isOneSided = /\b(one[- ]sided\b|only\s+(?:discusses|considers|analyses|looks\s+at)\s+(?:one\s+side|why|benefits|drawbacks)|lacks?\s+(?:a\s+)?counter[- ]argument|no\s+counter[- ]argument|fails?\s+to\s+(?:discuss|analyse|examine)\s+(?:the\s+other\s+side|both\s+sides|drawbacks|why\s+not))\b/i.test(diagText);
+    if (isOneSided && finalMark > 5) {
+      finalMark = 5;
+      if (evaluation.awarded > 1) evaluation.awarded = 1;
+      if (knowledge.awarded + analysis.awarded + evaluation.awarded > 5) {
+        analysis.awarded = Math.max(0, 5 - knowledge.awarded - evaluation.awarded);
+      }
+    }
+    const evalIsAbsent = /\b(evaluation\s+is\s+(?:absent|missing|non[- ]?existent)|no\s+creditable\s+evaluation|wholly\s+absent\s+evaluation)\b/i.test(diagText);
+    if (evalIsAbsent && evaluation.awarded > 0) {
+      evaluation.awarded = 0;
+      finalMark = Math.min(finalMark, knowledge.awarded + analysis.awarded);
+    }
+  }
+
+  // 2. On 6-mark Analyse questions: Cambridge mark schemes strictly enforce a maximum of 3 marks for listing points without causal analysis.
+  if (maxMark === 6 && split.ao2_marks === 6) {
+    const diagText = `${raw.examiner_summary || ""} ${analysis.comment || ""} ${(Array.isArray(raw.weaknesses) ? raw.weaknesses : []).join(" ")}`;
+    const isListingOnly = /\b(listing\s+(?:any\s+)?(?:methods|points|factors|policies)\s+(?:max\s+3|capped)|list[- ]only\b|lists?\s+(?:points|methods|policies)\s+without\s+(?:causal\s+development|analysis|explaining))\b/i.test(diagText);
+    if (isListingOnly && finalMark > 3) {
+      finalMark = 3;
+      analysis.awarded = 3;
+    }
+  }
+
   const rawMissing = (raw.missing_elements ?? {}) as Record<string, unknown>;
 
   const commandCheck = raw.command_word_check as any;

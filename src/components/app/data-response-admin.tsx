@@ -769,10 +769,10 @@ export function DataResponseStudio() {
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <FileText className="h-3.5 w-3.5 text-rose-500" />
+                      <FileText className="h-3.5 w-3.5 text-primary" />
                       Official Past Paper PDF
                       {currentPaper.pdfUrl && (
-                        <span className="flex h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                       )}
                     </Button>
                     <Button
@@ -806,7 +806,7 @@ export function DataResponseStudio() {
                     currentPaper.originalExamCode && (
                       <Badge
                         variant="outline"
-                        className="text-[10px] font-mono font-bold border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/5 ml-auto"
+                        className="text-[10px] font-mono font-bold border-primary/30 text-primary bg-primary/5 ml-auto"
                       >
                         {currentPaper.originalExamCode}
                       </Badge>
@@ -931,11 +931,11 @@ export function DataResponseStudio() {
                             className={cn(
                               "h-7 text-[11px] gap-1.5 font-semibold transition-all",
                               extractViewMode === "pdf"
-                                ? "border-rose-500/50 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                                ? "border-primary/50 bg-primary/10 text-primary"
                                 : "border-border/80 text-foreground hover:bg-muted"
                             )}
                           >
-                            <FileText className="h-3.5 w-3.5 text-rose-500" />
+                            <FileText className="h-3.5 w-3.5 text-primary" />
                             {extractViewMode === "pdf" ? "Showing Past Paper PDF" : "View in Past Paper PDF / Insert"}
                           </Button>
                           <Button
@@ -1934,7 +1934,7 @@ export function DataResponseStudio() {
           <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b border-border/60">
             <div>
               <DialogTitle className="text-base font-bold flex items-center gap-2">
-                <FileText className="h-4 w-4 text-rose-500" />
+                <FileText className="h-4 w-4 text-primary" />
                 {currentPaper?.originalExamCode || "Cambridge IGCSE 0455"} — Official Past Paper & Insert
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">

@@ -67,6 +67,7 @@ import { SiteNavLinks, SiteNavMobile } from "@/components/marketing/site-nav";
 import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import { Magnetic, TiltCard } from "@/components/marketing/three-d";
 import { AiComparisonSection } from "@/components/marketing/ai-comparison-section";
+import { AccuracyCredibilitySection } from "@/components/marketing/accuracy-credibility-section";
 import { RealEssayShowcase } from "@/components/marketing/real-essay-showcase";
 import { TeachersSection } from "@/components/marketing/teachers-section";
 import { CosmicAtmosphere } from "@/components/marketing/cosmic-atmosphere";
@@ -702,6 +703,9 @@ function Index() {
           <Ribbon items={RIBBON_ITEMS} />
         </div>
       </section>
+
+      {/* ── Verified Cambridge 0455 Examiner Accuracy Benchmark ────────── */}
+      <AccuracyCredibilitySection />
 
       {/* ── Real Graded Essay Showcase (User Scored Exemplar) ────────────── */}
       <RealEssayShowcase />
