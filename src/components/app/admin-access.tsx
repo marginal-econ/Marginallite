@@ -208,9 +208,9 @@ export function ActivityOverview({ search }: { search: string }) {
 
   const gradedToday = rows.reduce((sum, row) => sum + row.essaysToday, 0);
   const s = settings.data;
-  const currentSeats = s?.currentUsers ?? rows.length;
+  const currentSeats = Math.max(rows.length, s?.currentUsers ?? 0);
   const maxSeats = s?.maxUsers && s.maxUsers > 0 ? s.maxUsers : 100;
-  const totalRegisteredAccounts = Math.max(rows.length, currentSeats);
+  const totalRegisteredAccounts = currentSeats;
   const tiles = [
     { label: "Online now", value: online.length, tone: online.length > 0 },
     { label: "Active seats", value: `${currentSeats} / ${maxSeats}` },

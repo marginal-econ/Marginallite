@@ -184,9 +184,13 @@ export function DashboardPage() {
   const getVersionMaxMark = useCallback(
     (v: {
       essay_id?: string | null;
+      max_mark?: number | null;
       total_mark?: number | null;
       essays?: { max_mark?: number | null; question?: string | null } | { max_mark?: number | null; question?: string | null }[] | null;
     }) => {
+      if (typeof (v as any).max_mark === "number" && (v as any).max_mark > 0) {
+        return Number((v as any).max_mark);
+      }
       const essayObj = Array.isArray(v.essays) ? v.essays[0] : v.essays;
       if (essayObj?.max_mark && Number(essayObj.max_mark) > 0) {
         return Number(essayObj.max_mark);
@@ -197,7 +201,7 @@ export function DashboardPage() {
       const mark = v.total_mark ?? 0;
       if (mark > 12) return 20;
       if (mark > 8) return 12;
-      return 12;
+      return 8;
     },
     [essayMap],
   );
@@ -228,7 +232,7 @@ export function DashboardPage() {
         topVersion = v;
       }
     }
-    const maxMark = topVersion ? getVersionMaxMark(topVersion) : 12;
+    const maxMark = topVersion ? getVersionMaxMark(topVersion) : 8;
     const mark = topVersion?.total_mark ?? 0;
     return {
       mark,
@@ -291,7 +295,8 @@ export function DashboardPage() {
     if (activeTariff !== "all" && TARIFF_SPLITS[activeTariff]) {
       return TARIFF_SPLITS[activeTariff];
     }
-    return TARIFF_SPLITS[12];
+    // Cambridge IGCSE 0455 standard evaluative essay tariff is 8 marks (2m AO1, 3m AO2, 3m AO3)
+    return TARIFF_SPLITS[8];
   }, [activeTariff]);
 
   // Study Progress & Consistency Index (0 - 100%)
@@ -713,18 +718,6 @@ export function DashboardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTariff(12)}
-                className={cn(
-                  "rounded-lg px-2.5 sm:px-3 py-1 font-semibold transition-all whitespace-nowrap cursor-pointer text-xs",
-                  activeTariff === 12
-                    ? "bg-background text-foreground shadow-xs border border-border/60"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                8-mark essays
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTariff(8)}
                 className={cn(
                   "rounded-lg px-2.5 sm:px-3 py-1 font-semibold transition-all whitespace-nowrap cursor-pointer text-xs",
@@ -733,19 +726,31 @@ export function DashboardPage() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                8-mark
+                8-mark Discuss
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTariff(20)}
+                onClick={() => setActiveTariff(6)}
                 className={cn(
                   "rounded-lg px-2.5 sm:px-3 py-1 font-semibold transition-all whitespace-nowrap cursor-pointer text-xs",
-                  activeTariff === 20
+                  activeTariff === 6
                     ? "bg-background text-foreground shadow-xs border border-border/60"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                8-mark IGCSE
+                6-mark Analyse
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTariff(4)}
+                className={cn(
+                  "rounded-lg px-2.5 sm:px-3 py-1 font-semibold transition-all whitespace-nowrap cursor-pointer text-xs",
+                  activeTariff === 4
+                    ? "bg-background text-foreground shadow-xs border border-border/60"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                4-mark Explain
               </button>
             </div>
           </div>

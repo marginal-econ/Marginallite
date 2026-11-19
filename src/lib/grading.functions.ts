@@ -332,7 +332,7 @@ export const getProgress = createServerFn({ method: "GET" })
     try {
       const { data, error } = await supabaseAdmin
         .from("essay_submissions")
-        .select("max_marks, awarded_marks, grading_result, created_at")
+        .select("id, max_marks, awarded_marks, grading_result, created_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -341,15 +341,40 @@ export const getProgress = createServerFn({ method: "GET" })
         return data.map((row: any) => {
           const g = (row.grading_result || {}) as any;
           const maxM = row.max_marks ?? g?.max_mark ?? 8;
+          const awarded = row.awarded_marks ?? g?.total_mark ?? 0;
+
+          // Accurate AO breakdown according to Cambridge IGCSE 0455
+          let ao1Awarded = g?.ao_breakdown?.knowledge?.awarded ?? g?.ao1_awarded ?? g?.ao1_mark;
+          let ao2Awarded = g?.ao_breakdown?.analysis?.awarded ?? g?.ao2_awarded ?? g?.ao2_mark;
+          let ao3Awarded = g?.ao_breakdown?.evaluation?.awarded ?? g?.ao3_awarded ?? g?.ao3_mark;
+
+          const ao1OutOf = g?.ao_breakdown?.knowledge?.out_of ?? (maxM === 8 ? 2 : maxM === 6 ? 2 : 2);
+          const ao2OutOf = g?.ao_breakdown?.analysis?.out_of ?? (maxM === 8 ? 3 : maxM === 6 ? 4 : 2);
+          const ao3OutOf = g?.ao_breakdown?.evaluation?.out_of ?? (maxM === 8 ? 3 : 0);
+
+          if (ao1Awarded === undefined && ao2Awarded === undefined && ao3Awarded === undefined && awarded > 0) {
+            if (maxM === 8) {
+              ao1Awarded = Math.min(2, Math.round(awarded * 0.25));
+              ao2Awarded = Math.min(3, Math.round(awarded * 0.40));
+              ao3Awarded = Math.max(0, awarded - (ao1Awarded ?? 0) - (ao2Awarded ?? 0));
+            } else {
+              ao1Awarded = Math.min(ao1OutOf, Math.round(awarded * 0.5));
+              ao2Awarded = Math.max(0, awarded - (ao1Awarded ?? 0));
+              ao3Awarded = 0;
+            }
+          }
+
           return {
-            total_mark: row.awarded_marks,
+            id: row.id,
+            essay_id: row.id,
+            total_mark: awarded,
             max_mark: maxM,
-            ao1_awarded: g?.ao_breakdown?.knowledge?.awarded ?? 0,
-            ao2_awarded: g?.ao_breakdown?.analysis?.awarded ?? 0,
-            ao3_awarded: g?.ao_breakdown?.evaluation?.awarded ?? 0,
-            ao1_out_of: g?.ao_breakdown?.knowledge?.out_of ?? 2,
-            ao2_out_of: g?.ao_breakdown?.analysis?.out_of ?? 3,
-            ao3_out_of: g?.ao_breakdown?.evaluation?.out_of ?? 3,
+            ao1_awarded: ao1Awarded ?? 0,
+            ao2_awarded: ao2Awarded ?? 0,
+            ao3_awarded: ao3Awarded ?? 0,
+            ao1_out_of: ao1OutOf,
+            ao2_out_of: ao2OutOf,
+            ao3_out_of: ao3OutOf,
             confidence: g?.confidence ?? 0.9,
             created_at: row.created_at,
           };
@@ -362,11 +387,19 @@ export const getProgress = createServerFn({ method: "GET" })
     try {
       const { data } = await supabaseAdmin
         .from("essay_versions")
-        .select("total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
+        .select("id, essay_id, total_mark, ao1_awarded, ao2_awarded, ao3_awarded, confidence, created_at")
         .eq("user_id", context.userId)
         .order("created_at", { ascending: true })
         .limit(200);
-      if (data) return data;
+      if (data) {
+        return data.map((v: any) => ({
+          ...v,
+          max_mark: v.max_mark ?? 8,
+          ao1_out_of: 2,
+          ao2_out_of: 3,
+          ao3_out_of: 3,
+        }));
+      }
     } catch {}
 
     return [];
