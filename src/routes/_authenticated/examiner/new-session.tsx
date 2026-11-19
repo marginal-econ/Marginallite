@@ -165,10 +165,10 @@ function NewMarkingSessionPage() {
             scripts: chunk.map((item) => ({
               candidateCode: item.candidateCode,
               fileName: item.fileName,
-              pageCount: item.pages.length || item.pageCount || 1,
+              pageCount: item.pages?.length || item.pageCount || 1,
               pages:
-                item.pages.length > 0
-                  ? item.pages.map((p, idx) => ({
+                (item.pages?.length ?? 0) > 0
+                  ? (item.pages ?? []).map((p, idx) => ({
                       pageNumber: p.pageNumber || idx + 1,
                       dataUrl: p.dataUrl,
                       textFallback: p.textFallback || item.rawTextFallback,

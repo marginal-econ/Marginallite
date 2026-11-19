@@ -311,7 +311,7 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
         <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-300 shadow-xs">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
           <span>
-            <strong>Grounded in Knowledge Base:</strong> Verified against {grading.sources.length} Cambridge IGCSE 0455 syllabus source{grading.sources.length === 1 ? "" : "s"}{grading.sources.length > 0 ? ` (${Math.round((grading.sources[0]?.similarity ?? 0.85) * 100)}% match on ${grading.sources[0]?.documentTitle || "Cambridge 0455 Syllabus"}).` : "."}
+            <strong>Grounded in Knowledge Base:</strong> Verified against {sources.length} Cambridge IGCSE 0455 syllabus source{sources.length === 1 ? "" : "s"}{sources.length > 0 ? ` (${Math.round((sources[0]?.similarity ?? 0.85) * 100)}% match on ${sources[0]?.documentTitle || "Cambridge 0455 Syllabus"}).` : "."}
           </span>
         </div>
       )}
@@ -549,15 +549,15 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
       </div>
 
       {/* Suggested Practice and Resources */}
-      {(grading.suggested_practice.length > 0 || grading.suggested_resources.length > 0) && (
+      {(suggestedPractice.length > 0 || suggestedResources.length > 0) && (
         <div className="grid gap-3 md:grid-cols-2">
-          {grading.suggested_practice.length > 0 && (
+          {suggestedPractice.length > 0 && (
             <div className="panel p-3.5 sm:p-5 rounded-xl space-y-2">
               <h3 className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <TrendingUp className="size-3.5 text-primary" /> Practise next
               </h3>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
-                {grading.suggested_practice.map((item, index) => (
+                {suggestedPractice.map((item, index) => (
                   <li key={index} className="flex items-start gap-1.5">
                     <span className="text-primary font-bold">•</span>
                     <span>{stripStars(item)}</span>
@@ -566,13 +566,13 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
               </ul>
             </div>
           )}
-          {grading.suggested_resources.length > 0 && (
+          {suggestedResources.length > 0 && (
             <div className="panel p-3.5 sm:p-5 rounded-xl space-y-2">
               <h3 className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-1.5">
                 <BookOpen className="size-3.5 text-primary" /> Revise syllabus concepts
               </h3>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
-                {grading.suggested_resources.map((item, index) => (
+                {suggestedResources.map((item, index) => (
                   <li key={index} className="flex items-start gap-1.5">
                     <span className="text-primary font-bold">•</span>
                     <span>{stripStars(item)}</span>
@@ -591,7 +591,7 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
             <Layers className="size-4 text-primary" />
             <h3 className="text-xs sm:text-sm font-semibold text-foreground">Grounding Evidence</h3>
           </div>
-          {grading.sources.length > 0 ? (
+          {sources.length > 0 ? (
             <Button
               type="button"
               variant="ghost"
@@ -600,7 +600,7 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
               className="h-7 text-xs gap-1 text-emerald-400 hover:text-emerald-300"
             >
               <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[11px] font-medium">
-                {grading.sources.length} Cambridge Sources
+                {sources.length} Cambridge Sources
               </Badge>
               {sourcesOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
             </Button>
@@ -621,9 +621,9 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
             : "Evaluated against verified Cambridge International 0455 Assessment Objective band descriptors."}
         </p>
 
-        {grading.sources.length > 0 && sourcesOpen && (
+        {sources.length > 0 && sourcesOpen && (
           <ul className="mt-2 space-y-2 border-t border-border/60 pt-3 animate-in fade-in duration-200">
-            {grading.sources.map((source, index) => (
+            {sources.map((source, index) => (
               <li key={index} className="p-2.5 rounded-lg bg-background/80 border border-border/50 text-xs text-muted-foreground flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="font-mono text-primary font-semibold mr-1.5">[S{index + 1}]</span>

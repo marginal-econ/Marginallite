@@ -1543,9 +1543,9 @@ function StreamTab({
 
                   {/* Comments Thread Section */}
                   <div className="pt-3 border-t border-border/80 space-y-3 pl-12">
-                    {ann.comments.length > 0 && (
+                    {(ann.comments?.length ?? 0) > 0 && (
                       <div className="space-y-2.5">
-                        {ann.comments.map((comm) => (
+                        {(ann.comments ?? []).map((comm) => (
                           <div
                             key={comm.id}
                             className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-background/40 border border-border/60"
@@ -4049,7 +4049,7 @@ function StudentLifetimePortfolioModal({
                   )}
                 >
                   <FileText className="h-4 w-4" />
-                  All Essays Attempted ({portfolio.essays.length})
+                  All Essays Attempted ({portfolio.essays?.length ?? 0})
                 </button>
                 <button
                   type="button"
@@ -4062,7 +4062,7 @@ function StudentLifetimePortfolioModal({
                   )}
                 >
                   <BookOpen className="h-4 w-4" />
-                  MCQ Attempts & Papers ({portfolio.mcqs.length})
+                  MCQ Attempts & Papers ({portfolio.mcqs?.length ?? 0})
                 </button>
                 <button
                   type="button"
@@ -4075,7 +4075,7 @@ function StudentLifetimePortfolioModal({
                   )}
                 >
                   <BarChart3 className="h-4 w-4" />
-                  Topic Mastery & Diagnostics ({portfolio.topics.length})
+                  Topic Mastery & Diagnostics ({portfolio.topics?.length ?? 0})
                 </button>
               </div>
 
@@ -4087,16 +4087,16 @@ function StudentLifetimePortfolioModal({
                       Complete essay submission history across class assignments and self-directed practice.
                     </span>
                     <span className="font-semibold text-foreground">
-                      {portfolio.essays.length} total attempt(s)
+                      {portfolio.essays?.length ?? 0} total attempt(s)
                     </span>
                   </div>
 
-                  {portfolio.essays.length === 0 ? (
+                  {(portfolio.essays?.length ?? 0) === 0 ? (
                     <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-border bg-background/40 text-muted-foreground text-xs">
                       No essays recorded for this student yet.
                     </div>
                   ) : (
-                    portfolio.essays.map((e) => {
+                    (portfolio.essays ?? []).map((e) => {
                       const isExpanded = expandedEssayId === e.id;
                       const hasFeedback = Boolean(e.feedback);
                       return (
@@ -4305,16 +4305,16 @@ function StudentLifetimePortfolioModal({
                       All Cambridge past-paper exams and diagnostic topic tests attempted by the student.
                     </span>
                     <span className="font-semibold text-foreground">
-                      {portfolio.mcqs.length} total attempt(s)
+                      {portfolio.mcqs?.length ?? 0} total attempt(s)
                     </span>
                   </div>
 
-                  {portfolio.mcqs.length === 0 ? (
+                  {(portfolio.mcqs?.length ?? 0) === 0 ? (
                     <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-border bg-background/40 text-muted-foreground text-xs">
                       No MCQ test attempts recorded for this student yet.
                     </div>
                   ) : (
-                    portfolio.mcqs.map((m) => {
+                    (portfolio.mcqs ?? []).map((m) => {
                       const isExpanded = expandedMcqId === m.id;
                       const hasQuestions = Array.isArray(m.questions) && m.questions.length > 0;
                       return (
@@ -4459,13 +4459,13 @@ function StudentLifetimePortfolioModal({
                     Syllabus performance breakdown across all Cambridge IGCSE 0455 Economics units.
                   </div>
 
-                  {portfolio.topics.length === 0 ? (
+                  {(portfolio.topics?.length ?? 0) === 0 ? (
                     <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-border bg-background/40 text-muted-foreground text-xs">
                       No topic performance statistics recorded yet.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {portfolio.topics.map((top) => {
+                      {(portfolio.topics ?? []).map((top) => {
                         const acc = top.accuracyPct ?? 0;
                         return (
                           <div

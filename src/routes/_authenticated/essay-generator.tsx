@@ -509,11 +509,11 @@ function EssayGeneratorPage() {
                 />
               </div>
 
-              {essay.keyTerms.length > 0 ? (
+              {(essay.keyTerms?.length ?? 0) > 0 ? (
                 <div className="rounded-xl border border-border bg-card p-4 md:p-5">
                   <h3 className="mb-3 text-sm font-semibold">Key terms defined</h3>
                   <dl className="divide-y divide-border">
-                    {essay.keyTerms.map((term) => (
+                    {(essay.keyTerms ?? []).map((term) => (
                       <div
                         key={term.term}
                         className="grid gap-1 py-2 sm:grid-cols-[160px_1fr] sm:gap-4"
@@ -595,13 +595,13 @@ function EssayGeneratorPage() {
                 })}
               </div>
 
-              {essay.examinerComments.length > 0 ? (
+              {(essay.examinerComments?.length ?? 0) > 0 ? (
                 <div className="rounded-xl border border-border bg-card p-4 md:p-5">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <Quote className="size-4 text-primary" /> Examiner comments
                   </h3>
                   <ul className="space-y-2">
-                    {essay.examinerComments.map((comment, index) => (
+                    {(essay.examinerComments ?? []).map((comment, index) => (
                       <li key={index} className="flex gap-2.5 text-sm text-muted-foreground">
                         <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70" />
                         <span>{comment}</span>
@@ -611,13 +611,13 @@ function EssayGeneratorPage() {
                 </div>
               ) : null}
 
-              {essay.markSchemeNotes.length > 0 ? (
+              {(essay.markSchemeNotes?.length ?? 0) > 0 ? (
                 <div className="rounded-xl border border-border bg-card p-4 md:p-5">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <Sparkles className="size-4 text-primary" /> What a mark scheme credits here
                   </h3>
                   <ul className="space-y-2">
-                    {essay.markSchemeNotes.map((note, index) => (
+                    {(essay.markSchemeNotes ?? []).map((note, index) => (
                       <li key={index} className="flex gap-2.5 text-sm text-muted-foreground">
                         <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
                         <span>{note}</span>

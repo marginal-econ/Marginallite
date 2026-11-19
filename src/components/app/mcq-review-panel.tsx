@@ -482,10 +482,10 @@ export function McqReviewPanel({
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                      {t.wrongNumbers.length > 0 ? (
+                      {(t.wrongNumbers?.length ?? 0) > 0 ? (
                         <div className="flex flex-wrap items-center gap-1">
                           <span className="text-[10px] text-muted-foreground mr-0.5">Missed:</span>
-                          {t.wrongNumbers.map((qNum) =>
+                          {(t.wrongNumbers ?? []).map((qNum) =>
                             onSelectQuestion ? (
                               <button
                                 key={qNum}
@@ -994,9 +994,9 @@ export function McqMistakeLedger({
                   />
                 </div>
 
-                {!countsOverride && onSelectQuestion && bucket.questionNumbers.length > 0 ? (
+                {!countsOverride && onSelectQuestion && (bucket.questionNumbers?.length ?? 0) > 0 ? (
                   <div className="flex flex-wrap gap-1 pt-0.5">
-                    {bucket.questionNumbers.map((num) => (
+                    {(bucket.questionNumbers ?? []).map((num) => (
                       <button
                         key={num}
                         type="button"

@@ -254,7 +254,7 @@ export function AdminDiagnosticsPanel() {
           </TabsTrigger>
           <TabsTrigger value="schools" className="py-2.5 text-xs font-semibold gap-1.5">
             <Building2 className="size-3.5" />
-            <span>Schools &amp; Institutions ({data.schoolsBreakdown.length})</span>
+            <span>Schools &amp; Institutions ({data.schoolsBreakdown?.length ?? 0})</span>
           </TabsTrigger>
           <TabsTrigger value="readiness" className="py-2.5 text-xs font-semibold gap-1.5">
             <Target className="size-3.5 text-emerald-500" />
@@ -766,7 +766,7 @@ export function AdminDiagnosticsPanel() {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-muted-foreground font-mono text-[11px]">
-                        {s.domains.length > 0 ? s.domains.join(", ") : <span className="text-muted-foreground/60 italic">Self-Reported</span>}
+                        {(s.domains?.length ?? 0) > 0 ? s.domains.join(", ") : <span className="text-muted-foreground/60 italic">Self-Reported</span>}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
                         {s.isInternational ? "Global (UK / ID / Overseas)" : "India (Cambridge Centered)"}

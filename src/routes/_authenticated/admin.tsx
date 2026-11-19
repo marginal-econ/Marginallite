@@ -1932,7 +1932,7 @@ function MultiProviderPanel({
         },
       });
 
-      if (res.ok && res.models.length > 0) {
+      if (res.ok && Array.isArray(res.models) && res.models.length > 0) {
         setDiscoveredModels(res.models);
         toast.success(`Discovered ${res.models.length} active models from ${meta.label}!`);
       } else {
@@ -2340,18 +2340,18 @@ function MultiProviderPanel({
             <Input
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              placeholder={meta.models[0] ?? "model-id"}
+              placeholder={meta.models?.[0] ?? "model-id"}
               className="font-mono text-xs"
             />
 
             {/* Clickable Recommended Presets */}
-            {meta.models.length > 0 && (
+            {(meta.models?.length ?? 0) > 0 && (
               <div className="space-y-1 pt-1">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
                   Recommended Models:
                 </span>
                 <div className="flex flex-wrap gap-1">
-                  {meta.models.map((suggestion) => (
+                  {(meta.models ?? []).map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
@@ -2940,7 +2940,7 @@ function EmbeddingsPanel() {
           purpose: "embedding",
         },
       });
-      if (res.ok && res.models.length > 0) {
+      if (res.ok && Array.isArray(res.models) && res.models.length > 0) {
         setDiscoveredModels(res.models);
         toast.success(`Discovered ${res.models.length} active embedding models from ${meta.label}!`);
       } else {
@@ -3326,7 +3326,7 @@ function EmbeddingsPanel() {
           </div>
         ))}
 
-        {keys.data && keys.data.length === 0 ? (
+        {Array.isArray(keys.data) && keys.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No embedding keys yet. Add one on the left — Google and OpenRouter both offer free tiers
             that work well for a 0455 knowledge base.
@@ -3668,7 +3668,7 @@ function VisionPanel() {
           </div>
         ))}
 
-        {keys.data && keys.data.length === 0 ? (
+        {Array.isArray(keys.data) && keys.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No vision keys yet. Without one, handwriting OCR and bank extraction fall back to the
             active chat provider, then the built-in gateway.
@@ -5872,7 +5872,7 @@ function DiagramsPanel() {
           </div>
         ))}
 
-        {diagrams.data && diagrams.data.length === 0 ? (
+        {Array.isArray(diagrams.data) && diagrams.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No custom diagrams yet — the library still shows all built-in Cambridge diagrams.
           </p>

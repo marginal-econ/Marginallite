@@ -112,7 +112,7 @@ export function HandwritingUpload({
         );
         text += (text ? "\n\n" : "") + outcome.text;
         pages += outcome.pages;
-        failedPages += outcome.failedPages.length;
+        failedPages += outcome.failedPages?.length ?? 0;
       }
 
       return { text, pages, failedPages };
@@ -190,9 +190,9 @@ export function HandwritingUpload({
     onSuccess: ({ images, result }) => {
       onText(result.text);
       setTotalPages(result.pages);
-      setReadPages(result.pages - result.failedPages.length);
+      setReadPages(result.pages - (result.failedPages?.length ?? 0));
 
-      const failed: OutstandingPage[] = result.failedPages.map((page) => ({
+      const failed: OutstandingPage[] = (result.failedPages ?? []).map((page) => ({
         page,
         image: images[page - 1]!,
         error: result.pageErrors?.[page] ?? null,

@@ -835,11 +835,11 @@ function PaperMatrixPage() {
               {/* REAL PAST PAPER QUESTIONS */}
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">
-                  Real Past Cambridge Exam Questions ({selectedTopic.questions.length})
+                  Real Past Cambridge Exam Questions ({selectedTopic.questions?.length ?? 0})
                 </h4>
 
                 <div className="space-y-3">
-                  {selectedTopic.questions.map((q) => (
+                  {(selectedTopic.questions ?? []).map((q) => (
                     <div
                       key={q.id}
                       className="p-3.5 rounded-lg border border-border bg-card space-y-2.5 text-xs shadow-xs"

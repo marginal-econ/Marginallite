@@ -1306,13 +1306,13 @@ function ReviewResults({
             <ThumbsUp className="size-4 text-emerald-600 dark:text-emerald-400" /> What's genuinely working
           </h2>
           <ul className="mt-4 space-y-3">
-            {data.keyStrengths.map((item, index) => (
+            {(data.keyStrengths ?? []).map((item, index) => (
               <li key={index} className="rounded-lg border border-border/70 bg-background/50 p-3.5">
                 <p className="text-sm font-medium">{stripStars(item.title)}</p>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{stripStars(item.detail)}</p>
               </li>
             ))}
-            {data.keyStrengths.length === 0 ? (
+            {(!data.keyStrengths || data.keyStrengths.length === 0) ? (
               <p className="text-xs text-muted-foreground">No recurring strength flagged yet.</p>
             ) : null}
           </ul>
@@ -1323,7 +1323,7 @@ function ReviewResults({
             <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" /> What's costing you marks
           </h2>
           <ul className="mt-4 space-y-3">
-            {data.keyWeaknesses.map((item, index) => (
+            {(data.keyWeaknesses ?? []).map((item, index) => (
               <li key={index} className="rounded-lg border border-border/70 bg-background/50 p-3.5">
                 <p className="text-sm font-medium">{stripStars(item.title)}</p>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{stripStars(item.detail)}</p>
@@ -1334,7 +1334,7 @@ function ReviewResults({
                 ) : null}
               </li>
             ))}
-            {data.keyWeaknesses.length === 0 ? (
+            {(!data.keyWeaknesses || data.keyWeaknesses.length === 0) ? (
               <p className="text-xs text-muted-foreground">Nothing recurring flagged.</p>
             ) : null}
           </ul>

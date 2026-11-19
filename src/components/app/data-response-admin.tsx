@@ -874,7 +874,7 @@ export function DataResponseStudio() {
                   </div>
 
                   <span className="text-xs font-mono font-semibold text-muted-foreground whitespace-nowrap shrink-0">
-                    Q{activeQuestionIdx + 1} of {currentPaper.questions.length}
+                    Q{activeQuestionIdx + 1} of {currentPaper.questions?.length ?? 0}
                   </span>
                 </div>
 
@@ -1145,7 +1145,7 @@ export function DataResponseStudio() {
                       </Button>
 
                       <div className="flex items-center gap-2">
-                        {activeQuestionIdx < currentPaper.questions.length - 1 ? (
+                        {activeQuestionIdx < (currentPaper.questions?.length ?? 0) - 1 ? (
                           <Button
                             size="sm"
                             onClick={() => setActiveQuestionIdx((prev) => prev + 1)}
@@ -1491,7 +1491,7 @@ export function DataResponseStudio() {
                   ) : null}
 
                   {/* Rewarded Quotations from Candidate Script */}
-                  {result.evidenceQuotes.length > 0 && (
+                  {result.evidenceQuotes && result.evidenceQuotes.length > 0 && (
                     <div className="space-y-1.5">
                       <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                         Rewarded Quotations from Candidate Script:
@@ -1718,7 +1718,7 @@ export function DataResponseStudio() {
                         Parsed Paper Preview: {parsedPreviewPaper.title}
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        {parsedPreviewPaper.questions.length} Sub-questions extracted · {parsedPreviewPaper.totalMarks} Total marks
+                        {parsedPreviewPaper.questions?.length ?? 0} Sub-questions extracted · {parsedPreviewPaper.totalMarks} Total marks
                       </p>
                     </div>
 
@@ -1884,7 +1884,7 @@ export function DataResponseStudio() {
 
                     {/* Metadata line */}
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
-                      <span>{paper.questions.length} Questions</span>
+                      <span>{paper.questions?.length ?? 0} Questions</span>
                       <span>·</span>
                       <span>{paper.seriesLabel || "Official Series"}</span>
                     </div>

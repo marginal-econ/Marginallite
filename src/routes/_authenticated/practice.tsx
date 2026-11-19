@@ -299,7 +299,7 @@ function PracticePage() {
                 <p className="text-sm leading-relaxed">{feedback.verdict}</p>
               </div>
 
-              {feedback.chain.length > 0 ? (
+              {(feedback.chain?.length ?? 0) > 0 ? (
                 <div className="panel space-y-3 p-5">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -307,12 +307,12 @@ function PracticePage() {
                       {ao === "ao2" ? "Economic Causal Chain (AO2)" : "Key Assessment Requirements"}
                     </h2>
                     <Badge variant="outline" className="text-[10px]">
-                      {feedback.chain.filter((s) => s.present).length}/{feedback.chain.length} Links
+                      {(feedback.chain ?? []).filter((s) => s.present).length}/{(feedback.chain?.length ?? 0)} Links
                       Formed
                     </Badge>
                   </div>
                   <div className="space-y-2">
-                    {feedback.chain.map((step, index) => (
+                    {(feedback.chain ?? []).map((step, index) => (
                       <div
                         key={index}
                         className={cn(
@@ -357,14 +357,14 @@ function PracticePage() {
                 </div>
               ) : null}
 
-              {feedback.whatWorks.length > 0 || feedback.whatIsMissing.length > 0 ? (
+              {(feedback.whatWorks?.length ?? 0) > 0 || (feedback.whatIsMissing?.length ?? 0) > 0 ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="panel space-y-2 p-4">
                     <h3 className="text-xs font-semibold text-muted-foreground">
                       Already credit-worthy
                     </h3>
                     <ul className="space-y-1.5">
-                      {feedback.whatWorks.map((item, index) => (
+                      {(feedback.whatWorks ?? []).map((item, index) => (
                         <li key={index} className="flex gap-2 text-xs leading-relaxed">
                           <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
                           {item}
@@ -375,7 +375,7 @@ function PracticePage() {
                   <div className="panel space-y-2 p-4">
                     <h3 className="text-xs font-semibold text-muted-foreground">Missing</h3>
                     <ul className="space-y-1.5">
-                      {feedback.whatIsMissing.map((item, index) => (
+                      {(feedback.whatIsMissing ?? []).map((item, index) => (
                         <li key={index} className="flex gap-2 text-xs leading-relaxed">
                           <X className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                           {item}
@@ -386,10 +386,10 @@ function PracticePage() {
                 </div>
               ) : null}
 
-              {feedback.fixList.length > 0 ? (
+              {(feedback.fixList?.length ?? 0) > 0 ? (
                 <div className="panel space-y-3 p-5">
                   <h2 className="text-sm font-semibold">Change exactly this</h2>
-                  {feedback.fixList.map((fix, index) => (
+                  {(feedback.fixList ?? []).map((fix, index) => (
                     <div key={index} className="rounded-lg border border-border p-3">
                       <p className="text-sm font-medium">
                         {index + 1}. {fix.change}
@@ -445,14 +445,14 @@ function PracticePage() {
                 </div>
               ) : null}
 
-              {feedback.sources.length > 0 ? (
+              {(feedback.sources?.length ?? 0) > 0 ? (
                 <details className="panel p-4">
                   <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">
-                    Grounded in {feedback.sources.length} source
-                    {feedback.sources.length === 1 ? "" : "s"} from your knowledge base
+                    Grounded in {feedback.sources?.length ?? 0} source
+                    {(feedback.sources?.length ?? 0) === 1 ? "" : "s"} from your knowledge base
                   </summary>
                   <ul className="mt-2 space-y-1.5">
-                    {feedback.sources.map((source, index) => (
+                    {(feedback.sources ?? []).map((source, index) => (
                       <li key={index} className="text-[11px] text-muted-foreground">
                         [S{index + 1}] {source.documentTitle}
                         {source.heading ? ` — ${source.heading}` : ""}
