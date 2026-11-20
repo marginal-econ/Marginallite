@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { getEssayThread, gradeEssaySubmission } from "@/lib/grading.functions";
 import type { Grading } from "@/lib/examiner/types";
-import { cn } from "@/lib/utils";
+import { cn, stripStars } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/essay/$essayId")({
   head: () => ({
@@ -446,7 +446,7 @@ function EssayPage() {
                 <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 shadow-sm max-h-[calc(100vh-12rem)] overflow-y-auto">
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <p className="text-[14.5px] sm:text-[15px] leading-[1.85] whitespace-pre-wrap font-sans text-foreground/95 select-text">
-                      {active.essay_text}
+                      {stripStars(active.essay_text)}
                     </p>
                   </div>
                 </div>
@@ -489,7 +489,7 @@ function EssayPage() {
               </div>
               <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
                 <p className="text-[15px] sm:text-[15.5px] leading-[1.9] whitespace-pre-wrap font-sans text-foreground/95 select-text">
-                  {active.essay_text}
+                  {stripStars(active.essay_text)}
                 </p>
               </div>
             </div>

@@ -58,7 +58,7 @@ import {
 } from "lucide-react";
 import { useRef, useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, stripStars } from "@/lib/utils";
 
 import { AdminGodmodeDashboard, EssaysVaultTab, GodmodeErrorBoundary } from "@/components/app/admin-godmode";
 import { AdminDiagnosticsPanel } from "@/components/app/admin-diagnostics";
@@ -6459,11 +6459,11 @@ function ShowcaseAdminPanel() {
                   <div className="mt-3 space-y-2 border-t border-border/60 pt-3 text-xs">
                     {item.grading?.examiner_summary ? (
                       <p className="rounded-md bg-muted/40 p-2.5 italic text-muted-foreground">
-                        "{item.grading.examiner_summary.replace(/\*\*/g, "")}"
+                        "{stripStars(item.grading.examiner_summary)}"
                       </p>
                     ) : null}
                     <div className="max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/20 p-3 font-serif text-foreground border border-border/40">
-                      {item.essay_text}
+                      {stripStars(item.essay_text)}
                     </div>
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
                       <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">

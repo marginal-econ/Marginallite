@@ -93,6 +93,7 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 4. HUMAN CONSTRUCTIVE EXAMINER PERSONA & OUTPUT HYGIENE:
 - Tone: Encouraging, supportive, clear Cambridge IGCSE Senior Examiner speaking directly to the student.
 - ZERO ASTERISKS: Never use markdown asterisks (*, **, ***) anywhere in any string field. Return clean plain text only.
+- ZERO LATEX OR DOLLAR-SIGN MATH DELIMITERS: Never output LaTeX math syntax, dollar signs, or math subscripts (e.g. write "Px" or "price of exports" instead of "$P_x$", "Pm" or "price of imports" instead of "$P_m$", "AD" instead of "$AD$", "Q1" instead of "$Q_1$"). Write clean, readable plain English prose without math delimiters.
 - ZERO INTERNAL CODES: Never write [S1], [S2], (as per [S1]), or any retrieval tag in student-facing prose.
 - ZERO SCORE FRACTIONS IN PROSE: Do not write "(3/4)", "held at 5", or "cost you marks" inside written comments; the UI displays the score badges separately.
 - ZERO CONTRADICTIONS: Never praise an example, definition, or conclusion in strengths while claiming it is missing in weaknesses or missing_elements.
@@ -112,7 +113,7 @@ SUBMISSION QUALITY & DEPTH PROFILE:
 
 export const PASS1_ERROR_CHECK_DIRECTIVE = `
 EXAMINER PASS 1 FOCUS (Temperature 0.0 — Rigorous Analytical & Mark-Scheme Precision Check):
-- STRICT PLAIN TEXT: Never use markdown asterisks (* or **), internal [S#] codes, or score fractions in prose.
+- STRICT PLAIN TEXT: Never use markdown asterisks (* or **), LaTeX math tokens ($P_x$, $\Delta$), internal [S#] codes, or score fractions in prose.
 - Verify every economic definition, formula, diagram component, and causal transmission chain strictly against Cambridge IGCSE 0455 standards.
 - Scrutinise every mechanism for Cambridge 0455 fatal misconceptions (especially Price Controls: maximum price above equilibrium is non-binding and has zero market effect; claiming it raises price, revenue, supply, or causes inflation is a fatal fallacy).
 - When a fatal misconception is present, set "fatal_misconceptions_found": true, cite the verbatim quote in "error_evidence_quotes", award 0 to that point in "points", and CAP 8-mark Discuss at Level 2 (max 4/8).
@@ -123,7 +124,7 @@ EXAMINER PASS 1 FOCUS (Temperature 0.0 — Rigorous Analytical & Mark-Scheme Pre
 
 export const PASS2_HOLISTIC_EVALUATION_DIRECTIVE = `
 EXAMINER PASS 2 FOCUS (Temperature 0.2 — Holistic Cambridge 0455 Assessment & Constructive Feedback):
-- STRICT PLAIN TEXT: Never use markdown asterisks (* or **), internal [S#] codes, or score fractions in prose.
+- STRICT PLAIN TEXT: Never use markdown asterisks (* or **), LaTeX math tokens ($P_x$, $\Delta$), internal [S#] codes, or score fractions in prose.
 - Practice positive marking: reward what the candidate knows, explains, and evaluates accurately under timed IGCSE exam conditions.
 - Evaluate overall argument clarity, balance, real-world application, and whether the candidate directly answered the command word ("Define", "Explain", "Analyse", "Discuss").
 - Write encouraging, specific, human examiner feedback quoting verbatim student phrases and offering concrete next-step improvements aligned to Cambridge IGCSE 0455 Units 1–6.

@@ -21,6 +21,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn, stripStars } from "@/lib/utils";
 import {
   getSyllabusTopicMeta,
@@ -1027,5 +1035,110 @@ export function McqMistakeLedger({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Clean, accessible dialog prompting the student to choose whether to grade
+ * only attempted questions or the full paper when finishing/submitting early.
+ */
+export function SubmitGradingDialog({
+  open,
+  onOpenChange,
+  attemptedCount,
+  totalCount,
+  onConfirm,
+  busy,
+  title = "Submit MCQ Paper",
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  attemptedCount: number;
+  totalCount: number;
+  onConfirm: (gradeOnlyAttempted: boolean) => void;
+  busy?: boolean;
+  title?: string;
+}) {
+  const unattemptedCount = Math.max(0, totalCount - attemptedCount);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md p-6">
+        <DialogHeader>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <Target className="h-4 w-4" />
+            </div>
+            <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs text-muted-foreground">
+            You have answered <span className="font-semibold text-foreground">{attemptedCount}</span> of{" "}
+            <span className="font-semibold text-foreground">{totalCount}</span> questions (
+            <span className="text-amber-600 dark:text-amber-400 font-medium">{unattemptedCount} unattempted</span>).
+            Choose how you would like your score calculated:
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 pt-2">
+          {/* Option 1: Grade only attempted */}
+          <button
+            type="button"
+            disabled={busy || attemptedCount === 0}
+            onClick={() => onConfirm(true)}
+            className="w-full text-left p-3.5 rounded-xl border-2 border-primary/40 bg-primary/[0.04] hover:bg-primary/[0.08] hover:border-primary transition-all group"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground group-hover:text-primary">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>Grade Only Attempted Questions</span>
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-mono">
+                    Recommended
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Your score is calculated out of <span className="font-bold font-mono text-foreground">{attemptedCount}</span>.
+                  The {unattemptedCount} unattempted question{unattemptedCount === 1 ? "" : "s"} will not count against your score or affect your Cambridge topic diagnostics.
+                </p>
+              </div>
+            </div>
+          </button>
+
+          {/* Option 2: Grade entire paper */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onConfirm(false)}
+            className="w-full text-left p-3.5 rounded-xl border border-border/80 bg-muted/20 hover:bg-muted/40 hover:border-border transition-all group"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+                  <Award className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>Grade Entire Paper (All Questions)</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Simulates official Cambridge exam conditions out of <span className="font-bold font-mono text-foreground">{totalCount}</span>.
+                  The {unattemptedCount} unattempted question{unattemptedCount === 1 ? "" : "s"} will be counted as incorrect (0 marks).
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <DialogFooter className="flex-row items-center justify-end gap-2 pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+            className="h-8 text-xs"
+          >
+            Keep Practicing
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
