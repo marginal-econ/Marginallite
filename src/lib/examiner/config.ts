@@ -389,3 +389,37 @@ export function formatStructureNote(guidance: StructureGuidance): string {
     `\nNote: ${guidance.note}`
   );
 }
+
+/**
+ * The 17 Canonical Cambridge IGCSE 0455 Syllabus Units.
+ * All suggested_resources, topic citations, and feedback must align to these exact units.
+ */
+export const CAMBRIDGE_0455_CANONICAL_SYLLABUS = [
+  { unit: "1.1", title: "The nature of the economic problem" },
+  { unit: "2.7", title: "Price elasticity of demand (PED)" },
+  { unit: "2.8", title: "Price elasticity of supply (PES)" },
+  { unit: "2.11", title: "Market failure and government intervention" },
+  { unit: "3.3", title: "Workers" },
+  { unit: "4.2", title: "Macroeconomic aims of government" },
+  { unit: "4.3", title: "Fiscal policy" },
+  { unit: "4.4", title: "Monetary policy" },
+  { unit: "4.5", title: "Supply-side policy" },
+  { unit: "4.6", title: "Economic growth" },
+  { unit: "4.7", title: "Employment and unemployment" },
+  { unit: "4.8", title: "Inflation and deflation" },
+  { unit: "5.2", title: "Poverty" },
+  { unit: "6.1", title: "International specialisation" },
+  { unit: "6.2", title: "Globalisation, free trade and protection" },
+  { unit: "6.3", title: "Foreign exchange rates" },
+  { unit: "6.4", title: "Current account of balance of payments" },
+] as const;
+
+export function formatCanonicalSyllabusPrompt(): string {
+  return [
+    "AUTHORITATIVE CAMBRIDGE IGCSE 0455 SYLLABUS UNITS (CITE ONLY THESE):",
+    ...CAMBRIDGE_0455_CANONICAL_SYLLABUS.map(
+      (s) => `- Unit ${s.unit}: ${s.title} (Cite: "Cambridge IGCSE 0455 Unit ${s.unit}: ${s.title}")`,
+    ),
+  ].join("\n");
+}
+

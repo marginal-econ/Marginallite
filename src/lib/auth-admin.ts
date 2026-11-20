@@ -9,10 +9,12 @@ export const MARGINAL_ADMIN_EMAIL = "marginal.econ.ai@gmail.com";
 export const AUTHORIZED_ADMIN_IDS = new Set([
   "b22b0880-7903-4504-b12c-bfb955b1024b", // marginal.econ.ai@gmail.com (Marginalite Supabase)
   "00296414-0221-4d5b-aa1c-04dc9366a218", // marginal.econ.ai@gmail.com (Marginal legacy)
+  "677468c0-c14a-4157-8f52-d7e9eb6cfd59", // officialkrishrs@gmail.com (Saikrish)
 ]);
 
 export const AUTHORIZED_ADMIN_EMAILS = new Set([
-  "marginal.econ.ai@gmail.com", // Marginalite ONLY
+  "marginal.econ.ai@gmail.com", // Marginalite
+  "officialkrishrs@gmail.com", // Saikrish
 ]);
 
 export function getAdminEmails(): Set<string> {

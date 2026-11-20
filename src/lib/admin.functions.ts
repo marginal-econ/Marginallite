@@ -2040,6 +2040,57 @@ export const adminGetEssayDetail = createServerFn({ method: "POST" })
           },
         };
       }
+
+      // Check if data.essayId is an essay_versions ID
+      const { data: vRow } = await supabaseAdmin
+        .from("essay_versions")
+        .select("id, essay_id, version, essay_text, grading, total_mark, confidence, audited, created_at")
+        .eq("id", data.essayId)
+        .maybeSingle();
+
+      if (vRow) {
+        const { data: parentEssay } = await supabaseAdmin
+          .from("essays")
+          .select("id, user_id, question, max_mark, latest_mark, created_at, updated_at")
+          .eq("id", vRow.essay_id)
+          .maybeSingle();
+
+        if (parentEssay) {
+          const [profileRes, authUsers] = await Promise.all([
+            supabaseAdmin
+              .from("profiles")
+              .select("id, full_name, school")
+              .eq("id", parentEssay.user_id)
+              .maybeSingle(),
+            listAcceptedAuthUsers().catch(() => []),
+          ]);
+
+          const userList = Array.isArray(authUsers) ? authUsers : [];
+          const authorEmail = userList.find((u) => u.id === parentEssay.user_id)?.email || null;
+          const authorName = (profileRes?.data as any)?.full_name || authorEmail || "Student";
+          const authorSchool = (profileRes?.data as any)?.school || null;
+
+          let g = vRow.grading;
+          if (typeof g === "string") {
+            try {
+              g = JSON.parse(g);
+            } catch {
+              g = {};
+            }
+          }
+
+          return {
+            essay: parentEssay,
+            versions: [{ ...vRow, grading: g ?? {} }],
+            author: {
+              id: parentEssay.user_id,
+              name: authorName,
+              email: authorEmail,
+              school: authorSchool,
+            },
+          };
+        }
+      }
     } catch {}
 
     throw new Error("Essay not found");

@@ -264,4 +264,58 @@ describe("Cambridge IGCSE Economics (0455) Migration Verification Suite", () => 
       expect(summary.dominant?.meta.id).toBe("concept_gap");
     });
   });
+
+  describe("8-Mark Discuss Point Breakdown Math Reconciliation & Hygiene", () => {
+    it("reconciles point breakdown marks so their sum never exceeds overall mark (7/8)", () => {
+      const split = defaultSplitForMaxMark(8);
+      const raw = {
+        total_mark: 7,
+        max_mark: 8,
+        ao_breakdown: {
+          knowledge: { awarded: 2, out_of: 2, comment: "Accurate definitions." },
+          analysis: { awarded: 3, out_of: 3, comment: "Developed causal links." },
+          evaluation: { awarded: 2, out_of: 3, comment: "Sound evaluation." },
+        },
+        examiner_summary: "Strong 7/8 response with balanced discussion.",
+        strengths: ["Clear analysis of exchange rate impacts"],
+        weaknesses: ["Could deepen long-run elasticity consideration"],
+        missing_elements: {
+          definitions: [],
+          analysis: [],
+          evaluation: [],
+          examples: [],
+          diagrams: [],
+        },
+        actionable_feedback: ["Deepen elasticity conditions."],
+        suggested_resources: ["Cambridge IGCSE 0455 Unit 4.4: Monetary policy"],
+        suggested_practice: ["Practice 8-mark monetary policy questions."],
+        points: [
+          { quote: "makes housing affordable", matched_ms_point: "Affordability", identify_awarded: 1, development_awarded: 1, reason: "Valid point." },
+          { quote: "labour supply increases", matched_ms_point: "Labour mobility", identify_awarded: 1, development_awarded: 1, reason: "Valid point." },
+          { quote: "suppliers produce more", matched_ms_point: "Supply response", identify_awarded: 1, development_awarded: 1, reason: "Valid point." },
+          { quote: "housing shortages occur", matched_ms_point: "Shortages", identify_awarded: 1, development_awarded: 1, reason: "Valid point." },
+          { quote: "exports exceed imports causing dearer imports", matched_ms_point: "Trade", identify_awarded: 1, development_awarded: 1, reason: "Misleading backwards causal mechanism." },
+          { quote: "deincentivising producers", matched_ms_point: "Disincentive", identify_awarded: 1, development_awarded: 1, reason: "Valid counter point." },
+        ],
+      };
+
+      const essay = "deincentivising producers when housing prices are low";
+      const normalised = normaliseGrading(raw, 8, split, essay);
+
+      // Verify points total does NOT exceed overall mark (7)
+      const pointsTotal = (normalised.points ?? []).reduce(
+        (sum, p) => sum + p.identify_awarded + p.development_awarded,
+        0,
+      );
+      expect(pointsTotal).toBeLessThanOrEqual(7);
+      expect(pointsTotal).toBeLessThanOrEqual(normalised.total_mark);
+
+      // Point 5 (backward economics) must be zeroed out
+      expect(normalised.points?.[4]?.identify_awarded).toBe(0);
+      expect(normalised.points?.[4]?.development_awarded).toBe(0);
+
+      // Verbatim student spelling 'deincentivising' must be preserved, not altered
+      expect(normalised.points?.[5]?.quote).toContain("deincentivising");
+    });
+  });
 });

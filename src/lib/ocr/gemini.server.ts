@@ -86,6 +86,49 @@ export function isBlankOrUnread(text: string | null | undefined): boolean {
   return false;
 }
 
+/**
+ * Strips conversational AI preambles, unattempted worksheet headers, and AI conversational trailers
+ * that occasional vision models output despite prompt directives.
+ */
+export function sanitizeOcrTranscription(rawText: string): string {
+  if (!rawText || typeof rawText !== "string") return "";
+  let s = rawText.trim();
+
+  // 1. Strip markdown fences if Gemini wrapped output in ```
+  s = s.replace(/^```[a-z]*\s*\n?/i, "").replace(/\n?```$/i, "").trim();
+
+  // 2. Strip AI conversational preambles
+  // e.g. "Here is the transcription of your handwritten Economics notes. I've preserved your original wording..."
+  s = s.replace(
+    /^(?:(?:Here(?:'s| is) (?:the )?(?:transcription|transcribed text|text)|Here are the notes|Transcription:?|Below is the transcription)[^\n]*\n+)+/i,
+    "",
+  );
+  s = s.replace(
+    /^(?:I(?:'ve| have) preserved (?:the )?(?:student's )?(?:original )?(?:wording|spelling|text)[^\n]*\n+)+/i,
+    "",
+  );
+  s = s.replace(
+    /^(?:Note:?\s*(?:I have|This is|The following)[^\n]*\n+)+/i,
+    "",
+  );
+
+  // 3. Strip unattempted worksheet headers (e.g., "Practice Questions\n\n1. Discuss...\n2. Discuss...\n\n")
+  // if followed by an answer or question attempt
+  s = s.replace(
+    /^(?:Practice Questions|Exam Practice Questions|Questions?:?)\s*\n+(?:(?:\d+\.|\([a-z]\))\s*[^\n]+\n+)+(?=(?:Question\s*\d+|Answer\s*:?|\d+\.|\b(?:A|An|The|In|On)\b))/i,
+    "",
+  );
+
+  // 4. Strip conversational AI trailers at the end
+  s = s.replace(
+    /\n+(?:(?:Hope this helps!?|Let me know if you need anything else|I hope this transcription is helpful|End of transcription)[^\n]*)+$/i,
+    "",
+  );
+  s = s.replace(/\n+\[End of transcription\]$/i, "");
+
+  return s.trim();
+}
+
 export type PageTranscription = { page: number; text: string | null; error: string | null };
 
 export type GeminiOcrOutcome = {
@@ -305,7 +348,7 @@ async function transcribePage(
             ).text.trim();
       if (!text || isBlankOrUnread(text)) throw new Error(`${visionConfig.label} returned no legible handwriting.`);
       usedModels.add(`${visionConfig.provider}:${visionConfig.model}`);
-      return { text, error: null };
+      return { text: sanitizeOcrTranscription(text), error: null };
     } catch (error) {
       lastError = error;
       console.error(`OCR page ${page}: admin vision key (${visionConfig.provider}) failed`, error);
@@ -317,7 +360,7 @@ async function transcribePage(
       try {
         const text = await transcribeViaGateway(model, dataUrl, hint);
         usedModels.add(model);
-        return { text, error: null };
+        return { text: sanitizeOcrTranscription(text), error: null };
       } catch (error) {
         lastError = error;
         console.error(`OCR page ${page}: ${model} attempt ${attempt} failed`, error);
@@ -404,9 +447,11 @@ export async function transcribeWithGemini(
       .map((page) => [page.page, page.error ?? "No legible handwriting detected. Try a brighter, upright photo."]),
   );
 
-  const text = successfulResults
-    .map((page) => page.text!.trim())
-    .join("\n\n");
+  const text = sanitizeOcrTranscription(
+    successfulResults
+      .map((page) => sanitizeOcrTranscription(page.text!).trim())
+      .join("\n\n"),
+  );
 
   if (!text || successfulResults.length === 0) {
     throw new Error(
@@ -416,7 +461,9 @@ export async function transcribeWithGemini(
 
   return {
     text,
-    pageTexts: results.map((page) => (page.text && !isBlankOrUnread(page.text) ? page.text : null)),
+    pageTexts: results.map((page) =>
+      page.text && !isBlankOrUnread(page.text) ? sanitizeOcrTranscription(page.text) : null,
+    ),
     model: [...usedModels].join(", ") || GATEWAY_MODELS[0]!,
     pages: results.length,
     failedPages,

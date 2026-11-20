@@ -28,6 +28,7 @@ import {
 import { buildAnchorBlock, fetchCalibrationAnchors, selectBestAnchors } from "./calibration.server";
 import {
   buildAoEvaluationDirective,
+  formatCanonicalSyllabusPrompt,
   formatStructureNote,
   getStructureGuidance,
   MODEL_EXAMINER,
@@ -169,6 +170,7 @@ export async function gradeEssay(
     ao3_level_descriptors: renderAo3Descriptors(maxMark, ao3_marks),
     structure_note: structureNote,
     essay_quality_profile: qualityDirective,
+    canonical_syllabus_list: formatCanonicalSyllabusPrompt(),
   };
 
   let baseSystemPrompt = loadPrompt(EXAMINER_PROMPT, promptValues);

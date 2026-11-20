@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBlankOrUnread } from "./gemini.server";
+import { isBlankOrUnread, sanitizeOcrTranscription } from "./gemini.server";
 
 describe("Handwriting OCR Validation & Blank Filter", () => {
   it("detects empty or null transcriptions as blank/unread", () => {
@@ -47,5 +47,41 @@ describe("Handwriting OCR Validation & Blank Filter", () => {
       "[DIAGRAM: Demand and Supply with specific subsidy | axes: Price / Quantity | curves: S1 shifts down to S2 | labels: P1, P2, Q1, Q2]\n\n" +
       "As shown in the diagram, consumer surplus increases from area A to area A+B.";
     expect(isBlankOrUnread(answerWithDiagram)).toBe(false);
+  });
+});
+
+describe("sanitizeOcrTranscription Preamble & Header Stripper", () => {
+  it("strips conversational AI preambles while preserving student handwriting", () => {
+    const raw =
+      "Here is the transcription of your handwritten Economics notes. I've preserved your original wording and spelling.\n\n" +
+      "A maximum price below equilibrium causes shortages and excess demand.";
+    const cleaned = sanitizeOcrTranscription(raw);
+    expect(cleaned).toBe("A maximum price below equilibrium causes shortages and excess demand.");
+  });
+
+  it("strips unattempted worksheet practice question headers", () => {
+    const raw =
+      "Practice Questions\n\n" +
+      "1. Discuss whether or not money supply increases benefit an economy.\n" +
+      "2. Discuss whether or not maximum price controls benefit consumers.\n\n" +
+      "An increase in money supply can stimulate aggregate demand by lowering interest rates.";
+    const cleaned = sanitizeOcrTranscription(raw);
+    expect(cleaned).toBe(
+      "An increase in money supply can stimulate aggregate demand by lowering interest rates.",
+    );
+  });
+
+  it("strips conversational AI trailers", () => {
+    const raw =
+      "Fiscal policy shifts AD to the right.\n\n" +
+      "Hope this helps! Let me know if you need anything else.";
+    const cleaned = sanitizeOcrTranscription(raw);
+    expect(cleaned).toBe("Fiscal policy shifts AD to the right.");
+  });
+
+  it("strips markdown fences around OCR transcriptions", () => {
+    const raw = "```markdown\nA subsidy lowers production costs.\n```";
+    const cleaned = sanitizeOcrTranscription(raw);
+    expect(cleaned).toBe("A subsidy lowers production costs.");
   });
 });

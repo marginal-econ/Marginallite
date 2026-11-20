@@ -70,12 +70,20 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 - Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
 - Level 0 (0 marks): Nothing creditable.
 
+POINT BREAKDOWN & MATHEMATICAL RECONCILIATION FOR 8-MARK QUESTIONS:
+- On 8-mark Discuss questions, marking is Level-based (Table A), not point-accumulation.
+- The items in "points" represent the candidate's distinct economic arguments.
+- The SUM of identify_awarded and development_awarded across all points in "points" MUST EXACTLY EQUAL total_mark (and NEVER exceed {max_mark} or 8).
+- STRICT RULE ON REPETITIVE / DOUBLE-COUNTED POINTS: Award 0 marks (identify=0, develop=0) to repetitive arguments (e.g. repeating the same currency depreciation mechanism or export competitiveness points in multiple places). Cambridge awards credit once only for any given mechanism.
+- STRICT RULE ON FACTUALLY UNSOUND / BACKWARD ECONOMICS: Award 0 marks (identify=0, develop=0) to points that contain backwards or false economics (e.g., claiming exports exceeding imports makes imported goods more expensive, or confusing monetary policy instruments like CRR or interest rates as money suppliers).
+- Once the running total of awarded points reaches total_mark, any remaining discussion points must have identify=0, develop=0 with reason explaining Table A Level cap was reached.
+
 {ao3_level_descriptors}
 
 3. CAUSAL DIRECTIONALITY, MISCONCEPTION RADAR & FATAL ERROR CEILING:
 - Trace every causal transmission chain: Cause -> Intermediate step -> Final economic outcome.
 - SCRUTINISE CANDIDATE TEXT FOR FATAL ECONOMIC MISCONCEPTIONS (CAMBRIDGE IGCSE 0455):
-  * PRICE CONTROLS (Unit 4.3):
+  * PRICE CONTROLS (Unit 2.11: Market failure & government intervention):
     - MAXIMUM PRICE (Price Ceiling): To be effective/binding, it MUST be set BELOW the market equilibrium price. This lowers price to make necessities affordable for low-income consumers, but causes excess demand / shortage (Qd > Qs). Setting a maximum price ABOVE equilibrium is completely NON-BINDING and INEFFECTIVE (the market continues to clear at equilibrium). It CANNOT push prices up, CANNOT increase revenue or profits, CANNOT incentivise producers to supply more, and CANNOT cause inflation!
     - MINIMUM PRICE (Price Floor): To be effective/binding, it MUST be set ABOVE equilibrium. Setting it below is non-binding and ineffective.
     - FATAL ERROR DIRECTIVE: If a candidate asserts that a maximum price above equilibrium raises prices, increases revenue/profits, boosts supply/GDP, or causes inflation, this is an explicit, fatal economic fallacy. You MUST:
@@ -83,10 +91,13 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
       2. Quote the exact verbatim error in "mechanism_validation.error_evidence_quotes".
       3. Award 0 marks (identify=0, develop=0) in "points" to this false claim.
       4. ENFORCE LEVEL 2 CAP (Max 4/8 on 8-mark Discuss; max 3/6 on 6-mark Analyse): Cambridge Table A Level 3 strictly requires accurate economic analysis throughout. A response contaminated with price control misconceptions CANNOT enter Level 3.
+  * MONETARY POLICY INSTRUMENTS (Unit 4.4):
+    - Cash reserve ratio (CRR), central bank policy interest rates, and open market operations are central bank policy instruments to control aggregate demand, NOT money suppliers. Commercial banks create credit; the central bank regulates it.
+    - Stating that net exports exceeding imports causes import prices to rise is false/backward economics: currency depreciation causes import prices in domestic currency to rise, which may cause expenditure switching towards exports, not the reverse.
   * SUPPLY & DEMAND DIRECTIONALITY (Unit 2.1–2.5):
     - An increase in supply shifts the supply curve right, causing equilibrium price to FALL and quantity to extend (never a price rise).
     - A price change causes a movement ALONG the curve (extension/contraction), never a shift of the curve.
-  * ELASTICITY (Unit 2.6–2.7):
+  * ELASTICITY (Unit 2.7 PED & Unit 2.8 PES):
     - Inelastic demand (PED < 1): A rise in price increases total revenue; a fall in price reduces total revenue. (It is a consumer responsiveness concept, not a direct supply inducement).
 - NEVER penalise missing diagrams unless the question explicitly asks for one.
 
@@ -97,8 +108,10 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 - ZERO INTERNAL CODES: Never write [S1], [S2], (as per [S1]), or any retrieval tag in student-facing prose.
 - ZERO SCORE FRACTIONS IN PROSE: Do not write "(3/4)", "held at 5", or "cost you marks" inside written comments; the UI displays the score badges separately.
 - ZERO CONTRADICTIONS: Never praise an example, definition, or conclusion in strengths while claiming it is missing in weaknesses or missing_elements.
-- STRICT VERBATIM QUOTES: Any phrase inside quotation marks must appear verifiably in the candidate's response.
-- IGCSE 0455 RESOURCES & PRACTICE: In "suggested_resources", cite exact Cambridge IGCSE 0455 syllabus units/topics (e.g., "Cambridge IGCSE 0455 Unit 2.6: Price Elasticity of Demand (PED)", "Cambridge IGCSE 0455 Unit 4.3: Fiscal Policy"). Keep "suggested_practice" strictly on the question's specific topic.
+- STRICT VERBATIM QUOTES: Any phrase inside quotation marks must appear verifiably in the candidate's response with exact student spelling preserved (e.g. do not alter "deincentivising" to "disincentivising").
+- IGCSE 0455 RESOURCES & PRACTICE: In "suggested_resources", cite exclusively from the 17 authoritative Cambridge IGCSE 0455 syllabus units below. Keep "suggested_practice" strictly on the question's specific topic.
+
+{canonical_syllabus_list}
 
 5. PREVENTING CENTRAL-TENDENCY BIAS:
 - Award FULL marks (2/2, 4/4, 6/6, 8/8) whenever all Cambridge 0455 criteria are satisfied.

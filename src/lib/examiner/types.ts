@@ -162,41 +162,129 @@ export function verifyVerbatimQuotes(feedbackText: string, essayText?: string): 
   });
 }
 
+// Generic stop words for semantic deduplication of feedback points
+const FEEDBACK_STOP_WORDS = new Set([
+  "the", "and", "that", "this", "with", "from", "for", "are", "was", "were",
+  "been", "being", "have", "has", "had", "does", "did", "doing", "would",
+  "should", "could", "ought", "their", "they", "them", "which", "what",
+  "when", "where", "also", "into", "onto", "then", "than", "more", "most",
+  "some", "such", "only", "even", "student", "candidate", "essay", "response",
+  "economic", "economics", "analysis", "evaluation", "explanation", "explain",
+  "explaining", "your", "about", "while", "however", "although", "through",
+  "between", "whether", "further", "clear", "clearly", "provide", "provides",
+  "providing", "include", "including", "ensure", "strengthen", "elevate",
+  "improve", "deepen", "develop", "developed", "developing", "specific",
+]);
+
+function extractFeedbackStems(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !FEEDBACK_STOP_WORDS.has(w))
+      .map((w) => w.replace(/(ations|ation|ings|ing|tion|ment|ities|ity|ness|ally|ed|ly|es|s)$/, ""))
+      .filter((w) => w.length >= 3),
+  );
+}
+
 /**
- * Semantically deduplicates feedback bullet arrays using normalized token overlap.
+ * Computes Jaccard similarity and Overlap Coefficient (intersection / min(|A|, |B|))
+ * on stemmed content words so a longer bullet with a quote is still recognised as
+ * duplicating a shorter bullet on the exact same point.
+ */
+export function feedbackSimilarity(a: string, b: string): { jaccard: number; overlap: number } {
+  const aWords = extractFeedbackStems(a);
+  const bWords = extractFeedbackStems(b);
+  if (aWords.size === 0 || bWords.size === 0) return { jaccard: 0, overlap: 0 };
+  let intersection = 0;
+  for (const w of aWords) {
+    if (bWords.has(w)) intersection++;
+  }
+  const union = aWords.size + bWords.size - intersection;
+  const minSize = Math.min(aWords.size, bWords.size);
+  return {
+    jaccard: union > 0 ? intersection / union : 0,
+    overlap: minSize > 0 ? intersection / minSize : 0,
+  };
+}
+
+/**
+ * Semantically deduplicates feedback bullet arrays using stemmed content-word Jaccard (>= 0.30)
+ * or Overlap Coefficient (>= 0.48), preventing repetitive or near-duplicate feedback points.
  */
 export function deduplicateFeedbackPoints(points: string[], maxCount = 5): string[] {
   const result: string[] = [];
-  const tokenSets: Set<string>[] = [];
 
   for (const raw of points) {
-    const cleaned = sanitizeIgcseFeedbackText(raw);
+    const cleaned = sanitizeIgcseFeedbackText(raw).trim();
     if (!cleaned || cleaned.length < 4) continue;
-    const tokens = new Set(
-      cleaned
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length >= 4),
-    );
-    let isDup = false;
-    for (const prev of tokenSets) {
-      if (tokens.size === 0 || prev.size === 0) continue;
-      let overlap = 0;
-      for (const t of tokens) if (prev.has(t)) overlap++;
-      const jaccard = overlap / Math.min(tokens.size, prev.size);
-      if (jaccard >= 0.72) {
-        isDup = true;
-        break;
-      }
-    }
-    if (!isDup) {
+    const exists = result.some((existing) => {
+      const sim = feedbackSimilarity(existing, cleaned);
+      return sim.jaccard >= 0.30 || sim.overlap >= 0.48;
+    });
+    if (!exists) {
       result.push(cleaned);
-      tokenSets.push(tokens);
       if (result.length >= maxCount) break;
     }
   }
   return result;
+}
+
+export function canonicalizeCambridge0455Resource(res: string): string {
+  const lower = res.toLowerCase();
+  if (lower.includes("price control") || lower.includes("maximum price") || lower.includes("minimum price") || lower.includes("ceiling") || lower.includes("floor")) {
+    return "Cambridge IGCSE 0455 Unit 2.11: Market failure and government intervention";
+  }
+  if (lower.includes("monetary policy") || lower.includes("interest rate") || lower.includes("money supply")) {
+    return "Cambridge IGCSE 0455 Unit 4.4: Monetary policy";
+  }
+  if (lower.includes("fiscal policy") || lower.includes("taxation") || lower.includes("government spending")) {
+    return "Cambridge IGCSE 0455 Unit 4.3: Fiscal policy";
+  }
+  if (lower.includes("ped") || lower.includes("price elasticity of demand")) {
+    return "Cambridge IGCSE 0455 Unit 2.7: Price elasticity of demand (PED)";
+  }
+  if (lower.includes("pes") || lower.includes("price elasticity of supply")) {
+    return "Cambridge IGCSE 0455 Unit 2.8: Price elasticity of supply (PES)";
+  }
+  if (lower.includes("supply-side") || lower.includes("supply side")) {
+    return "Cambridge IGCSE 0455 Unit 4.5: Supply-side policy";
+  }
+  if (lower.includes("economic growth") || lower.includes("gdp")) {
+    return "Cambridge IGCSE 0455 Unit 4.6: Economic growth";
+  }
+  if (lower.includes("unemployment") || lower.includes("employment")) {
+    return "Cambridge IGCSE 0455 Unit 4.7: Employment and unemployment";
+  }
+  if (lower.includes("inflation") || lower.includes("deflation") || lower.includes("cpi")) {
+    return "Cambridge IGCSE 0455 Unit 4.8: Inflation and deflation";
+  }
+  if (lower.includes("poverty") || lower.includes("living standards")) {
+    return "Cambridge IGCSE 0455 Unit 5.2: Poverty";
+  }
+  if (lower.includes("exchange rate") || lower.includes("depreciation") || lower.includes("appreciation")) {
+    return "Cambridge IGCSE 0455 Unit 6.3: Foreign exchange rates";
+  }
+  if (lower.includes("balance of payments") || lower.includes("current account") || lower.includes("trade balance")) {
+    return "Cambridge IGCSE 0455 Unit 6.4: Current account of balance of payments";
+  }
+  if (lower.includes("trade union") || lower.includes("worker") || lower.includes("labour market") || lower.includes("wage")) {
+    return "Cambridge IGCSE 0455 Unit 3.3: Workers";
+  }
+  if (lower.includes("specialisation") || lower.includes("specialization")) {
+    return "Cambridge IGCSE 0455 Unit 6.1: International specialisation";
+  }
+  if (lower.includes("free trade") || lower.includes("protectionism") || lower.includes("tariff") || lower.includes("globalisation")) {
+    return "Cambridge IGCSE 0455 Unit 6.2: Globalisation, free trade and protection";
+  }
+  if (lower.includes("macroeconomic aims")) {
+    return "Cambridge IGCSE 0455 Unit 4.2: Macroeconomic aims of government";
+  }
+  if (lower.includes("economic problem") || lower.includes("scarcity") || lower.includes("opportunity cost")) {
+    return "Cambridge IGCSE 0455 Unit 1.1: The nature of the economic problem";
+  }
+  return res;
 }
 
 /**
@@ -251,30 +339,114 @@ export function purgeContradictions(grading: Grading): Grading {
       ? arr.filter((x) => !/\b(evaluation|evaluative|counter-argument|weighing|conclusion)\b/i.test(x))
       : arr;
 
+  let weaknesses = evalFilter(cleanList(grading.weaknesses, 4));
+
+  // Reclassify evaluation dimensions out of missing_elements.analysis
+  const isEvaluationDimension = (item: string): boolean =>
+    /\b(short[- ]run|long[- ]run|stakeholder|trade[- ]off|weigh|depends on|conditionality|elasticity condition)\b/i.test(
+      item,
+    );
+
+  const rawAnalysis = (grading.missing_elements.analysis || []).filter((x) => !isALevelOnlyLeak(x)).filter(filterContradiction);
+  const reclassifiedEval: string[] = [];
+  const keptAnalysis: string[] = [];
+  for (const item of rawAnalysis) {
+    if (isEvaluationDimension(item)) {
+      reclassifiedEval.push(item);
+    } else {
+      keptAnalysis.push(item);
+    }
+  }
+
+  // Filter any missing_elements item that repeats an already-stated weakness or another missing item
+  const seenMissing: string[] = [];
+  const filterMissingList = (items: string[], max = 3): string[] => {
+    const out: string[] = [];
+    const validItems = (items || []).filter((x) => !isALevelOnlyLeak(x)).filter(filterContradiction);
+    for (const raw of deduplicateFeedbackPoints(validItems, max)) {
+      const cleaned = raw.trim();
+      if (!cleaned) continue;
+      const repeatsWeakness = weaknesses.some((w) => {
+        const sim = feedbackSimilarity(w, cleaned);
+        return sim.jaccard >= 0.30 || sim.overlap >= 0.48;
+      });
+      const repeatsEarlierMissing = seenMissing.some((m) => {
+        const sim = feedbackSimilarity(m, cleaned);
+        return sim.jaccard >= 0.30 || sim.overlap >= 0.48;
+      });
+      if (!repeatsWeakness && !repeatsEarlierMissing) {
+        out.push(cleaned);
+        seenMissing.push(cleaned);
+      }
+    }
+    return out;
+  };
+
+  const rawEval = [
+    ...(grading.missing_elements.evaluation || []),
+    ...reclassifiedEval,
+  ].filter((x) => !isALevelOnlyLeak(x)).filter(filterContradiction);
+
+  const missingElements: MissingElements = {
+    definitions: filterMissingList(grading.missing_elements.definitions, 3),
+    analysis: filterMissingList(keptAnalysis, 3),
+    evaluation: noEvalRequired ? [] : filterMissingList(rawEval, 3),
+    examples: filterMissingList(grading.missing_elements.examples, 3),
+    diagrams: filterMissingList(grading.missing_elements.diagrams, 3),
+  };
+
+  // Deduplicate actionable_feedback internally AND against weaknesses/missing_elements
+  const dedupedRawActions: string[] = [];
+  for (const item of evalFilter(cleanList(grading.actionable_feedback || [], 5))) {
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const isDup = dedupedRawActions.some((existing) => {
+      const sim = feedbackSimilarity(existing, trimmed);
+      return sim.jaccard >= 0.28 || sim.overlap >= 0.44;
+    });
+    if (!isDup) {
+      dedupedRawActions.push(trimmed);
+      if (dedupedRawActions.length >= 4) break;
+    }
+  }
+
+  const distinctActions = dedupedRawActions.filter((action) => {
+    const repeatsWeakness = weaknesses.some((w) => {
+      const sim = feedbackSimilarity(w, action);
+      return sim.jaccard >= 0.34 || sim.overlap >= 0.52;
+    });
+    const repeatsMissing = seenMissing.some((m) => {
+      const sim = feedbackSimilarity(m, action);
+      return sim.jaccard >= 0.34 || sim.overlap >= 0.52;
+    });
+    return !repeatsWeakness && !repeatsMissing;
+  });
+
+  let actionableFeedback = distinctActions.slice(0, 3);
+  if (actionableFeedback.length === 0 && dedupedRawActions.length > 0) {
+    actionableFeedback = [dedupedRawActions[0]];
+  }
+
+  const canonicalResources = deduplicateFeedbackPoints(
+    grading.suggested_resources
+      .filter((x) => !isALevelOnlyLeak(x))
+      .map(canonicalizeCambridge0455Resource),
+    4,
+  );
+
   return {
     ...grading,
     examiner_summary: sanitizeIgcseFeedbackText(grading.examiner_summary),
-    strengths: deduplicateFeedbackPoints(grading.strengths.filter((x) => !isALevelOnlyLeak(x)), 5),
-    weaknesses: evalFilter(cleanList(grading.weaknesses, 5)),
-    actionable_feedback: evalFilter(cleanList(grading.actionable_feedback, 5)),
-    next_step_feedback: grading.next_step_feedback
-      ? evalFilter(cleanList(grading.next_step_feedback, 4))
-      : undefined,
-    suggested_resources: deduplicateFeedbackPoints(
-      grading.suggested_resources.filter((x) => !isALevelOnlyLeak(x)),
-      4,
-    ),
+    strengths: deduplicateFeedbackPoints(grading.strengths.filter((x) => !isALevelOnlyLeak(x)), 4),
+    weaknesses,
+    actionable_feedback: actionableFeedback,
+    next_step_feedback: actionableFeedback,
+    suggested_resources: canonicalResources,
     suggested_practice: deduplicateFeedbackPoints(
       grading.suggested_practice.filter((x) => !isALevelOnlyLeak(x)),
       4,
     ),
-    missing_elements: {
-      definitions: cleanList(grading.missing_elements.definitions, 4),
-      analysis: cleanList(grading.missing_elements.analysis, 4),
-      evaluation: noEvalRequired ? [] : cleanList(grading.missing_elements.evaluation, 4),
-      examples: cleanList(grading.missing_elements.examples, 4),
-      diagrams: cleanList(grading.missing_elements.diagrams, 3),
-    },
+    missing_elements: missingElements,
     ao_breakdown: {
       knowledge: {
         ...grading.ao_breakdown.knowledge,
@@ -355,11 +527,24 @@ export function normaliseGrading(
       }
     : undefined;
 
-  // Parse points if present (point-marking for 2m/4m/6m)
+function findVerbatimStudentQuote(quote: string, essayText?: string): string {
+  if (!quote || !essayText) return quote;
+  const qClean = quote.trim();
+  if (essayText.includes(qClean)) return qClean;
+  const lowerEssay = essayText.toLowerCase();
+  const lowerQ = qClean.toLowerCase();
+  const idx = lowerEssay.indexOf(lowerQ);
+  if (idx !== -1) {
+    return essayText.slice(idx, idx + qClean.length);
+  }
+  return qClean;
+}
+
+  // Parse points if present (point-marking for 2m/4m/6m & Table A evidence points for 8m)
   let points: CreditPoint[] | undefined;
   if (Array.isArray(raw.points)) {
     points = raw.points.map((p: any) => ({
-      quote: cleanStars(String(p.quote || "")),
+      quote: cleanStars(findVerbatimStudentQuote(String(p.quote || ""), essayText)),
       matched_ms_point: cleanStars(String(p.matched_ms_point || "")),
       identify_awarded: Math.min(1, Math.max(0, Number(p.identify_awarded) || 0)),
       development_awarded: Math.min(1, Math.max(0, Number(p.development_awarded) || 0)),
@@ -422,6 +607,71 @@ export function normaliseGrading(
     if (isListingOnly && finalMark > 3) {
       finalMark = 3;
       analysis.awarded = 3;
+    }
+  }
+
+  // Reconcile and cap Credit Points against finalMark & eliminate unsound / duplicate points
+  if (points && points.length > 0) {
+    // 1. Detect erroneous or backward economics in points
+    for (const pt of points) {
+      const reasonLower = pt.reason.toLowerCase();
+      const hasErrorInReason =
+        /\b(misleading|incorrect|backwards?|confuses?|false\s+economics?|fatal\s+fallacy|error|unsound|not\s+credited)\b/i.test(
+          reasonLower,
+        );
+      const matchesErrorEvidence = Boolean(
+        mechanism_validation?.fatal_misconceptions_found &&
+        mechanism_validation.error_evidence_quotes.some(
+          (eq) =>
+            pt.quote.toLowerCase().includes(eq.toLowerCase()) ||
+            eq.toLowerCase().includes(pt.quote.toLowerCase()),
+        ),
+      );
+      if (hasErrorInReason || matchesErrorEvidence) {
+        pt.identify_awarded = 0;
+        pt.development_awarded = 0;
+      }
+    }
+
+    // 2. Detect duplicate mechanisms across points
+    const seenPointMechanisms: string[] = [];
+    for (const pt of points) {
+      if (pt.identify_awarded === 0 && pt.development_awarded === 0) continue;
+      const pointText = `${pt.matched_ms_point} ${pt.quote}`;
+      const isDup = seenPointMechanisms.some((prev) => {
+        const sim = feedbackSimilarity(prev, pointText);
+        return sim.jaccard >= 0.32 || sim.overlap >= 0.50;
+      });
+      if (isDup) {
+        pt.identify_awarded = 0;
+        pt.development_awarded = 0;
+        if (!pt.reason.includes("Duplicate")) {
+          pt.reason = `${pt.reason} (Duplicate argument: credit already awarded in earlier point; Cambridge mark schemes award credit once only per mechanism).`;
+        }
+      } else {
+        seenPointMechanisms.push(pointText);
+      }
+    }
+
+    // 3. Mathematical reconciliation so point sum never exceeds finalMark or maxMark
+    let runningPointSum = 0;
+    for (const pt of points) {
+      if (pt.identify_awarded === 0 && pt.development_awarded === 0) continue;
+      const available = finalMark - runningPointSum;
+      if (available <= 0) {
+        pt.identify_awarded = 0;
+        pt.development_awarded = 0;
+        if (!pt.reason.includes("cap reached")) {
+          pt.reason = `${pt.reason} (Cambridge mark cap reached: maximum ${finalMark}/${maxMark} marks awarded).`;
+        }
+      } else if (available === 1 && pt.identify_awarded + pt.development_awarded > 1) {
+        pt.identify_awarded = 1;
+        pt.development_awarded = 0;
+        runningPointSum += 1;
+      } else {
+        const awarded = pt.identify_awarded + (pt.identify_awarded > 0 ? pt.development_awarded : 0);
+        runningPointSum += awarded;
+      }
     }
   }
 

@@ -472,7 +472,9 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
               <CheckCircle2 className="size-4 text-primary" />
-              IGCSE 0455 Mark Scheme Point Breakdown
+              {grading.max_mark === 8
+                ? `IGCSE 0455 Discussion Argument Breakdown (${grading.total_mark}/${grading.max_mark})`
+                : "IGCSE 0455 Mark Scheme Point Breakdown"}
             </h3>
             {grading.command_word_check && (
               <Badge
@@ -499,19 +501,35 @@ ${actionableFeedback.map((f, i) => `${i + 1}. ${stripStars(f)}`).join("\n")}`;
               {grading.points.map((pt, idx) => (
                 <div
                   key={idx}
-                  className="rounded-xl border border-border/60 bg-background/70 p-3 text-xs space-y-1.5"
+                  className={cn(
+                    "rounded-xl border p-3 text-xs space-y-1.5",
+                    pt.identify_awarded === 0 && pt.development_awarded === 0
+                      ? "border-border/40 bg-muted/20 opacity-80"
+                      : "border-border/60 bg-background/70",
+                  )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-foreground">
                       Point {idx + 1}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="secondary" className="text-[10px]">
-                        Identify: +{pt.identify_awarded}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px]">
-                        Develop: +{pt.development_awarded}
-                      </Badge>
+                      {pt.identify_awarded === 0 && pt.development_awarded === 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-muted-foreground/30 text-muted-foreground bg-muted/30"
+                        >
+                          Not Credited (0m)
+                        </Badge>
+                      ) : (
+                        <>
+                          <Badge variant="secondary" className="text-[10px]">
+                            Identify: +{pt.identify_awarded}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            Develop: +{pt.development_awarded}
+                          </Badge>
+                        </>
+                      )}
                     </div>
                   </div>
                   {pt.quote && (

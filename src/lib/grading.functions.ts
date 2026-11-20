@@ -365,6 +365,39 @@ export const getEssayThread = createServerFn({ method: "POST" })
 
         return { essay, versions: safeVersions };
       }
+
+      // Check if data.essayId is actually an essay_versions ID
+      const { data: verRow } = await supabaseAdmin
+        .from("essay_versions")
+        .select("id, essay_id, version, essay_text, grading, total_mark, confidence, audited, created_at")
+        .eq("id", data.essayId)
+        .maybeSingle();
+
+      if (verRow) {
+        const { data: parentEssay } = await supabaseAdmin
+          .from("essays")
+          .select("id, question, max_mark, latest_mark, created_at, user_id")
+          .eq("id", verRow.essay_id)
+          .maybeSingle();
+
+        if (parentEssay) {
+          if (!isAdmin && parentEssay.user_id !== context.userId) {
+            throw new Error("You do not have permission to view this essay.");
+          }
+          let g = verRow.grading;
+          if (typeof g === "string") {
+            try {
+              g = JSON.parse(g);
+            } catch {
+              g = {};
+            }
+          }
+          return {
+            essay: parentEssay,
+            versions: [{ ...verRow, grading: g ?? {} }],
+          };
+        }
+      }
     } catch {}
 
     throw new Error("That essay could not be found.");
