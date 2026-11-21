@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Layers,
   MessageSquare,
+  MinusCircle,
   PenLine,
   Radio,
   RefreshCw,
@@ -1001,6 +1002,9 @@ function McqVaultTab() {
                     {mcqDetailQuery.data.author.email && (
                       <span className="font-mono text-muted-foreground">({mcqDetailQuery.data.author.email})</span>
                     )}
+                    {mcqDetailQuery.data.author.school && (
+                      <span className="text-muted-foreground"> · {mcqDetailQuery.data.author.school}</span>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs font-bold">
@@ -1041,27 +1045,38 @@ function McqVaultTab() {
                   mcqDetailQuery.data.attempt.questions.map((q: any, idx: number) => {
                     const qNum = q.number ?? idx + 1;
                     const studentAns =
-                      mcqDetailQuery.data.kind === "generated"
-                        ? mcqDetailQuery.data.attempt.answers?.[String(qNum)]
-                        : q.user_answer;
-                    const correctAns =
-                      mcqDetailQuery.data.kind === "generated" ? q.answer : q.correct_answer;
+                      q.user_answer ??
+                      (mcqDetailQuery.data.attempt.answers &&
+                      typeof mcqDetailQuery.data.attempt.answers === "object" &&
+                      !Array.isArray(mcqDetailQuery.data.attempt.answers)
+                        ? mcqDetailQuery.data.attempt.answers[String(qNum)]
+                        : null);
+                    const correctAns = q.correct_answer || q.answer || "—";
+                    const isAttempted =
+                      studentAns !== null && studentAns !== undefined && studentAns !== "" && studentAns !== "—";
                     const isCorrect =
-                      mcqDetailQuery.data.kind === "generated"
-                        ? studentAns === correctAns
-                        : Boolean(q.correct);
+                      q.correct === true ||
+                      (isAttempted &&
+                        correctAns !== "—" &&
+                        String(studentAns).trim().toUpperCase() === String(correctAns).trim().toUpperCase());
 
                     return (
                       <div
                         key={idx}
                         className={cn(
                           "rounded-xl border p-3.5 space-y-2 text-xs transition-colors",
-                          isCorrect ? "border-emerald-500/30 bg-emerald-500/5" : "border-rose-500/30 bg-rose-500/5",
+                          !isAttempted
+                            ? "border-muted-foreground/30 bg-muted/20"
+                            : isCorrect
+                              ? "border-emerald-500/30 bg-emerald-500/5"
+                              : "border-rose-500/30 bg-rose-500/5",
                         )}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-bold flex items-center gap-1.5">
-                            {isCorrect ? (
+                            {!isAttempted ? (
+                              <MinusCircle className="size-3.5 text-muted-foreground" />
+                            ) : isCorrect ? (
                               <CheckCircle2 className="size-3.5 text-emerald-500" />
                             ) : (
                               <XCircle className="size-3.5 text-rose-500" />
@@ -1070,17 +1085,33 @@ function McqVaultTab() {
                           </span>
                           <div className="flex items-center gap-2 font-mono text-[11px]">
                             <span>
-                              Chosen: <strong>{studentAns || "—"}</strong>
+                              Chosen:{" "}
+                              <strong className={!isAttempted ? "text-muted-foreground italic font-normal" : undefined}>
+                                {isAttempted ? studentAns : "Unattempted"}
+                              </strong>
                             </span>
                             <span>·</span>
                             <span>
                               Correct: <strong>{correctAns}</strong>
                             </span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] h-4 px-1.5 ml-1",
+                                !isAttempted
+                                  ? "border-muted-foreground/40 text-muted-foreground"
+                                  : isCorrect
+                                    ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-semibold"
+                                    : "border-rose-500/40 text-rose-600 dark:text-rose-400 font-semibold",
+                              )}
+                            >
+                              {!isAttempted ? "Skipped" : isCorrect ? "Correct (+1)" : "Incorrect (+0)"}
+                            </Badge>
                           </div>
                         </div>
 
-                        {q.question && (
-                          <p className="text-foreground leading-relaxed font-sans">{q.question}</p>
+                        {(q.question || q.stem_text) && (
+                          <p className="text-foreground leading-relaxed font-sans">{q.question || q.stem_text}</p>
                         )}
 
                         {q.explanation && (

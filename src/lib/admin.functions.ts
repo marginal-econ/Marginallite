@@ -2102,17 +2102,25 @@ export const adminListAllMcqAttempts = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
-    const [genRes, pdfRes, profilesRes, authUsers] = await Promise.all([
+    // Authoritative Cambridge past paper attempts in Marginalite
+    const pdfPromise = supabaseAdmin
+      .from("mcq_pdf_attempts")
+      .select("id, user_id, title, level, score, total, created_at, completed_at")
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    // Safely query generated mcq_attempts (if table exists)
+    const genPromise = Promise.resolve(
       supabaseAdmin
         .from("mcq_attempts")
-        .select("id, user_id, title, topic, level, status, score, total, created_at, completed_at")
+        .select("id, user_id, score, total_questions, created_at, submitted_at, status")
         .order("created_at", { ascending: false })
         .limit(200),
-      supabaseAdmin
-        .from("mcq_pdf_attempts")
-        .select("id, user_id, title, filename, level, score, total, created_at, completed_at")
-        .order("created_at", { ascending: false })
-        .limit(200),
+    ).catch(() => ({ data: [] as any[], error: null }));
+
+    const [pdfRes, genRes, profilesRes, authUsers] = await Promise.all([
+      pdfPromise,
+      genPromise,
       supabaseAdmin.from("profiles").select("id, full_name, school"),
       listAcceptedAuthUsers(),
     ]);
@@ -2120,39 +2128,19 @@ export const adminListAllMcqAttempts = createServerFn({ method: "GET" })
     const authMap = new Map(authUsers.map((u) => [u.id, u.email]));
     const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p]));
 
-    const generated = (genRes.data ?? []).map((a: any) => {
-      const profile: any = profileMap.get(a.user_id);
-      const email = authMap.get(a.user_id);
-      return {
-        id: a.id,
-        kind: "generated" as const,
-        userId: a.user_id,
-        studentName: profile?.full_name || email || "Student",
-        studentEmail: email || null,
-        title: a.title,
-        topic: a.topic || "All Syllabus Topics",
-        level: a.level,
-        status: a.status,
-        score: a.score,
-        total: a.total,
-        percentage: a.score !== null && a.total > 0 ? Math.round((a.score / a.total) * 100) : null,
-        createdAt: a.created_at,
-        completedAt: a.completed_at,
-      };
-    });
-
     const pastPaper = (pdfRes.data ?? []).map((a: any) => {
       const profile: any = profileMap.get(a.user_id);
       const email = authMap.get(a.user_id);
+      const paperTitle = a.title || "Cambridge IGCSE 0455 Past Paper";
       return {
         id: a.id,
         kind: "past_paper" as const,
         userId: a.user_id,
         studentName: profile?.full_name || email || "Student",
         studentEmail: email || null,
-        title: a.title,
-        topic: a.filename || "Cambridge Past Paper",
-        level: a.level,
+        title: paperTitle,
+        topic: paperTitle,
+        level: a.level || "igcse",
         status: a.completed_at ? "marked" : "in_progress",
         score: a.score,
         total: a.total,
@@ -2162,7 +2150,29 @@ export const adminListAllMcqAttempts = createServerFn({ method: "GET" })
       };
     });
 
-    return [...generated, ...pastPaper].sort(
+    const generated = (!genRes.error && Array.isArray(genRes.data) ? genRes.data : []).map((a: any) => {
+      const profile: any = profileMap.get(a.user_id);
+      const email = authMap.get(a.user_id);
+      const total = a.total ?? a.total_questions ?? 0;
+      return {
+        id: a.id,
+        kind: "generated" as const,
+        userId: a.user_id,
+        studentName: profile?.full_name || email || "Student",
+        studentEmail: email || null,
+        title: a.title || "Topic Practice Session",
+        topic: a.topic || "All Syllabus Topics",
+        level: a.level || "igcse",
+        status: a.status || (a.submitted_at || a.completed_at ? "marked" : "in_progress"),
+        score: a.score,
+        total,
+        percentage: a.score !== null && total > 0 ? Math.round((a.score / total) * 100) : null,
+        createdAt: a.created_at,
+        completedAt: a.completed_at || a.submitted_at,
+      };
+    });
+
+    return [...pastPaper, ...generated].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   });
@@ -2170,32 +2180,84 @@ export const adminListAllMcqAttempts = createServerFn({ method: "GET" })
 export const adminGetMcqAttemptDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid(), kind: z.enum(["generated", "past_paper"]) }).parse(unwrapData(input)),
+    z.object({ id: z.string().uuid(), kind: z.enum(["generated", "past_paper"]).default("past_paper") }).parse(unwrapData(input)),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
     let attempt: any = null;
-    if (data.kind === "generated") {
-      const { data: row, error } = await supabaseAdmin
-        .from("mcq_attempts")
-        .select("*")
-        .eq("id", data.id)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      attempt = row;
-    } else {
-      const { data: row, error } = await supabaseAdmin
-        .from("mcq_pdf_attempts")
-        .select("*")
-        .eq("id", data.id)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      attempt = row;
+    let resolvedKind: "generated" | "past_paper" = data.kind;
+
+    // Check primary table first, then fallback
+    const tables: Array<{ table: "mcq_pdf_attempts" | "mcq_attempts"; kind: "past_paper" | "generated" }> =
+      data.kind === "generated"
+        ? [
+            { table: "mcq_attempts", kind: "generated" },
+            { table: "mcq_pdf_attempts", kind: "past_paper" },
+          ]
+        : [
+            { table: "mcq_pdf_attempts", kind: "past_paper" },
+            { table: "mcq_attempts", kind: "generated" },
+          ];
+
+    for (const t of tables) {
+      try {
+        const { data: row } = await supabaseAdmin
+          .from(t.table)
+          .select("*")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (row) {
+          attempt = row;
+          resolvedKind = t.kind;
+          break;
+        }
+      } catch {}
     }
 
     if (!attempt) throw new Error("MCQ attempt not found");
+
+    // Normalize question list from answers array or questions JSON
+    const rawQuestions = Array.isArray(attempt.questions)
+      ? attempt.questions
+      : Array.isArray(attempt.answers)
+        ? attempt.answers
+        : [];
+
+    const isAnswersMap = attempt.answers && typeof attempt.answers === "object" && !Array.isArray(attempt.answers);
+
+    const questions = rawQuestions.map((q: any, idx: number) => {
+      const qNum = q.number ?? idx + 1;
+      const questionText = q.question || q.stem_text || q.text || `Question ${qNum}`;
+      const userAns = q.user_answer ?? q.selected ?? q.userAnswer ?? (isAnswersMap ? attempt.answers[String(qNum)] : null);
+      const correctAns = q.correct_answer ?? q.correctAnswer ?? q.answer ?? "";
+      const isCorrect =
+        q.correct !== undefined && q.correct !== null
+          ? Boolean(q.correct)
+          : userAns && correctAns
+            ? String(userAns).trim().toUpperCase() === String(correctAns).trim().toUpperCase()
+            : null;
+      const topic = q.topic || q.subtopic || q.unit || "Economics";
+      const explanation = q.explanation || q.notes || null;
+
+      return {
+        number: qNum,
+        question: questionText,
+        user_answer: userAns,
+        correct_answer: correctAns,
+        correct: isCorrect,
+        topic,
+        explanation,
+      };
+    });
+
+    const normalizedAttempt = {
+      ...attempt,
+      title: attempt.title || "Cambridge IGCSE 0455 Past Paper",
+      total: attempt.total ?? attempt.total_questions ?? questions.length,
+      questions,
+    };
 
     const [profileRes, authUsers] = await Promise.all([
       supabaseAdmin.from("profiles").select("id, full_name, school").eq("id", attempt.user_id).maybeSingle(),
@@ -2205,8 +2267,8 @@ export const adminGetMcqAttemptDetail = createServerFn({ method: "POST" })
     const authorEmail = authUsers.find((u) => u.id === attempt.user_id)?.email || null;
 
     return {
-      attempt,
-      kind: data.kind,
+      attempt: normalizedAttempt,
+      kind: resolvedKind,
       author: {
         id: attempt.user_id,
         name: profileRes.data?.full_name || authorEmail || "Student",
@@ -2225,14 +2287,23 @@ export const adminDeleteMcqAttempt = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/backend/client.server");
 
-    const table = data.kind === "generated" ? "mcq_attempts" : "mcq_pdf_attempts";
-    const { error, count } = await supabaseAdmin
-      .from(table)
-      .delete({ count: "exact" })
-      .eq("id", data.id);
+    const tables = data.kind === "generated" ? ["mcq_attempts", "mcq_pdf_attempts"] : ["mcq_pdf_attempts", "mcq_attempts"];
+    let deleted = false;
 
-    if (error) throw new Error(error.message);
-    if (!count) throw new Error("MCQ attempt not found or already deleted");
+    for (const table of tables) {
+      try {
+        const { error, count } = await supabaseAdmin
+          .from(table)
+          .delete({ count: "exact" })
+          .eq("id", data.id);
+        if (!error && (count ?? 0) > 0) {
+          deleted = true;
+          break;
+        }
+      } catch {}
+    }
+
+    if (!deleted) throw new Error("MCQ attempt not found or already deleted");
 
     return { ok: true, deletedId: data.id };
   });
@@ -2332,14 +2403,16 @@ export const adminGetStudentDossier = createServerFn({ method: "POST" })
           .select("id, question, max_mark, latest_mark, created_at, updated_at")
           .eq("user_id", data.userId)
           .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("mcq_attempts")
-          .select("id, title, topic, level, status, score, total, created_at, completed_at")
-          .eq("user_id", data.userId)
-          .order("created_at", { ascending: false }),
+        Promise.resolve(
+          supabaseAdmin
+            .from("mcq_attempts")
+            .select("id, score, total_questions, created_at, submitted_at, status")
+            .eq("user_id", data.userId)
+            .order("created_at", { ascending: false }),
+        ).catch(() => ({ data: [] as any[], error: null })),
         supabaseAdmin
           .from("mcq_pdf_attempts")
-          .select("id, title, filename, level, score, total, created_at, completed_at")
+          .select("id, title, level, score, total, created_at, completed_at")
           .eq("user_id", data.userId)
           .order("created_at", { ascending: false }),
         supabaseAdmin

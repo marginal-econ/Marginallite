@@ -515,7 +515,7 @@ export const getPdfMcqAttempt = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data: row, error } = await supabase
       .from("mcq_pdf_attempts")
-      .select("id, title, level, paper_id, score, total, completed_at, questions")
+      .select("id, title, level, paper_id, score, total, completed_at, answers")
       .eq("id", data.attemptId)
       .eq("user_id", userId)
       .maybeSingle();
@@ -523,7 +523,11 @@ export const getPdfMcqAttempt = createServerFn({ method: "GET" })
     if (!row) throw new Error("That attempt wasn't found.");
 
     const levelUpper = row.level === "a2" ? "A2" : "AS";
-    const rawQuestions = Array.isArray(row.questions) ? row.questions : [];
+    const rawQuestions = Array.isArray((row as any).answers)
+      ? (row as any).answers
+      : Array.isArray((row as any).questions)
+        ? (row as any).questions
+        : [];
     const normalizedQuestions = rawQuestions.map((rawQ: any, idx: number) => {
       const q = (rawQ && typeof rawQ === "object" ? rawQ : {}) as Record<string, unknown>;
       const number = typeof q.number === "number" ? q.number : idx + 1;

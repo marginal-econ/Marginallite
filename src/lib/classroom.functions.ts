@@ -2424,10 +2424,12 @@ export const getClassroomAggregateAnalytics = createServerFn({ method: "GET" })
         .select("id, user_id, question, max_mark, latest_mark, created_at, updated_at")
         .in("user_id", studentIds)
         .order("created_at", { ascending: false }),
-      authority.admin
-        .from("mcq_attempts")
-        .select("id, user_id, title, topic, level, score, total, created_at, completed_at")
-        .in("user_id", studentIds),
+      Promise.resolve(
+        authority.admin
+          .from("mcq_attempts")
+          .select("id, user_id, title, topic, level, score, total, created_at, completed_at")
+          .in("user_id", studentIds),
+      ).catch(() => ({ data: [] as any[], error: null })),
       authority.admin
         .from("mcq_pdf_attempts")
         .select("id, user_id, title, level, score, total, created_at, completed_at")
@@ -2797,14 +2799,16 @@ export const getStudentLifetimePortfolio = createServerFn({ method: "GET" })
         .select("id, question, max_mark, latest_mark, topic_id, created_at, updated_at")
         .eq("user_id", data.studentId)
         .order("created_at", { ascending: false }),
-      authority.admin
-        .from("mcq_attempts")
-        .select("id, title, topic, level, status, score, total, questions, answers, created_at, completed_at")
-        .eq("user_id", data.studentId)
-        .order("created_at", { ascending: false }),
+      Promise.resolve(
+        authority.admin
+          .from("mcq_attempts")
+          .select("id, title, topic, level, status, score, total, questions, answers, created_at, completed_at")
+          .eq("user_id", data.studentId)
+          .order("created_at", { ascending: false }),
+      ).catch(() => ({ data: [] as any[], error: null })),
       authority.admin
         .from("mcq_pdf_attempts")
-        .select("id, title, filename, level, score, total, questions, created_at, completed_at")
+        .select("id, title, level, score, total, answers, created_at, completed_at")
         .eq("user_id", data.studentId)
         .order("created_at", { ascending: false }),
       authority.admin
@@ -2982,7 +2986,7 @@ export const getStudentLifetimePortfolio = createServerFn({ method: "GET" })
             ? Math.round((Number(m.score) / Number(m.total)) * 100)
             : null,
         completedAt: m.completed_at || m.created_at,
-        questions: m.questions,
+        questions: m.answers || m.questions,
       });
     }
 
