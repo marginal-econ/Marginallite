@@ -168,6 +168,131 @@ export type McqExplanationResult = {
   diagnostic?: McqDiagnostic;
 };
 
+const inMemoryExplanationCache = new Map<string, McqExplanationResult>();
+
+/**
+ * Retrieves all stored explanations for a paper (from database & cache)
+ * so students don't experience any waiting when practicing in Tutor Mode.
+ */
+export async function getStoredPaperExplanationsServer(
+  paperId: string,
+): Promise<Record<number, McqExplanationResult>> {
+  const result: Record<number, McqExplanationResult> = {};
+
+  // 1. Pull from in-memory cache for this paper
+  const prefix = `${paperId}:`;
+  for (const [key, val] of inMemoryExplanationCache.entries()) {
+    if (key.startsWith(prefix)) {
+      const qNum = parseInt(key.slice(prefix.length), 10);
+      if (Number.isFinite(qNum)) {
+        result[qNum] = val;
+      }
+    }
+  }
+
+  // 2. If it's a UUID paper from the library, pull from overlay.explanations in mcq_pdf_papers
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paperId);
+  if (isUuid) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("mcq_pdf_papers")
+        .select("overlay")
+        .eq("id", paperId)
+        .maybeSingle();
+
+      if (!error && data?.overlay) {
+        const dbExplanations = (data.overlay as Record<string, any>)?.explanations;
+        if (dbExplanations && typeof dbExplanations === "object") {
+          for (const [numStr, expl] of Object.entries(dbExplanations)) {
+            const qNum = parseInt(numStr, 10);
+            if (Number.isFinite(qNum) && expl && typeof expl === "object") {
+              result[qNum] = expl as McqExplanationResult;
+              inMemoryExplanationCache.set(`${paperId}:${qNum}`, expl as McqExplanationResult);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch stored explanations from mcq_pdf_papers:", err);
+    }
+  } else {
+    // 3. If it's a topical paper, check if its source past papers have stored explanations
+    try {
+      const { getTopicalPaperById } = await import("../topical-mcq-papers");
+      const topical = getTopicalPaperById(paperId);
+      if (topical) {
+        const sourceTitles = Array.from(
+          new Set(topical.questions.map((q) => q.sourcePaperTitle).filter(Boolean)),
+        );
+        if (sourceTitles.length > 0) {
+          const { data: sourcePapers } = await supabaseAdmin
+            .from("mcq_pdf_papers")
+            .select("title, overlay")
+            .in("title", sourceTitles);
+
+          if (sourcePapers) {
+            const byTitle = new Map(sourcePapers.map((p) => [p.title, p]));
+            for (const q of topical.questions) {
+              const sp = byTitle.get(q.sourcePaperTitle);
+              const spExpls = (sp?.overlay as any)?.explanations;
+              const spExpl = spExpls?.[String(q.originalQuestionNumber)];
+              if (spExpl && !result[q.number]) {
+                result[q.number] = spExpl as McqExplanationResult;
+                inMemoryExplanationCache.set(`${paperId}:${q.number}`, spExpl as McqExplanationResult);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to map topical paper explanations:", err);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Persists an explanation to the in-memory cache and directly into Supabase (mcq_pdf_papers.overlay)
+ * so it is stored beforehand and accessible instantly to every student.
+ */
+export async function savePaperExplanationServer(
+  paperId: string,
+  number: number,
+  explanation: McqExplanationResult,
+): Promise<void> {
+  // Store in in-memory cache immediately
+  inMemoryExplanationCache.set(`${paperId}:${number}`, explanation);
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paperId);
+  if (isUuid) {
+    try {
+      const { data } = await supabaseAdmin
+        .from("mcq_pdf_papers")
+        .select("id, overlay")
+        .eq("id", paperId)
+        .maybeSingle();
+
+      if (data) {
+        const currentOverlay = ((data.overlay as any) ?? {}) as Record<string, any>;
+        const currentExplanations = (currentOverlay.explanations ?? {}) as Record<string, any>;
+        currentExplanations[String(number)] = explanation;
+        await supabaseAdmin
+          .from("mcq_pdf_papers")
+          .update({
+            overlay: {
+              ...currentOverlay,
+              explanations: currentExplanations,
+            },
+          })
+          .eq("id", paperId);
+      }
+    } catch (err) {
+      console.warn("Failed to save explanation to mcq_pdf_papers:", err);
+    }
+  }
+}
+
 /**
  * Advanced examiner explanation of why one question's mark-scheme answer is
  * correct, generated on demand when a student opens a question in the

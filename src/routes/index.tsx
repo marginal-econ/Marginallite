@@ -28,6 +28,8 @@ import {
   Users,
   FileSpreadsheet,
   FileText,
+  Gamepad2,
+  Trophy,
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -71,6 +73,7 @@ import { AccuracyCredibilitySection } from "@/components/marketing/accuracy-cred
 import { RealEssayShowcase } from "@/components/marketing/real-essay-showcase";
 import { TeachersSection } from "@/components/marketing/teachers-section";
 import { CosmicAtmosphere } from "@/components/marketing/cosmic-atmosphere";
+import { CommunityPartnerBanner } from "@/components/marketing/community-partner-banner";
 import { captureReferralCode } from "@/lib/waitlist-client";
 import { supabase } from "@/integrations/backend/client";
 
@@ -233,8 +236,16 @@ const OBJECTIVES = [
   { code: "AO3", name: "Evaluation", dot: "bg-ao3", share: 45 },
 ];
 
-// All ten specialized features engineered for Cambridge IGCSE 0455 Economics.
+// Specialized features engineered for Cambridge IGCSE 0455 Economics.
 const TOOLS = [
+  {
+    icon: Gamepad2,
+    tile: "bg-amber-600",
+    badge: "Multiplayer Arena",
+    title: "Live MCQ Quiz Arena",
+    body: "Multiplayer Cambridge IGCSE 0455 past paper races with 6-digit PIN, Serious Exam sprint, and Game Arena with power-ups (Steal, Swap & Tax).",
+    href: "/quiz",
+  },
   {
     icon: PenLine,
     tile: "bg-ao2",
@@ -469,6 +480,9 @@ function Index() {
       <CustomCursor />
       <ScrollProgress />
 
+      {/* ── Community Partner Banner (r/The_IGCSE_Workaholics) ─────────── */}
+      <CommunityPartnerBanner />
+
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="relative mx-auto flex max-w-7xl 2xl:max-w-[1440px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6 md:px-10 lg:px-12 xl:px-16 sm:py-3">
@@ -656,6 +670,17 @@ function Index() {
                     <span>See Graded Sample</span>
                   </a>
                 </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="h-12 px-4 text-sm font-semibold border-2 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-foreground gap-2 shadow-xs cursor-pointer w-full sm:w-auto inline-flex items-center justify-center"
+                >
+                  <Link to="/quiz">
+                    <Gamepad2 className="size-4 text-amber-500 shrink-0" />
+                    <span>Live Quiz (PIN)</span>
+                  </Link>
+                </Button>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
@@ -726,9 +751,60 @@ function Index() {
           <Reveal>
             <SectionHeading
               eyebrow="Cambridge IGCSE 0455 Tools"
-              title="Ten specialized tools, one Cambridge syllabus"
-              lead="Ten specialized features engineered exclusively for Cambridge IGCSE Economics (0455)."
+              title="Eleven specialized tools, one Cambridge syllabus"
+              lead="Eleven specialized features engineered exclusively for Cambridge IGCSE Economics (0455)."
             />
+          </Reveal>
+
+          {/* Spotlight Banner: Live Multiplayer MCQ Quiz Arena */}
+          <Reveal delay={40}>
+            <div className="mt-8 mb-4 overflow-hidden rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/[0.12] via-primary/[0.06] to-purple-500/[0.12] p-5 sm:p-7 shadow-xl relative">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+                <div className="space-y-2 max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5 shadow-2xs">
+                      <Gamepad2 className="size-3.5 text-amber-500 animate-pulse" />
+                      NEW: MULTIPLAYER MCQ ARENA
+                    </span>
+                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      ⚡ 6-Digit PIN · Sign In to Compete &amp; Save Diagnostics
+                    </span>
+                    <span className="rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-primary">
+                      Cambridge IGCSE 0455
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+                    Race Cambridge 0455 Past Papers Live with Classmates &amp; Teachers
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    Choose between <strong className="text-foreground">Serious Exam Sprint</strong> (silent timed mock) or <strong className="text-foreground">Game Arena</strong> with strategic power-ups (Pigouvian Tax, Rival Steals, 50/50 Elimination &amp; Policy Shock Freezes). Live podium and instant mark schemes.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 shrink-0 w-full sm:w-auto">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-11 px-5 text-xs sm:text-sm font-extrabold bg-amber-500 hover:bg-amber-600 text-amber-950 shadow-md gap-2"
+                  >
+                    <Link to="/quiz">
+                      <Gamepad2 className="size-4" />
+                      <span>Join with PIN</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="h-11 px-4 text-xs sm:text-sm font-bold border-2 gap-2"
+                  >
+                    <Link to="/mcq-live">
+                      <Trophy className="size-4 text-primary" />
+                      <span>Host a Quiz (Free)</span>
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </Reveal>
 
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -1351,6 +1427,9 @@ function MinimalistHome({
 }) {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
+      {/* ── Community Partner Banner (r/The_IGCSE_Workaholics) ─────────── */}
+      <CommunityPartnerBanner />
+
       {/* ── Minimal Header ────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">

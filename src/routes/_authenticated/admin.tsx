@@ -25,6 +25,7 @@ import {
   Eye,
   EyeOff,
   FileCheck2,
+  Gamepad2,
   GraduationCap,
   ImagePlus,
   KeyRound,
@@ -69,6 +70,7 @@ import { PublicWaitlistPanel } from "@/components/app/public-waitlist-admin";
 import { TeacherApprovalsPanel } from "@/components/app/teacher-approvals-admin";
 import { PricingAdminPanel } from "@/components/app/pricing-admin";
 import { DataResponseAdminPanel } from "@/components/app/data-response-admin";
+import { AdminMcqQuizPanel } from "@/components/app/admin-mcq-quiz";
 import {
   AccessPanel,
   ActivityOverview,
@@ -289,6 +291,16 @@ const ADMIN_SECTIONS: Record<string, AdminSectionMeta> = {
     subtitle: "Real-time repository of all Cambridge IGCSE 0455 essays, automated grades, student scripts, and examiner breakdowns.",
     icon: BookOpen,
   },
+  quiz: {
+    id: "quiz",
+    category: "Platform & Intelligence",
+    title: "Live Multiplayer MCQ Quiz Arena & Diagnostics",
+    sidebarLabel: "Live MCQ Quizzes",
+    subtitle: "Real-time surveillance of live and past quiz rooms, PINs, host teachers, active players, and student leaderboard scores.",
+    icon: Gamepad2,
+    badge: "Live Arena",
+    badgeColor: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
+  },
   feedback: {
     id: "feedback",
     category: "User & Community Support",
@@ -422,8 +434,16 @@ const ADMIN_SECTIONS: Record<string, AdminSectionMeta> = {
 const ADMIN_CATEGORIES = [
   {
     title: "Platform & Intelligence",
-    items: [ADMIN_SECTIONS.overview, ADMIN_SECTIONS.diagnostics, ADMIN_SECTIONS.godmode, ADMIN_SECTIONS.essays],
+    items: [
+      ADMIN_SECTIONS.overview,
+      ADMIN_SECTIONS.diagnostics,
+      ADMIN_SECTIONS.godmode,
+      ADMIN_SECTIONS.essays,
+      ADMIN_SECTIONS.quiz,
+    ],
     externalLinks: [
+      { label: "Live Examiner Studio", to: "/live-examiner", icon: Sparkles, desc: "Real-time AI Essay Examiner (Admin Lab)" },
+      { label: "Live Quiz Arena", to: "/quiz", icon: Gamepad2, desc: "Multiplayer Blooket / Quizizz Arena" },
     ],
   },
   {
@@ -854,6 +874,7 @@ function AdminPage() {
                 onOpenDiagnostics={() => setActiveTab("diagnostics")}
                 onOpenGodmode={() => setActiveTab("godmode")}
                 onOpenEssays={() => setActiveTab("essays")}
+                onOpenQuiz={() => setActiveTab("quiz")}
                 onOpenUsers={() => setActiveTab("users")}
                 onTextUser={(userId) => {
                   setTextTargetUserId(userId);
@@ -883,6 +904,7 @@ function AdminPage() {
                 <EssaysVaultTab />
               </GodmodeErrorBoundary>
             )}
+            {activeTab === "quiz" && <AdminMcqQuizPanel />}
             {activeTab === "users" && (
               <UsersPanel
                 onTextUser={(userId) => {
@@ -3868,12 +3890,14 @@ function OverviewPanel({
   onOpenDiagnostics,
   onOpenGodmode,
   onOpenEssays,
+  onOpenQuiz,
   onOpenUsers,
   onTextUser,
 }: {
   onOpenDiagnostics?: () => void;
   onOpenGodmode?: () => void;
   onOpenEssays?: () => void;
+  onOpenQuiz?: () => void;
   onOpenUsers?: () => void;
   onTextUser?: (userId: string) => void;
 } = {}) {
@@ -4447,7 +4471,29 @@ function OverviewPanel({
           </div>
 
           {/* Direct Vault Links */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {onOpenQuiz && (
+              <button
+                type="button"
+                onClick={onOpenQuiz}
+                className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.03] hover:border-emerald-500/60 hover:bg-emerald-500/[0.08] text-left transition-all space-y-1.5 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                    <Gamepad2 className="size-4" />
+                  </span>
+                  <ChevronRight className="size-4 text-muted-foreground group-hover:text-emerald-500 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span>Live Quiz Arena</span>
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[9px] py-0 px-1">
+                    Live
+                  </Badge>
+                </h4>
+                <p className="text-[11px] text-muted-foreground">Multiplayer rooms, PINs, active players &amp; live leaderboard.</p>
+              </button>
+            )}
+
             {onOpenEssays && (
               <button
                 type="button"

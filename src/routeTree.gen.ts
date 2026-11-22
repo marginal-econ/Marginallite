@@ -32,6 +32,7 @@ import { Route as AuthenticatedDiagramsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEssayGeneratorRouteImport } from './routes/_authenticated/essay-generator'
 import { Route as AuthenticatedGradeRouteImport } from './routes/_authenticated/grade'
 import { Route as AuthenticatedKnowledgeRouteImport } from './routes/_authenticated/knowledge'
+import { Route as AuthenticatedLiveExaminerRouteImport } from './routes/_authenticated/live-examiner'
 import { Route as AuthenticatedMcqRouteImport } from './routes/_authenticated/mcq'
 import { Route as AuthenticatedMcqLiveRouteImport } from './routes/_authenticated/mcq-live'
 import { Route as AuthenticatedMcqPapersAdminRouteImport } from './routes/_authenticated/mcq-papers-admin'
@@ -42,6 +43,8 @@ import { Route as AuthenticatedResponseStructureRouteImport } from './routes/_au
 import { Route as AuthenticatedReviewRouteImport } from './routes/_authenticated/review'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedShowcaseRouteImport } from './routes/_authenticated/showcase'
+import { Route as QuizIndexRouteImport } from './routes/quiz/index'
+import { Route as QuizPinRouteImport } from './routes/quiz/$pin'
 import { Route as AuthenticatedEssayEssayIdRouteImport } from './routes/_authenticated/essay.$essayId'
 import { Route as AuthenticatedExaminerIndexRouteImport } from './routes/_authenticated/examiner/index'
 import { Route as AuthenticatedExaminerBenchmarksRouteImport } from './routes/_authenticated/examiner/benchmarks'
@@ -170,6 +173,12 @@ const AuthenticatedKnowledgeRoute = AuthenticatedKnowledgeRouteImport.update({
   path: '/knowledge',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLiveExaminerRoute =
+  AuthenticatedLiveExaminerRouteImport.update({
+    id: '/live-examiner',
+    path: '/live-examiner',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMcqRoute = AuthenticatedMcqRouteImport.update({
   id: '/mcq',
   path: '/mcq',
@@ -223,6 +232,16 @@ const AuthenticatedShowcaseRoute = AuthenticatedShowcaseRouteImport.update({
   id: '/showcase',
   path: '/showcase',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const QuizIndexRoute = QuizIndexRouteImport.update({
+  id: '/quiz/',
+  path: '/quiz/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuizPinRoute = QuizPinRouteImport.update({
+  id: '/quiz/$pin',
+  path: '/quiz/$pin',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedEssayEssayIdRoute =
   AuthenticatedEssayEssayIdRouteImport.update({
@@ -290,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/essay-generator': typeof AuthenticatedEssayGeneratorRoute
   '/grade': typeof AuthenticatedGradeRoute
   '/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/live-examiner': typeof AuthenticatedLiveExaminerRoute
   '/mcq': typeof AuthenticatedMcqRoute
   '/mcq-live': typeof AuthenticatedMcqLiveRoute
   '/mcq-papers-admin': typeof AuthenticatedMcqPapersAdminRoute
@@ -300,6 +320,8 @@ export interface FileRoutesByFullPath {
   '/review': typeof AuthenticatedReviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/showcase': typeof AuthenticatedShowcaseRoute
+  '/quiz/$pin': typeof QuizPinRoute
+  '/quiz/': typeof QuizIndexRoute
   '/essay/$essayId': typeof AuthenticatedEssayEssayIdRoute
   '/examiner/benchmarks': typeof AuthenticatedExaminerBenchmarksRoute
   '/examiner/moderation': typeof AuthenticatedExaminerModerationRoute
@@ -331,6 +353,7 @@ export interface FileRoutesByTo {
   '/essay-generator': typeof AuthenticatedEssayGeneratorRoute
   '/grade': typeof AuthenticatedGradeRoute
   '/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/live-examiner': typeof AuthenticatedLiveExaminerRoute
   '/mcq': typeof AuthenticatedMcqRoute
   '/mcq-live': typeof AuthenticatedMcqLiveRoute
   '/mcq-papers-admin': typeof AuthenticatedMcqPapersAdminRoute
@@ -341,6 +364,8 @@ export interface FileRoutesByTo {
   '/review': typeof AuthenticatedReviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/showcase': typeof AuthenticatedShowcaseRoute
+  '/quiz/$pin': typeof QuizPinRoute
+  '/quiz': typeof QuizIndexRoute
   '/essay/$essayId': typeof AuthenticatedEssayEssayIdRoute
   '/examiner/benchmarks': typeof AuthenticatedExaminerBenchmarksRoute
   '/examiner/moderation': typeof AuthenticatedExaminerModerationRoute
@@ -374,6 +399,7 @@ export interface FileRoutesById {
   '/_authenticated/essay-generator': typeof AuthenticatedEssayGeneratorRoute
   '/_authenticated/grade': typeof AuthenticatedGradeRoute
   '/_authenticated/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/_authenticated/live-examiner': typeof AuthenticatedLiveExaminerRoute
   '/_authenticated/mcq': typeof AuthenticatedMcqRoute
   '/_authenticated/mcq-live': typeof AuthenticatedMcqLiveRoute
   '/_authenticated/mcq-papers-admin': typeof AuthenticatedMcqPapersAdminRoute
@@ -384,6 +410,8 @@ export interface FileRoutesById {
   '/_authenticated/review': typeof AuthenticatedReviewRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/showcase': typeof AuthenticatedShowcaseRoute
+  '/quiz/$pin': typeof QuizPinRoute
+  '/quiz/': typeof QuizIndexRoute
   '/_authenticated/essay/$essayId': typeof AuthenticatedEssayEssayIdRoute
   '/_authenticated/examiner/benchmarks': typeof AuthenticatedExaminerBenchmarksRoute
   '/_authenticated/examiner/moderation': typeof AuthenticatedExaminerModerationRoute
@@ -417,6 +445,7 @@ export interface FileRouteTypes {
     | '/essay-generator'
     | '/grade'
     | '/knowledge'
+    | '/live-examiner'
     | '/mcq'
     | '/mcq-live'
     | '/mcq-papers-admin'
@@ -427,6 +456,8 @@ export interface FileRouteTypes {
     | '/review'
     | '/settings'
     | '/showcase'
+    | '/quiz/$pin'
+    | '/quiz/'
     | '/essay/$essayId'
     | '/examiner/benchmarks'
     | '/examiner/moderation'
@@ -458,6 +489,7 @@ export interface FileRouteTypes {
     | '/essay-generator'
     | '/grade'
     | '/knowledge'
+    | '/live-examiner'
     | '/mcq'
     | '/mcq-live'
     | '/mcq-papers-admin'
@@ -468,6 +500,8 @@ export interface FileRouteTypes {
     | '/review'
     | '/settings'
     | '/showcase'
+    | '/quiz/$pin'
+    | '/quiz'
     | '/essay/$essayId'
     | '/examiner/benchmarks'
     | '/examiner/moderation'
@@ -500,6 +534,7 @@ export interface FileRouteTypes {
     | '/_authenticated/essay-generator'
     | '/_authenticated/grade'
     | '/_authenticated/knowledge'
+    | '/_authenticated/live-examiner'
     | '/_authenticated/mcq'
     | '/_authenticated/mcq-live'
     | '/_authenticated/mcq-papers-admin'
@@ -510,6 +545,8 @@ export interface FileRouteTypes {
     | '/_authenticated/review'
     | '/_authenticated/settings'
     | '/_authenticated/showcase'
+    | '/quiz/$pin'
+    | '/quiz/'
     | '/_authenticated/essay/$essayId'
     | '/_authenticated/examiner/benchmarks'
     | '/_authenticated/examiner/moderation'
@@ -529,6 +566,8 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TeacherAuthRoute: typeof TeacherAuthRoute
   TermsRoute: typeof TermsRoute
+  QuizPinRoute: typeof QuizPinRoute
+  QuizIndexRoute: typeof QuizIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -694,6 +733,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKnowledgeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/live-examiner': {
+      id: '/_authenticated/live-examiner'
+      path: '/live-examiner'
+      fullPath: '/live-examiner'
+      preLoaderRoute: typeof AuthenticatedLiveExaminerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/mcq': {
       id: '/_authenticated/mcq'
       path: '/mcq'
@@ -764,6 +810,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedShowcaseRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/quiz/': {
+      id: '/quiz/'
+      path: '/quiz'
+      fullPath: '/quiz/'
+      preLoaderRoute: typeof QuizIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quiz/$pin': {
+      id: '/quiz/$pin'
+      path: '/quiz/$pin'
+      fullPath: '/quiz/$pin'
+      preLoaderRoute: typeof QuizPinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/essay/$essayId': {
       id: '/_authenticated/essay/$essayId'
       path: '/essay/$essayId'
@@ -831,6 +891,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEssayGeneratorRoute: typeof AuthenticatedEssayGeneratorRoute
   AuthenticatedGradeRoute: typeof AuthenticatedGradeRoute
   AuthenticatedKnowledgeRoute: typeof AuthenticatedKnowledgeRoute
+  AuthenticatedLiveExaminerRoute: typeof AuthenticatedLiveExaminerRoute
   AuthenticatedMcqRoute: typeof AuthenticatedMcqRoute
   AuthenticatedMcqLiveRoute: typeof AuthenticatedMcqLiveRoute
   AuthenticatedMcqPapersAdminRoute: typeof AuthenticatedMcqPapersAdminRoute
@@ -865,6 +926,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEssayGeneratorRoute: AuthenticatedEssayGeneratorRoute,
   AuthenticatedGradeRoute: AuthenticatedGradeRoute,
   AuthenticatedKnowledgeRoute: AuthenticatedKnowledgeRoute,
+  AuthenticatedLiveExaminerRoute: AuthenticatedLiveExaminerRoute,
   AuthenticatedMcqRoute: AuthenticatedMcqRoute,
   AuthenticatedMcqLiveRoute: AuthenticatedMcqLiveRoute,
   AuthenticatedMcqPapersAdminRoute: AuthenticatedMcqPapersAdminRoute,
@@ -899,6 +961,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TeacherAuthRoute: TeacherAuthRoute,
   TermsRoute: TermsRoute,
+  QuizPinRoute: QuizPinRoute,
+  QuizIndexRoute: QuizIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
