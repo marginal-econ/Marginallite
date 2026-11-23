@@ -35,6 +35,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { McqQuizArenaTab } from "@/components/app/mcq-quiz-arena-tab";
+import { McqQuizHostModal } from "@/components/app/mcq-quiz-host-modal";
+import { normalizeQuizPin, type QuizSourceType } from "@/lib/mcq-quiz.types";
 import { PageHeader } from "@/components/app/app-shell";
 import { CompactProgressBar, type ProgressStage } from "@/components/app/grading-progress";
 import { McqCalculator } from "@/components/app/mcq-calculator";
@@ -417,7 +420,29 @@ function McqLivePage() {
       window.dispatchEvent(new Event("marginal-exam-state"));
     };
   }, [stage]);
-  const [libraryTab, setLibraryTab] = useState<"past_papers" | "topical" | "analytics">("past_papers");
+  const [libraryTab, setLibraryTab] = useState<"past_papers" | "topical" | "live_quiz" | "analytics">("past_papers");
+  const [hostQuizModalOpen, setHostQuizModalOpen] = useState(false);
+  const [hostQuizSourceType, setHostQuizSourceType] = useState<QuizSourceType>("library_paper");
+  const [hostQuizPaperId, setHostQuizPaperId] = useState<string | null>(null);
+
+  const openHostLiveQuiz = useCallback(
+    (sourceType: QuizSourceType = "library_paper", paperId: string | null = null) => {
+      setHostQuizSourceType(sourceType);
+      setHostQuizPaperId(paperId);
+      setHostQuizModalOpen(true);
+    },
+    [],
+  );
+
+  // Support /mcq-live?quiz=849201 or /mcq-live?pin=849201 direct links
+  useEffect(() => {
+    const rawPin = search.quiz || search.pin;
+    if (!rawPin) return;
+    const clean = normalizeQuizPin(rawPin);
+    if (clean.length === 6) {
+      navigate({ to: "/quiz/$pin", params: { pin: clean }, replace: true });
+    }
+  }, [search.quiz, search.pin, navigate]);
   const [showAttemptDiagnostics, setShowAttemptDiagnostics] = useState(false);
   const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
   const [level, setLevel] = useState<Level>("as");

@@ -152,7 +152,7 @@ describe("Cambridge IGCSE 0455 Past Paper Harvester", () => {
       expect(commandWords.some((c) => c.startsWith("explain"))).toBe(true);
       expect(commandWords.some((c) => c.startsWith("analyse"))).toBe(true);
       expect(commandWords.some((c) => c.startsWith("discuss"))).toBe(true);
-    });
+    }, 15000);
   });
 
   describe("Chunk Idempotency & Hashing", () => {

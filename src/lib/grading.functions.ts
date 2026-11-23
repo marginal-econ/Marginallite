@@ -529,3 +529,67 @@ export const checkQuestionGrounding = createServerFn({ method: "POST" })
       return { checked: false, grounded: false, sourceCount: 0 };
     }
   });
+
+const LiveDraftInput = z.object({
+  question: z.string().max(2000),
+  essayText: z.string().max(40000),
+  maxMark: z.number().int().min(1).max(100).default(8),
+  wordCount: z.number().int().nonnegative().optional(),
+});
+
+/**
+ * Real-time draft telemetry sync: informs God Mode what question and essay text
+ * the student is currently writing in the Essay Grader.
+ */
+export const syncLiveEssayDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => LiveDraftInput.parse(unwrapData(input)))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+
+    try {
+      const trimmedText = data.essayText.trim();
+      const trimmedQ = data.question.trim();
+
+      // If user completely cleared both fields, wipe their draft telemetry
+      if (!trimmedText && !trimmedQ) {
+        await supabaseAdmin
+          .from("ai_usage_log")
+          .delete()
+          .eq("user_id", userId)
+          .eq("feature", "LIVE_DRAFT_GRADE");
+        return { ok: true, cleared: true };
+      }
+
+      const words = data.wordCount ?? (trimmedText ? trimmedText.split(/\s+/).length : 0);
+      const payload = JSON.stringify({
+        question: data.question,
+        essayText: data.essayText,
+        maxMark: data.maxMark,
+        wordCount: words,
+        charCount: data.essayText.length,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Keep only latest draft snapshot for this user
+      await supabaseAdmin
+        .from("ai_usage_log")
+        .delete()
+        .eq("user_id", userId)
+        .eq("feature", "LIVE_DRAFT_GRADE");
+
+      await supabaseAdmin.from("ai_usage_log").insert({
+        user_id: userId,
+        feature: "LIVE_DRAFT_GRADE",
+        model: "live-telemetry",
+        ok: true,
+        error_message: payload,
+      });
+    } catch {
+      /* non-blocking telemetry */
+    }
+
+    return { ok: true };
+  });
+

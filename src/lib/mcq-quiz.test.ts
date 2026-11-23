@@ -11,6 +11,10 @@ import {
   type PublicMcqQuizMeta,
   type QuizPlayer,
 } from "./mcq-quiz.types";
+import {
+  resolveCorrectAnswerForQuestion,
+  listAdminQuizSessionsServer,
+} from "./mcq-quiz.server";
 
 function makePlayer(overrides: Partial<QuizPlayer>): QuizPlayer {
   return {
@@ -181,7 +185,6 @@ describe("MCQ Live Quiz Engine (Blooket / Quizizz mode)", () => {
   });
 
   it("resolves correct answers for custom questions cleanly without ReferenceError", async () => {
-    const { resolveCorrectAnswerForQuestion } = await import("./mcq-quiz.server");
     const meta = {
       pin: "123456",
       title: "Custom Quiz",
@@ -215,7 +218,6 @@ describe("MCQ Live Quiz Engine (Blooket / Quizizz mode)", () => {
   }, 20000);
 
   it("protects listAdminQuizSessionsServer and rejects non-admin users", async () => {
-    const { listAdminQuizSessionsServer } = await import("./mcq-quiz.server");
     await expect(
       listAdminQuizSessionsServer({
         userId: "regular_user_123",

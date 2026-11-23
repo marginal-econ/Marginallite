@@ -1535,6 +1535,13 @@ function MinimalistHome({
               <span>MCQ Past Papers</span>
             </Link>
             <Link
+              to="/quiz"
+              className="rounded-lg border-2 border-amber-500/50 bg-amber-500/10 px-4 py-2.5 text-sm font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-2"
+            >
+              <Gamepad2 className="size-4 text-amber-500" />
+              <span>Live Quiz (PIN)</span>
+            </Link>
+            <Link
               to={isAuthenticated ? "/grade" : "/auth"}
               search={isAuthenticated ? undefined : ({ redirect: "/grade" } as any)}
               className="rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted inline-flex items-center gap-2"

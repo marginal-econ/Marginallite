@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   ClipboardCheck,
   LayoutDashboard,
+  Gamepad2,
   ListChecks,
   LogOut,
   PenLine,
@@ -63,6 +64,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { LockedFeatureModal, type LockedFeatureType } from "@/components/app/locked-feature-modal";
 import { FeedbackDialog, FloatingFeedbackPill } from "@/components/feedback/feedback-dialog";
 import {
   StudentMessagesDialog,
@@ -260,12 +262,14 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/review", label: "Diagnostics & Review", icon: ClipboardCheck, badge: "Analytics" },
       { to: "/grade", label: "Grade Essays", icon: PenLine, badge: "AI Grader" },
-      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks, badge: "P1 & P3" },
+      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks, badge: "Paper 1" },
+      { to: "/quiz", label: "Live Quiz Arena", icon: Gamepad2, badge: "PIN" },
+      { to: "/live-examiner", label: "Live Examiner", icon: Sparkles, badge: "Live AI" },
       {
         to: "/data-response",
         label: "Data Response Papers",
         icon: FileSpreadsheet,
-        badge: "P2 & P4",
+        badge: "Paper 2",
       },
       { to: "/essay-generator", label: "Sample Essay Generator", icon: Wand2, badge: "AI Models" },
       {
@@ -317,12 +321,14 @@ const TEACHER_NAV_GROUPS: NavGroup[] = [
       { to: "/dashboard", label: "Educator Dashboard", icon: LayoutDashboard },
       { to: "/review", label: "Diagnostics & Review", icon: ClipboardCheck, badge: "Analytics" },
       { to: "/grade", label: "Grade Essays", icon: PenLine, badge: "AI Grader" },
-      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks, badge: "P1 & P3" },
+      { to: "/mcq-live", label: "MCQ Past Papers", icon: ListChecks, badge: "Paper 1" },
+      { to: "/quiz", label: "Live Quiz Arena", icon: Gamepad2, badge: "PIN" },
+      { to: "/live-examiner", label: "Live Examiner", icon: Sparkles, badge: "Live AI" },
       {
         to: "/data-response",
         label: "Data Response Papers",
         icon: FileSpreadsheet,
-        badge: "P2 & P4",
+        badge: "Paper 2",
       },
       { to: "/essay-generator", label: "Sample Essay Generator", icon: Wand2, badge: "AI Models" },
       {
