@@ -121,6 +121,9 @@ function AuthenticatedLayout() {
         <PrivacyConsent userId={user.id} onResolved={handlePrivacyResolved} />
         <OnboardingTutorial
           open={initialOnboardingActive}
+          initialFullName={resolvedName || ""}
+          initialSchool={data?.school || (user.user_metadata as any)?.school || ""}
+          role={resolvedRole}
           onFinished={() => {
             setTutorialDismissed(true);
             void meQuery.refetch();

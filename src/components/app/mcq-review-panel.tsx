@@ -101,6 +101,7 @@ export function buildTopicStatsFromQuestions(
   >();
 
   for (const q of questions) {
+    if (q.correct === null || q.correct === undefined) continue;
     const meta = getSyllabusTopicMeta(q.topic, level);
     const canonicalTopic = meta.topic;
     const entry = map.get(canonicalTopic) ?? {

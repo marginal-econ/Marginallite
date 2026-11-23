@@ -277,3 +277,154 @@ export const deleteFeedbackItem = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+/**
+ * Admin: Reply directly to a user's bug report or feedback.
+ * Sends an email notification (via Mailjet) and/or creates an in-app message.
+ */
+export const replyToFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        feedbackId: z.string().uuid(),
+        recipientEmail: z.string().trim().email(),
+        recipientName: z.string().trim(),
+        recipientUserId: z.string().nullable().optional(),
+        replySubject: z.string().trim().min(2).max(200),
+        replyMessage: z.string().trim().min(5).max(4000),
+        originalMessage: z.string().optional(),
+        sendEmail: z.boolean().default(true),
+        sendInApp: z.boolean().default(true),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/backend/client.server");
+
+    let emailSent = false;
+    let inAppSent = false;
+
+    // 1. Send via Mailjet email if requested
+    if (data.sendEmail && data.recipientEmail && !data.recipientEmail.includes("anonymous")) {
+      try {
+        const apiKey = readEnv("MAILJET_API_KEY");
+        const secretKey = readEnv("MAILJET_SECRET_KEY");
+        const sender = readEnv("MAILJET_SENDER_EMAIL") || "marginal.econ.ai@gmail.com";
+
+        if (apiKey && secretKey) {
+          const resp = await fetch("https://api.mailjet.com/v3.1/send", {
+            method: "POST",
+            headers: {
+              authorization: `Basic ${btoa(`${apiKey}:${secretKey}`)}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              Messages: [
+                {
+                  From: { Email: sender, Name: "Marginalite Team" },
+                  To: [{ Email: data.recipientEmail, Name: data.recipientName }],
+                  Subject: data.replySubject,
+                  HTMLPart: `
+                    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d0914;padding:32px 16px;color:#f8fafc;">
+                      <div style="max-width:580px;margin:0 auto;background:#181124;border:1px solid rgba(147,51,234,0.3);border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                          <div style="background:#7c3aed;color:#ffffff;font-weight:bold;font-size:16px;width:32px;height:32px;border-radius:8px;text-align:center;line-height:32px;">m</div>
+                          <span style="font-weight:bold;font-size:16px;color:#ffffff;letter-spacing:-0.02em;">Marginalite Support</span>
+                        </div>
+                        <h2 style="margin:0 0 16px;font-size:18px;color:#ffffff;line-height:1.4;">${data.replySubject}</h2>
+                        <p style="margin:0 0 16px;font-size:14px;color:#cbd5e1;line-height:1.6;">Hi ${data.recipientName},</p>
+                        <div style="background:#221833;border-left:3px solid #a855f7;padding:16px;border-radius:8px;margin-bottom:20px;font-size:14px;line-height:1.6;color:#f1f5f9;white-space:pre-wrap;">${data.replyMessage}</div>
+                        ${
+                          data.originalMessage
+                            ? `
+                          <div style="border-top:1px solid #2d2244;padding-top:16px;margin-top:20px;">
+                            <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;font-weight:600;">Your Original Report</p>
+                            <p style="margin:0;font-size:12px;color:#94a3b8;font-style:italic;line-height:1.5;">${data.originalMessage.slice(0, 300)}${data.originalMessage.length > 300 ? "..." : ""}</p>
+                          </div>
+                        `
+                            : ""
+                        }
+                        <p style="margin:24px 0 0;font-size:12px;color:#64748b;border-top:1px solid #2d2244;padding-top:16px;">
+                          Marginalite · Cambridge IGCSE 0455 Economics Platform · <a href="https://lite.marginal-econ.com" style="color:#a855f7;text-decoration:none;">lite.marginal-econ.com</a>
+                        </p>
+                      </div>
+                    </div>
+                  `,
+                },
+              ],
+            }),
+            signal: AbortSignal.timeout(10000),
+          });
+          emailSent = resp.ok;
+        }
+      } catch (err) {
+        console.warn("[feedback.functions] Failed to send email reply:", err);
+      }
+    }
+
+    // 2. Send in-app message if user has an account
+    if (data.sendInApp && data.recipientUserId) {
+      try {
+        const inAppPayload = {
+          sender: "admin",
+          senderName: "Marginalite Team",
+          text: `[Reply to: ${data.replySubject}]\n\n${data.replyMessage}`,
+          createdAt: new Date().toISOString(),
+        };
+
+        await supabaseAdmin.from("ai_usage_log").insert({
+          user_id: data.recipientUserId,
+          feature: "DIRECT_MESSAGE",
+          model: "feedback_reply",
+          ok: false, // unread
+          error_message: JSON.stringify(inAppPayload),
+        });
+        inAppSent = true;
+      } catch (err) {
+        console.warn("[feedback.functions] Failed to send in-app message:", err);
+      }
+    }
+
+    // 3. Mark feedback item as replied in database
+    try {
+      const { data: row } = await supabaseAdmin
+        .from("ai_usage_log")
+        .select("error_message")
+        .eq("id", data.feedbackId)
+        .single();
+
+      if (row?.error_message) {
+        const existing = JSON.parse(row.error_message);
+        existing.replied = true;
+        existing.repliedAt = new Date().toISOString();
+        existing.replyMessage = data.replyMessage;
+        existing.replySubject = data.replySubject;
+
+        await supabaseAdmin
+          .from("ai_usage_log")
+          .update({
+            ok: true, // mark as handled
+            error_message: JSON.stringify(existing),
+          })
+          .eq("id", data.feedbackId);
+      }
+    } catch (err) {
+      console.warn("[feedback.functions] Failed to update feedback replied state:", err);
+    }
+
+    return {
+      ok: true,
+      emailSent,
+      inAppSent,
+      message:
+        emailSent && inAppSent
+          ? "Reply dispatched via Email and In-App notification!"
+          : emailSent
+          ? "Reply sent to user's email."
+          : inAppSent
+          ? "Reply delivered as an in-app message."
+          : "Reply recorded successfully.",
+    };
+  });

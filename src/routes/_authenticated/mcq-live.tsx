@@ -135,6 +135,11 @@ const RENDER_SCALE = 1.6;
 const mcqLiveSearchSchema = z
   .object({
     paperId: z.string().optional().catch(undefined),
+    paper: z.string().optional().catch(undefined),
+    topic: z.string().optional().catch(undefined),
+    mode: z.enum(["full_paper", "question_by_question"]).optional().catch(undefined),
+    quiz: z.string().optional().catch(undefined),
+    pin: z.string().optional().catch(undefined),
   })
   .passthrough()
   .catch({});
@@ -1917,6 +1922,16 @@ function fillMissingQuestionPages(
     return Array.from({ length: count }, (_, i) => i + 1);
   }, [answerKey, answers, stemBlobs, questionPages, qCount]);
 
+  const topicalTopicMap = useMemo(() => {
+    const matched = getTopicalPaperById(selectedPaperId);
+    if (!matched) return undefined;
+    const map: Record<number, { topic: string; subtopic: string }> = {};
+    for (const q of matched.questions) {
+      map[q.number] = { topic: matched.shortTitle, subtopic: q.subtopic };
+    }
+    return map;
+  }, [selectedPaperId]);
+
   function leavePractice() {
     if (isExamFullscreenActive() || examModeActive) {
       isLeavingExamModeRef.current = true;
@@ -2601,6 +2616,7 @@ function fillMissingQuestionPages(
               questionPages={questionPages}
               questionSlices={questionSlices}
               stemBlobs={stemBlobs}
+              topicalTopicMap={topicalTopicMap}
               answerKey={answerKey}
               answers={answers}
               checkedQuestions={checkedQuestions}
@@ -3799,6 +3815,7 @@ type McqPaperSummary = Awaited<ReturnType<typeof listMcqPapers>>["papers"][numbe
 const SERIES_DISPLAY_ORDER = ["Oct/Nov", "May/June", "Feb/March"] as const;
 
 function paperCode(paper: McqPaperSummary): string {
+  if (!paper || !paper.title) return "Paper";
   // 1. Look for explicit "Paper XX"
   const namedPaper = paper.title.match(/\bpaper\s*(\d{1,2})\b/i)?.[1];
   if (namedPaper) return `Paper ${namedPaper.padStart(2, "0")}`;
@@ -3944,7 +3961,7 @@ function PastPaperSelector({
 }) {
   const years = useMemo(() => {
     return uniqueSorted(
-      papers.map((paper) => (paper.examYear ? String(paper.examYear) : "Unsorted")),
+      (papers || []).map((paper) => (paper?.examYear ? String(paper.examYear) : "Unsorted")),
       (a, b) => {
         if (a === "Unsorted") return 1;
         if (b === "Unsorted") return -1;
@@ -3957,14 +3974,14 @@ function PastPaperSelector({
   const activeYear = years.includes(selectedYear) ? selectedYear : (years[0] ?? "");
 
   const yearPapers = useMemo(() => {
-    return papers.filter(
-      (paper) => (paper.examYear ? String(paper.examYear) : "Unsorted") === activeYear,
+    return (papers || []).filter(
+      (paper) => (paper?.examYear ? String(paper.examYear) : "Unsorted") === activeYear,
     );
   }, [papers, activeYear]);
 
   const seriesOptions = useMemo(() => {
     return uniqueSorted(
-      yearPapers.map((paper) => paper.examSeries ?? "Unsorted"),
+      yearPapers.map((paper) => paper?.examSeries ?? "Unsorted"),
       (a, b) => {
         if (a === "Unsorted") return 1;
         if (b === "Unsorted") return -1;
@@ -4653,6 +4670,7 @@ function TopicalPaperShowcase({
                 <PracticeModePicker
                   value={practiceMode}
                   onChange={onChangePracticeMode}
+                  onHostQuiz={onHostLiveQuiz ? () => onHostLiveQuiz(activeTopic) : undefined}
                   compact
                 />
               ) : null}

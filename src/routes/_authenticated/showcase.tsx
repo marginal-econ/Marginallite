@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  Anchor,
   BookOpen,
   CheckCircle,
   Copy,
@@ -9,6 +10,7 @@ import {
   FileText,
   Filter,
   GraduationCap,
+  Loader2,
   MessageSquare,
   Search,
   Sparkles,
@@ -26,6 +28,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listShowcaseEssays, type ShowcaseEssayItem } from "@/lib/showcase.functions";
+import {
+  addShowcaseToCalibration,
+  getCalibrationAnchorQuestions,
+} from "@/lib/calibration.functions";
+import { getMe } from "@/lib/account.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/showcase")({
@@ -42,7 +49,19 @@ export const Route = createFileRoute("/_authenticated/showcase")({
   component: ShowcasePage,
 });
 
-function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
+function ShowcaseCard({
+  essay,
+  isAdmin,
+  isAnchor,
+  onAddToCalibration,
+  isCalibrating,
+}: {
+  essay: ShowcaseEssayItem;
+  isAdmin?: boolean;
+  isAnchor?: boolean;
+  onAddToCalibration?: (essay: ShowcaseEssayItem) => void;
+  isCalibrating?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -77,6 +96,15 @@ function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
                 <Trophy className="mr-1 size-3 text-amber-500" />
                 {essay.total_mark} / {essay.max_mark} marks ({scorePct}%)
               </Badge>
+
+              {isAnchor ? (
+                <Badge
+                  variant="outline"
+                  className="border-primary/40 bg-primary/10 text-xs font-medium text-primary"
+                >
+                  <Anchor className="mr-1 size-3" /> Calibration Anchor
+                </Badge>
+              ) : null}
 
               {essay.source === "cambridge_model" ? (
                 <Badge
@@ -165,6 +193,38 @@ function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
         </CollapsibleTrigger>
 
         <CollapsibleContent className="mt-3.5 space-y-4">
+          {isAdmin && onAddToCalibration ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Anchor className="size-4 text-primary shrink-0" />
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {isAnchor ? "✓ Active Examiner Calibration Anchor" : "Add to Examiner Calibration Anchors"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isAnchor
+                      ? "This exemplar is currently grounding AI scoring for Cambridge examiners."
+                      : "Ground AI examiner rubrics by injecting this verified exemplar into few-shot calibration."}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant={isAnchor ? "outline" : "default"}
+                className="h-7 text-xs shrink-0 gap-1.5"
+                onClick={() => onAddToCalibration(essay)}
+                disabled={isCalibrating}
+              >
+                {isCalibrating ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Anchor className="size-3" />
+                )}
+                {isAnchor ? "Sync Calibration Anchor" : "Add to Calibration Anchors"}
+              </Button>
+            </div>
+          ) : null}
+
           <Tabs defaultValue="essay" className="w-full">
             <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-1">
               <TabsList className="h-7 bg-muted/50 p-0.5">
@@ -176,19 +236,43 @@ function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
                 </TabsTrigger>
               </TabsList>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={copyEssay}
-              >
-                {copied ? (
-                  <Check className="mr-1 size-3 text-emerald-500" />
-                ) : (
-                  <Copy className="mr-1 size-3" />
-                )}
-                {copied ? "Copied" : "Copy text"}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {isAdmin && onAddToCalibration ? (
+                  <Button
+                    variant={isAnchor ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-6 px-2 text-[11px] gap-1"
+                    onClick={() => onAddToCalibration(essay)}
+                    disabled={isCalibrating}
+                    title={
+                      isAnchor
+                        ? "Already in Calibration Anchors (click to sync)"
+                        : "Add directly into Calibration Anchors"
+                    }
+                  >
+                    {isCalibrating ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Anchor className="size-3 text-primary" />
+                    )}
+                    <span>{isAnchor ? "Sync Anchor" : "Add as Anchor"}</span>
+                  </Button>
+                ) : null}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={copyEssay}
+                >
+                  {copied ? (
+                    <Check className="mr-1 size-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="mr-1 size-3" />
+                  )}
+                  {copied ? "Copied" : "Copy text"}
+                </Button>
+              </div>
             </div>
 
             {/* Tab 1: Full Essay */}
@@ -293,9 +377,56 @@ function ShowcaseCard({ essay }: { essay: ShowcaseEssayItem }) {
 }
 
 function ShowcasePage() {
+  const queryClient = useQueryClient();
   const fetchShowcase = useServerFn(listShowcaseEssays);
+  const fetchMe = useServerFn(getMe);
+  const getAnchorQuestionsFn = useServerFn(getCalibrationAnchorQuestions);
+  const addToCalibrationFn = useServerFn(addShowcaseToCalibration);
+
   const [selectedTariff, setSelectedTariff] = useState<number | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [calibratingId, setCalibratingId] = useState<string | null>(null);
+
+  const meQuery = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
+  const isAdmin = meQuery.data?.isAdmin === true;
+
+  const anchorQuestionsQuery = useQuery({
+    queryKey: ["calibration-anchor-questions"],
+    queryFn: () => getAnchorQuestionsFn(),
+    enabled: isAdmin,
+  });
+
+  const anchorQuestions = useMemo(
+    () => new Set((anchorQuestionsQuery.data ?? []).map((q) => q.trim())),
+    [anchorQuestionsQuery.data],
+  );
+
+  const calibrationMutation = useMutation({
+    mutationFn: (item: ShowcaseEssayItem) => {
+      setCalibratingId(item.version_id);
+      return addToCalibrationFn({
+        data: {
+          question: item.question,
+          essayText: item.essay_text,
+          mark: item.total_mark,
+          maxMark: item.max_mark,
+          notes: item.grading?.examiner_summary
+            ? `Examiner note: ${item.grading.examiner_summary}`
+            : `Exemplar essay from Showcase (${item.author_initials})`,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(
+        res.updated
+          ? "Calibration anchor updated from this exemplar."
+          : "Exemplar successfully added as a calibration anchor!",
+      );
+      queryClient.invalidateQueries({ queryKey: ["calibration-anchor-questions"] });
+    },
+    onError: (err: Error) => toast.error(`Failed to add anchor: ${err.message}`),
+    onSettled: () => setCalibratingId(null),
+  });
 
   const query = useQuery({
     queryKey: ["showcase-essays", selectedTariff],
@@ -420,7 +551,14 @@ function ShowcasePage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {filteredEssays.map((essay) => (
-              <ShowcaseCard key={essay.version_id} essay={essay} />
+              <ShowcaseCard
+                key={essay.version_id}
+                essay={essay}
+                isAdmin={isAdmin}
+                isAnchor={anchorQuestions.has(essay.question.trim())}
+                onAddToCalibration={(e) => calibrationMutation.mutate(e)}
+                isCalibrating={calibratingId === essay.version_id}
+              />
             ))}
           </div>
         )}

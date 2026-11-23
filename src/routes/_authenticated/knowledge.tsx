@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Filter,
   Loader2,
@@ -97,6 +99,8 @@ export function KnowledgePage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [docPage, setDocPage] = useState(1);
+  const docPageSize = 9;
   const [addModalOpen, setAddModalOpen] = useState(false);
 
   // Easy Add form state
@@ -134,6 +138,13 @@ export function KnowledgePage() {
       return matchesType && matchesQuery;
     });
   }, [allDocs, selectedType, searchQuery]);
+
+  const totalDocPages = Math.max(1, Math.ceil(filteredDocs.length / docPageSize));
+  const currentDocPage = Math.min(docPage, totalDocPages);
+  const paginatedDocs = useMemo(() => {
+    const start = (currentDocPage - 1) * docPageSize;
+    return filteredDocs.slice(start, start + docPageSize);
+  }, [filteredDocs, currentDocPage, docPageSize]);
 
   // File drop/upload parser
   const handleFileChange = async (file: File) => {
@@ -369,13 +380,19 @@ export function KnowledgePage() {
               <Input
                 placeholder="Search Cambridge 0455 mark schemes, concepts, questions, or syllabus terms..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setDocPage(1);
+                }}
                 className="pl-9.5 pr-4 h-10 text-xs sm:text-sm bg-background"
               />
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setDocPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   ✕
@@ -383,7 +400,13 @@ export function KnowledgePage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Select value={selectedType} onValueChange={setSelectedType}>
+              <Select
+                value={selectedType}
+                onValueChange={(val) => {
+                  setSelectedType(val);
+                  setDocPage(1);
+                }}
+              >
                 <SelectTrigger className="w-[150px] h-10 text-xs bg-background">
                   <Filter className="size-3.5 mr-1.5 text-muted-foreground" />
                   <SelectValue placeholder="All Types" />
@@ -518,76 +541,137 @@ export function KnowledgePage() {
               )}
             </div>
           ) : (
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredDocs.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="rounded-2xl border border-border/80 bg-card/90 p-4 shadow-sm hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between group"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge
-                        variant="outline"
-                        className="text-[10.5px] capitalize font-semibold border-primary/25 bg-primary/5 text-primary"
-                      >
-                        {doc.doc_type === "mark_scheme" ? "Mark Scheme" : doc.doc_type === "syllabus" ? "Syllabus" : "Past Paper"}
-                      </Badge>
-                      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                        {doc.status === "ready" ? (
-                          <>
-                            <CheckCircle2 className="size-3.5 text-emerald-500" />
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Ready</span>
-                          </>
-                        ) : doc.status === "failed" ? (
-                          <>
-                            <AlertCircle className="size-3.5 text-destructive" />
-                            <span className="text-destructive font-semibold">Failed</span>
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin text-amber-500" />
-                            <span className="text-amber-600 dark:text-amber-400">Ingesting</span>
-                          </>
-                        )}
-                      </span>
+            <div className="space-y-4">
+              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {paginatedDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="rounded-2xl border border-border/80 bg-card/90 p-4 shadow-sm hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between group"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[10.5px] capitalize font-semibold border-primary/25 bg-primary/5 text-primary"
+                        >
+                          {doc.doc_type === "mark_scheme" ? "Mark Scheme" : doc.doc_type === "syllabus" ? "Syllabus" : "Past Paper"}
+                        </Badge>
+                        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                          {doc.status === "ready" ? (
+                            <>
+                              <CheckCircle2 className="size-3.5 text-emerald-500" />
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Ready</span>
+                            </>
+                          ) : doc.status === "failed" ? (
+                            <>
+                              <AlertCircle className="size-3.5 text-destructive" />
+                              <span className="text-destructive font-semibold">Failed</span>
+                            </>
+                          ) : (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin text-amber-500" />
+                              <span className="text-amber-600 dark:text-amber-400">Ingesting</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                          {doc.title}
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground font-mono">
+                          Series: {doc.exam_series || "Official Guide"}
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                        {doc.title}
-                      </h4>
-                      <p className="mt-1 text-xs text-muted-foreground font-mono">
-                        Series: {doc.exam_series || "Official Guide"}
-                      </p>
+                    <div className="mt-4 pt-2.5 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-medium">
+                        {doc.chunk_count || 0} {(doc.chunk_count === 1) ? "chunk" : "chunks"} indexed
+                      </span>
+                      {isStaff && (
+                        <button
+                          onClick={async () => {
+                            if (confirm(`Remove "${doc.title}" from Knowledge Base?`)) {
+                              try {
+                                await removeDoc({ data: { id: doc.id, documentId: doc.id } });
+                                toast.success("Document removed.");
+                                queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] });
+                              } catch (err: any) {
+                                toast.error(formatErrorMessage(err, "Failed to delete"));
+                              }
+                            }
+                          }}
+                          className="text-muted-foreground hover:text-destructive p-1 rounded"
+                          title="Delete document"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  <div className="mt-4 pt-2.5 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-medium">
-                      {doc.chunk_count || 0} {(doc.chunk_count === 1) ? "chunk" : "chunks"} indexed
-                    </span>
-                    {isStaff && (
-                      <button
-                        onClick={async () => {
-                          if (confirm(`Remove "${doc.title}" from Knowledge Base?`)) {
-                            try {
-                              await removeDoc({ data: { id: doc.id, documentId: doc.id } });
-                              toast.success("Document removed.");
-                              queryClient.invalidateQueries({ queryKey: ["knowledge-documents"] });
-                            } catch (err: any) {
-                              toast.error(formatErrorMessage(err, "Failed to delete"));
-                            }
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-destructive p-1 rounded"
-                        title="Delete document"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    )}
+              {/* Document Pagination Controls */}
+              {totalDocPages > 1 && (
+                <div className="panel p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <p className="text-muted-foreground">
+                    Showing <strong className="text-foreground">{(currentDocPage - 1) * docPageSize + 1}</strong> to{" "}
+                    <strong className="text-foreground">
+                      {Math.min(currentDocPage * docPageSize, filteredDocs.length)}
+                    </strong>{" "}
+                    of <strong className="text-foreground">{filteredDocs.length}</strong> documents
+                  </p>
+
+                  <div className="flex items-center gap-1 self-center sm:self-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDocPage((p) => Math.max(1, p - 1))}
+                      disabled={currentDocPage <= 1}
+                      className="h-7 text-xs px-2"
+                    >
+                      <ChevronLeft className="size-3.5 mr-0.5" /> Prev
+                    </Button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: Math.min(5, totalDocPages) }, (_, idx) => {
+                        let pageNum = idx + 1;
+                        if (totalDocPages > 5 && currentDocPage > 3) {
+                          pageNum = Math.min(currentDocPage - 2 + idx, totalDocPages);
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => setDocPage(pageNum)}
+                            className={cn(
+                              "size-7 rounded text-xs font-semibold transition-colors",
+                              currentDocPage === pageNum
+                                ? "bg-primary text-primary-foreground shadow-xs"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            )}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDocPage((p) => Math.min(totalDocPages, p + 1))}
+                      disabled={currentDocPage >= totalDocPages}
+                      className="h-7 text-xs px-2"
+                    >
+                      Next <ChevronRight className="size-3.5 ml-0.5" />
+                    </Button>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </section>

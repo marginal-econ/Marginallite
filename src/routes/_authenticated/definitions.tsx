@@ -13,7 +13,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/app/app-shell";
@@ -51,6 +51,9 @@ import {
 } from "@/lib/definitions.functions";
 
 export const Route = createFileRoute("/_authenticated/definitions")({
+  validateSearch: (search: Record<string, unknown>): { q?: string } => ({
+    q: typeof search.q === "string" ? search.q : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Definitions hub — Marginalite" },
@@ -88,7 +91,14 @@ function DefinitionsPage() {
   const fetchDefinitions = useServerFn(listDefinitions);
   const runDelete = useServerFn(deleteDefinition);
   const saveEntry = useServerFn(saveDefinition);
-  const [search, setSearch] = useState("");
+  const routeSearch = Route.useSearch();
+  const [search, setSearch] = useState(() => routeSearch.q ?? "");
+
+  useEffect(() => {
+    if (typeof routeSearch.q === "string") {
+      setSearch(routeSearch.q);
+    }
+  }, [routeSearch.q]);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
   const isStaff = me.data?.isStaff ?? false;

@@ -72,6 +72,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   adminFixFailedEssay,
   adminGetEssayDetail,
+  adminGetLiveExaminerSessionDetail,
   adminGetLiveUserMonitoring,
   adminGetMcqAttemptDetail,
   adminDeleteMcqAttempt,
@@ -79,6 +80,7 @@ import {
   adminGetStudentDossier,
   adminListAllDossierUsers,
   adminListAllEssays,
+  adminListAllLiveExaminerSessions,
   adminListAllMcqAttempts,
   adminListFailedEssays,
 } from "@/lib/admin.functions";
@@ -140,10 +142,10 @@ export class GodmodeErrorBoundary extends Component<GodmodeErrorBoundaryProps, G
 export function AdminGodmodeDashboard({
   initialTab,
 }: {
-  initialTab?: "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq";
+  initialTab?: "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq" | "live";
 } = {}) {
   const [subTab, setSubTab] = useState<
-    "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq"
+    "radar" | "dossier" | "failures" | "activity" | "essays" | "mcq" | "live"
   >(initialTab || "radar");
 
   useEffect(() => {
@@ -290,6 +292,14 @@ export function AdminGodmodeDashboard({
             <Target className="size-3.5 shrink-0 text-emerald-500" />
             <span className="whitespace-nowrap">MCQ Attempts</span>
           </TabsTrigger>
+
+          <TabsTrigger
+            value="live"
+            className="flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all border border-transparent data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border/60 data-[state=active]:shadow-xs text-muted-foreground hover:text-foreground hover:bg-background/40 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <PenLine className="size-3.5 shrink-0 text-indigo-500" />
+            <span className="whitespace-nowrap">Live Examiner</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="radar" className="mt-4">
@@ -325,6 +335,12 @@ export function AdminGodmodeDashboard({
         <TabsContent value="mcq" className="mt-4">
           <GodmodeErrorBoundary tabName="MCQ Attempts">
             {subTab === "mcq" && <McqVaultTab />}
+          </GodmodeErrorBoundary>
+        </TabsContent>
+
+        <TabsContent value="live" className="mt-4">
+          <GodmodeErrorBoundary tabName="Live Examiner">
+            {subTab === "live" && <LiveExaminerVaultTab />}
           </GodmodeErrorBoundary>
         </TabsContent>
       </Tabs>
@@ -1123,6 +1139,257 @@ function McqVaultTab() {
                     );
                   })}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ============================================================================
+ * TAB 3: LIVE EXAMINER SESSIONS VAULT
+ * ============================================================================ */
+
+function LiveExaminerVaultTab() {
+  const fetchAllLive = useServerFn(adminListAllLiveExaminerSessions);
+  const fetchLiveDetail = useServerFn(adminGetLiveExaminerSessionDetail);
+  const liveQuery = useQuery({ queryKey: ["admin-all-live"], queryFn: () => fetchAllLive() });
+
+  const [search, setSearch] = useState("");
+  const [inspectSessionId, setInspectSessionId] = useState<string | null>(null);
+
+  const liveDetailQuery = useQuery({
+    queryKey: ["admin-live-detail", inspectSessionId],
+    queryFn: () => fetchLiveDetail({ data: { sessionId: inspectSessionId! } }),
+    enabled: Boolean(inspectSessionId),
+  });
+
+  const sessions = liveQuery.data ?? [];
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      const q = search.trim().toLowerCase();
+      return (
+        !q ||
+        s.studentName.toLowerCase().includes(q) ||
+        (s.studentEmail && s.studentEmail.toLowerCase().includes(q)) ||
+        s.question.toLowerCase().includes(q) ||
+        s.topic.toLowerCase().includes(q)
+      );
+    });
+  }, [sessions, search]);
+
+  return (
+    <div className="space-y-4">
+      {/* KPI banner */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Total Live Examiner Sessions</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums">{sessions.length}</p>
+          <p className="text-[11px] text-muted-foreground">Active and completed live writing runs</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Total Words Drafted</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-indigo-500">
+            {sessions.reduce((acc, s) => acc + s.wordCount, 0).toLocaleString()}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Cumulative words typed under examiner supervision</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card/60 p-4 space-y-1">
+          <p className="text-xs text-muted-foreground font-medium">Total Suggestions Generated</p>
+          <p className="text-2xl font-bold tracking-tight tabular-nums text-emerald-500">
+            {sessions.reduce((acc, s) => acc + s.issuesCount, 0).toLocaleString()}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Grammar, terminology, and AO points flagged</p>
+        </div>
+      </div>
+
+      {/* Search & Refresh */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[260px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by student, email, question, or topic..."
+            className="pl-9 text-xs h-9"
+          />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 text-xs"
+          onClick={() => liveQuery.refetch()}
+          disabled={liveQuery.isFetching}
+        >
+          <RefreshCw className={cn("size-3", liveQuery.isFetching && "animate-spin")} />
+          <span>Refresh</span>
+        </Button>
+      </div>
+
+      {/* Sessions list */}
+      {liveQuery.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : filteredSessions.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
+          <PenLine className="mx-auto size-8 text-muted-foreground/60" />
+          <p className="text-sm font-medium">No Live Examiner sessions found</p>
+          <p className="text-xs text-muted-foreground">Sessions will appear as students write essays in Live Examiner.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-xl border border-border bg-card/40 overflow-hidden shadow-sm">
+          {filteredSessions.map((session) => (
+            <div
+              key={session.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors"
+            >
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-xs text-foreground truncate">
+                    {session.studentName}
+                  </span>
+                  {session.studentEmail && (
+                    <span className="text-[11px] font-mono text-muted-foreground truncate">
+                      ({session.studentEmail})
+                    </span>
+                  )}
+                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                    {session.level.toUpperCase()} · Max {session.maxMark}m
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground ml-auto sm:ml-0">
+                    Last active: {new Date(session.updatedAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                </div>
+
+                <p className="text-xs font-medium text-foreground line-clamp-1">
+                  {session.question}
+                </p>
+
+                <p className="text-[11px] text-muted-foreground line-clamp-2 italic font-serif">
+                  &ldquo;{session.previewText || "Empty draft..."}&rdquo;
+                </p>
+
+                <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground pt-1">
+                  <span>✍️ {session.wordCount} words</span>
+                  <span>·</span>
+                  <span>💡 {session.issuesCount} examiner points</span>
+                </div>
+              </div>
+
+              <div className="shrink-0 self-end sm:self-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1"
+                  onClick={() => setInspectSessionId(session.id)}
+                >
+                  <Eye className="size-3.5" />
+                  <span>Inspect Draft</span>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Inspect Live Draft Modal */}
+      <Dialog open={Boolean(inspectSessionId)} onOpenChange={(open) => !open && setInspectSessionId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <PenLine className="size-4 text-indigo-500" />
+              Live Examiner Session Inspector
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Live student writing buffer, word count, and real-time suggestion log.
+            </DialogDescription>
+          </DialogHeader>
+
+          {liveDetailQuery.isLoading ? (
+            <div className="space-y-4 py-6">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          ) : !liveDetailQuery.data?.session ? (
+            <p className="text-sm text-muted-foreground py-6">Session details could not be loaded.</p>
+          ) : (
+            <div className="space-y-5 pt-2">
+              <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-foreground">
+                    Student: {liveDetailQuery.data.author.name}{" "}
+                    {liveDetailQuery.data.author.email && (
+                      <span className="font-mono text-muted-foreground">({liveDetailQuery.data.author.email})</span>
+                    )}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {liveDetailQuery.data.session.level.toUpperCase()} · Max {liveDetailQuery.data.session.max_mark} marks
+                  </Badge>
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  {liveDetailQuery.data.session.question}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Live Draft Text:</span>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {liveDetailQuery.data.session.essay_text?.trim()
+                      ? liveDetailQuery.data.session.essay_text.trim().split(/\s+/).length
+                      : 0}{" "}
+                    words
+                  </span>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-4 text-xs leading-relaxed font-serif whitespace-pre-wrap max-h-72 overflow-y-auto">
+                  {liveDetailQuery.data.session.essay_text || "No text written yet."}
+                </div>
+              </div>
+
+              {/* Suggestions history */}
+              {Array.isArray(liveDetailQuery.data.session.issues_history) &&
+                liveDetailQuery.data.session.issues_history.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground block">
+                      Suggestions Given ({liveDetailQuery.data.session.issues_history.length}):
+                    </span>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {liveDetailQuery.data.session.issues_history.map((issue: any, idx: number) => (
+                        <div key={idx} className="rounded-lg border border-border bg-card/60 p-3 text-xs space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {issue.category || "Examiner Note"}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground capitalize">
+                              Status: {issue.status || "active"}
+                            </span>
+                          </div>
+                          {issue.original && (
+                            <p className="text-rose-500 font-mono text-[11px]">
+                              Original: &ldquo;{issue.original}&rdquo;
+                            </p>
+                          )}
+                          {issue.suggestion && (
+                            <p className="text-emerald-500 font-mono text-[11px]">
+                              Suggestion: &ldquo;{issue.suggestion}&rdquo;
+                            </p>
+                          )}
+                          {issue.explanation && (
+                            <p className="text-muted-foreground text-[11px]">{issue.explanation}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
             </div>
           )}
         </DialogContent>

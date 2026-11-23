@@ -65,6 +65,7 @@ type McqTutorModeProps = {
   questionPages: Record<number, number>;
   questionSlices: Record<number, HTMLCanvasElement>;
   stemBlobs: StemBlob[];
+  topicalTopicMap?: Record<number, { topic: string; subtopic: string }>;
   answerKey: Record<number, Letter>;
   answers: Record<number, Letter>;
   checkedQuestions: Set<number>;
@@ -207,6 +208,7 @@ export function McqTutorMode({
   questionPages,
   questionSlices,
   stemBlobs,
+  topicalTopicMap,
   answerKey,
   answers,
   checkedQuestions,
@@ -352,12 +354,15 @@ export function McqTutorMode({
   // Syllabus classification for current question (instant, zero network)
   const questionMeta = useMemo(() => {
     const stem = stemBlobs.find((s) => s.number === currentNumber)?.text ?? "";
+    const topicalOverride = topicalTopicMap?.[currentNumber];
     return classifyMcqQuestion({
       level: level === "a2" ? "A2" : "AS",
       number: currentNumber,
       text: stem,
+      existingTopic: topicalOverride?.topic,
+      existingSubtopic: topicalOverride?.subtopic,
     });
-  }, [stemBlobs, currentNumber, level]);
+  }, [stemBlobs, currentNumber, level, topicalTopicMap]);
 
   // Resolve real PDF canvas (isolated single-question PDF crop OR full PDF page fallback)
   const sliceCanvas = questionSlices[currentNumber] ?? null;
