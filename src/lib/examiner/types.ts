@@ -634,13 +634,21 @@ function findVerbatimStudentQuote(quote: string, essayText?: string): string {
     }
 
     // 2. Detect duplicate mechanisms across points
-    const seenPointMechanisms: string[] = [];
+    const seenPointMechanisms: Array<{ msPoint: string; quote: string }> = [];
     for (const pt of points) {
       if (pt.identify_awarded === 0 && pt.development_awarded === 0) continue;
-      const pointText = `${pt.matched_ms_point} ${pt.quote}`;
       const isDup = seenPointMechanisms.some((prev) => {
-        const sim = feedbackSimilarity(prev, pointText);
-        return sim.jaccard >= 0.32 || sim.overlap >= 0.50;
+        // Direct duplicate if matched mark scheme point is essentially identical
+        const msSim = feedbackSimilarity(prev.msPoint, pt.matched_ms_point);
+        if (msSim.jaccard >= 0.60 || (msSim.overlap >= 0.75 && pt.matched_ms_point.length > 10)) {
+          return true;
+        }
+        // Or if the student quote is repeating the same explanation
+        const quoteSim = feedbackSimilarity(prev.quote, pt.quote);
+        if (quoteSim.jaccard >= 0.60 || (quoteSim.overlap >= 0.75 && pt.quote.length > 15)) {
+          return true;
+        }
+        return false;
       });
       if (isDup) {
         pt.identify_awarded = 0;
@@ -649,7 +657,7 @@ function findVerbatimStudentQuote(quote: string, essayText?: string): string {
           pt.reason = `${pt.reason} (Duplicate argument: credit already awarded in earlier point; Cambridge mark schemes award credit once only per mechanism).`;
         }
       } else {
-        seenPointMechanisms.push(pointText);
+        seenPointMechanisms.push({ msPoint: pt.matched_ms_point, quote: pt.quote });
       }
     }
 
