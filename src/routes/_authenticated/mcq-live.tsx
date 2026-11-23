@@ -12,6 +12,7 @@ import {
   Clock,
   Eraser,
   Flag,
+  Gamepad2,
   History,
   Layers,
   LayoutGrid,
@@ -1917,16 +1918,28 @@ function fillMissingQuestionPages(
           title="MCQ Live"
           description="Practice straight off a real past paper — answer from the button panel beside it."
           action={
-            <Button
-              size="sm"
-              variant={calcOpen ? "default" : "outline"}
-              onClick={() => setCalcOpen((v) => !v)}
-              className="h-9 gap-1.5 rounded-xl border-border font-medium shadow-2xs hover:bg-muted"
-              title="Open Cambridge Economics Calculator & Solvers (Alt+C)"
-            >
-              <CalculatorIcon className="h-4 w-4 text-primary" />
-              <span>Cambridge Calculator</span>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => openHostLiveQuiz("library_paper")}
+                className="h-9 gap-1.5 rounded-xl font-bold shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                title="Create a Blooket / Quizizz style live quiz link for your class"
+              >
+                <Gamepad2 className="h-4 w-4" />
+                <span>Host Live Quiz</span>
+              </Button>
+              <Button
+                size="sm"
+                variant={calcOpen ? "default" : "outline"}
+                onClick={() => setCalcOpen((v) => !v)}
+                className="h-9 gap-1.5 rounded-xl border-border font-medium shadow-2xs hover:bg-muted"
+                title="Open Cambridge Economics Calculator & Solvers (Alt+C)"
+              >
+                <CalculatorIcon className="h-4 w-4 text-primary" />
+                <span className="hidden sm:inline">Cambridge Calculator</span>
+                <span className="sm:hidden">Calc</span>
+              </Button>
+            </div>
           }
         />
       ) : null}
@@ -1970,6 +1983,29 @@ function fillMissingQuestionPages(
                   )}
                 >
                   Coming Soon
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLibraryTab("live_quiz")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all",
+                  libraryTab === "live_quiz"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Gamepad2 className="h-3.5 w-3.5" />
+                <span>Live Quiz Arena</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold uppercase",
+                    libraryTab === "live_quiz"
+                      ? "bg-white/20 text-white"
+                      : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+                  )}
+                >
+                  LIVE
                 </span>
               </button>
               <button
@@ -2102,6 +2138,7 @@ function fillMissingQuestionPages(
                     busy={!!busyLabel}
                     busyPaperId={selectedPaperId}
                     onStart={(paper) => beginPractice(paper, undefined, practiceMode)}
+                    onHostLiveQuiz={(paper) => openHostLiveQuiz("library_paper", paper.id)}
                     activeDraftPaperId={activeDraftSummary?.paper.id}
                     activeDraftAnswersCount={
                       activeDraftSummary ? Object.keys(activeDraftSummary.draft.answers).length : 0
@@ -2133,6 +2170,7 @@ function fillMissingQuestionPages(
               onStart={(topical) =>
                 beginPractice(toMcqPaperSummaryFromTopical(topical), undefined, practiceMode)
               }
+              onHostLiveQuiz={(topical) => openHostLiveQuiz("topical_paper", topical.id)}
               activeDraftPaperId={activeDraftSummary?.paper.id}
               activeDraftAnswersCount={
                 activeDraftSummary ? Object.keys(activeDraftSummary.draft.answers).length : 0
@@ -2145,7 +2183,12 @@ function fillMissingQuestionPages(
             />
           ) : null}
 
-          {/* TAB 3: PERFORMANCE & ANALYTICS */}
+          {/* TAB 3: LIVE QUIZ ARENA (BLOOKET / QUIZIZZ STYLE MULTIPLAYER) */}
+          {libraryTab === "live_quiz" ? (
+            <McqQuizArenaTab onOpenHostModal={(src) => openHostLiveQuiz(src ?? "library_paper")} />
+          ) : null}
+
+          {/* TAB 4: PERFORMANCE & ANALYTICS */}
           {libraryTab === "analytics" ? (
             <div className="grid gap-6 lg:grid-cols-[1fr_19rem]">
               <div className="min-w-0 space-y-4">
@@ -2921,6 +2964,14 @@ function fillMissingQuestionPages(
         }}
       />
       <McqCalculator isOpen={calcOpen} onClose={() => setCalcOpen(false)} />
+
+      <McqQuizHostModal
+        open={hostQuizModalOpen}
+        onOpenChange={setHostQuizModalOpen}
+        libraryPapers={papersQuery.data?.papers ?? []}
+        initialSourceType={hostQuizSourceType}
+        initialPaperId={hostQuizPaperId}
+      />
 
       <ExamLockdownPromptDialog
         open={examPromptOpen}
@@ -3733,10 +3784,12 @@ function uniqueSorted<T>(values: T[], compare: (a: T, b: T) => number): T[] {
 function PracticeModePicker({
   value,
   onChange,
+  onHostQuiz,
   compact = false,
 }: {
   value: PracticeMode;
   onChange: (mode: PracticeMode) => void;
+  onHostQuiz?: () => void;
   compact?: boolean;
 }) {
   return (
@@ -3751,7 +3804,7 @@ function PracticeModePicker({
           </span>
         ) : null}
       </div>
-      <div className={cn("grid gap-2", compact ? "grid-cols-2" : "sm:grid-cols-2")}>
+      <div className={cn("grid gap-2", onHostQuiz ? (compact ? "grid-cols-3" : "sm:grid-cols-3") : (compact ? "grid-cols-2" : "sm:grid-cols-2"))}>
         <button
           type="button"
           onClick={() => onChange("full_paper")}
@@ -3789,6 +3842,23 @@ function PracticeModePicker({
             1 real PDF question at a time · corrects mistakes immediately.
           </p>
         </button>
+
+        {onHostQuiz ? (
+          <button
+            type="button"
+            onClick={onHostQuiz}
+            className="flex flex-col gap-0.5 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 p-2.5 text-left transition-all group"
+          >
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+              <Gamepad2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+              <span>Live Quiz Arena</span>
+              <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300">PIN</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Host multiplayer arena with PIN, power-ups &amp; live podium.
+            </p>
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -3799,6 +3869,7 @@ function PastPaperSelector({
   busy,
   busyPaperId,
   onStart,
+  onHostLiveQuiz,
   activeDraftPaperId,
   activeDraftAnswersCount = 0,
   startInExamMode = false,
@@ -3810,6 +3881,7 @@ function PastPaperSelector({
   busy: boolean;
   busyPaperId: string | null;
   onStart: (paper: McqPaperSummary) => void;
+  onHostLiveQuiz?: (paper: McqPaperSummary) => void;
   activeDraftPaperId?: string | null;
   activeDraftAnswersCount?: number;
   startInExamMode?: boolean;
@@ -4004,7 +4076,11 @@ function PastPaperSelector({
         {selectedPaper ? (
           <div className="space-y-4 border-t pt-5">
             {onChangePracticeMode ? (
-              <PracticeModePicker value={practiceMode} onChange={onChangePracticeMode} />
+              <PracticeModePicker
+                value={practiceMode}
+                onChange={onChangePracticeMode}
+                onHostQuiz={onHostLiveQuiz ? () => onHostLiveQuiz(selectedPaper) : undefined}
+              />
             ) : null}
 
             {onToggleExamMode && practiceMode === "full_paper" ? (
@@ -4027,8 +4103,8 @@ function PastPaperSelector({
             ) : null}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold">{selectedPaper.title}</p>
                   {activeDraftPaperId === selectedPaper.id ? (
                     <UiBadge variant="secondary" className="border-primary/40 text-primary text-[10px] uppercase font-bold tracking-wider">
@@ -4043,28 +4119,44 @@ function PastPaperSelector({
                     : " · Incomplete mark scheme — ask an administrator to re-upload it"}
                 </p>
               </div>
-              <Button
-                size="lg"
-                disabled={busy || !hasCompleteAnswerKey(selectedPaper)}
-                onClick={() => onStart(selectedPaper)}
-                className="min-w-44"
-              >
-                {busy && busyPaperId === selectedPaper.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : activeDraftPaperId === selectedPaper.id ? (
-                  <>
-                    <Play className="mr-1.5 h-4 w-4 fill-current" />
-                    Resume in-progress exam
-                  </>
-                ) : practiceMode === "question_by_question" ? (
-                  <>
-                    <Target className="mr-1.5 h-4 w-4" />
-                    Start 1-by-1 Tutor
-                  </>
-                ) : (
-                  "Load question paper"
-                )}
-              </Button>
+              <div className="flex flex-wrap items-center justify-end gap-2 shrink-0 sm:ml-auto">
+                {onHostLiveQuiz ? (
+                  <Button
+                    type="button"
+                    size="default"
+                    variant="outline"
+                    disabled={busy || !hasCompleteAnswerKey(selectedPaper)}
+                    onClick={() => onHostLiveQuiz(selectedPaper)}
+                    className="h-10 gap-1.5 whitespace-nowrap font-semibold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
+                    title="Generate a live Blooket / Quizizz link for students to play this paper together"
+                  >
+                    <Gamepad2 className="h-4 w-4" />
+                    Host Live Quiz
+                  </Button>
+                ) : null}
+                <Button
+                  size="default"
+                  disabled={busy || !hasCompleteAnswerKey(selectedPaper)}
+                  onClick={() => onStart(selectedPaper)}
+                  className="h-10 whitespace-nowrap font-semibold"
+                >
+                  {busy && busyPaperId === selectedPaper.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : activeDraftPaperId === selectedPaper.id ? (
+                    <>
+                      <Play className="mr-1.5 h-4 w-4 fill-current" />
+                      Resume in-progress exam
+                    </>
+                  ) : practiceMode === "question_by_question" ? (
+                    <>
+                      <Target className="mr-1.5 h-4 w-4" />
+                      Start 1-by-1 Tutor
+                    </>
+                  ) : (
+                    "Load question paper"
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -4181,6 +4273,7 @@ function TopicalPaperShowcase({
   busy,
   busyPaperId,
   onStart,
+  onHostLiveQuiz,
   activeDraftPaperId,
   activeDraftAnswersCount = 0,
   startInExamMode = false,
@@ -4193,6 +4286,7 @@ function TopicalPaperShowcase({
   busy: boolean;
   busyPaperId: string | null;
   onStart: (paper: TopicalMcqPaper) => void;
+  onHostLiveQuiz?: (paper: TopicalMcqPaper) => void;
   activeDraftPaperId?: string | null;
   activeDraftAnswersCount?: number;
   startInExamMode?: boolean;
@@ -4554,6 +4648,19 @@ function TopicalPaperShowcase({
                   </>
                 )}
               </Button>
+              {onHostLiveQuiz ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onHostLiveQuiz(activeTopic)}
+                  className="w-full gap-1.5 font-semibold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
+                >
+                  <Gamepad2 className="h-4 w-4" />
+                  Host Live Class Quiz Link
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         </div>
