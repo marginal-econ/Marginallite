@@ -46,7 +46,13 @@ import {
 } from "./examiner-prompt";
 import { extractFirstJsonObject } from "./json";
 import { refineExaminerReport } from "./refine.server";
-import { normaliseGrading, purgeContradictions, type Grading, type GroundingSource } from "./types";
+import {
+  deduplicateAcrossSections,
+  normaliseGrading,
+  purgeContradictions,
+  type Grading,
+  type GroundingSource,
+} from "./types";
 import {
   analyzeEssayQuality,
   applyWritingQualityGuardrail,
@@ -316,7 +322,14 @@ export async function gradeEssay(
   if (runSinglePass) {
     const res = await executeExaminerPass(pass2SystemPrompt, "grade_essay", TEMPERATURE_PASS2);
     finalGrading = normaliseGrading(extractFirstJsonObject(res.text), maxMark, split, essayText);
-    finalGrading = applyWritingQualityGuardrail(finalGrading, qualityAnalysis, maxMark, split, essayText);
+    finalGrading = applyWritingQualityGuardrail(
+      finalGrading,
+      qualityAnalysis,
+      maxMark,
+      split,
+      essayText,
+      question,
+    );
     if (finalGrading.off_syllabus) {
       throw new OffSyllabusError(
         finalGrading.detected_subject || "another subject",
@@ -348,10 +361,24 @@ export async function gradeEssay(
 
     if (first && second) {
       let grading1 = normaliseGrading(extractFirstJsonObject(first.text), maxMark, split, essayText);
-      grading1 = applyWritingQualityGuardrail(grading1, qualityAnalysis, maxMark, split, essayText);
+      grading1 = applyWritingQualityGuardrail(
+        grading1,
+        qualityAnalysis,
+        maxMark,
+        split,
+        essayText,
+        question,
+      );
 
       let grading2 = normaliseGrading(extractFirstJsonObject(second.text), maxMark, split, essayText);
-      grading2 = applyWritingQualityGuardrail(grading2, qualityAnalysis, maxMark, split, essayText);
+      grading2 = applyWritingQualityGuardrail(
+        grading2,
+        qualityAnalysis,
+        maxMark,
+        split,
+        essayText,
+        question,
+      );
 
       if (grading1.off_syllabus || grading2.off_syllabus) {
         const rejected = grading1.off_syllabus ? grading1 : grading2;
@@ -423,6 +450,7 @@ export async function gradeEssay(
         maxMark,
         split,
         essayText,
+        question,
       );
       if (finalGrading.off_syllabus) {
         throw new OffSyllabusError(
@@ -470,7 +498,7 @@ export async function gradeEssay(
   finalGrading.activeKeyType = activeKeyType;
   const totalLatencyMs = Date.now() - startedAt;
   finalGrading.latencyMs = totalLatencyMs;
-  finalGrading = cleanStars(purgeContradictions(finalGrading));
+  finalGrading = cleanStars(deduplicateAcrossSections(purgeContradictions(finalGrading), question));
   // Set indicative_grade AFTER cleanStars so "A*" keeps its asterisk!
   const gradeStd = getCambridgeGradeStandard(finalGrading.total_mark, maxMark);
   finalGrading.indicative_grade = gradeStd.letter;

@@ -272,6 +272,214 @@ export function applyMisconceptionCeilingGuardrail(
   };
 }
 
+export function questionRequiresDiagram(question?: string | null): boolean {
+  if (!question) return false;
+  return /\b(using\s+(?:an?\s+)?(?:demand\s+and\s+supply|ppc|production\s+possibility|economic)\s+diagram|draw\s+(?:an?\s+)?(?:demand\s+and\s+supply|ppc|production\s+possibility|economic)\s+diagram|illustrate\s+with\s+(?:an?\s+)?diagram|with\s+the\s+aid\s+of\s+(?:an?\s+)?diagram)\b/i.test(question);
+}
+
+export function essayHasDiagram(essayText?: string | null): boolean {
+  if (!essayText) return false;
+  return /\[DIAGRAM:[^\]]*\]/i.test(essayText);
+}
+
+export function applyRequiredDiagramGuardrail(
+  grading: Grading,
+  question: string | undefined,
+  essayText: string | undefined,
+  maxMark: number,
+  split: AoSplit,
+): Grading {
+  if (!question || !essayText) return grading;
+  if (!questionRequiresDiagram(question) || essayHasDiagram(essayText)) {
+    return grading;
+  }
+
+  const maxAo2WithoutDiagram = maxMark === 6 ? 2 : Math.min(split.ao2_marks, Math.floor(split.ao2_marks * 0.4));
+  let ao2 = grading.ao_breakdown.analysis.awarded;
+  const capped = ao2 > maxAo2WithoutDiagram;
+  if (capped) {
+    ao2 = maxAo2WithoutDiagram;
+  }
+
+  const ao1 = grading.ao_breakdown.knowledge.awarded;
+  const ao3 = grading.ao_breakdown.evaluation.awarded;
+  const total = ao1 + ao2 + ao3;
+  const updatedBand = bandFor(total, maxMark);
+
+  const diagWeakness =
+    "The question explicitly requested a diagram, which is missing from the submission; under Cambridge IGCSE 0455 mark scheme rules, omitting a required diagram restricts analysis to the written component only.";
+  const weaknesses = [...(grading.weaknesses || [])];
+  if (!weaknesses.some((w) => /diagram/i.test(w))) {
+    weaknesses.unshift(diagWeakness);
+  }
+
+  const missingDiagrams = [...(grading.missing_elements?.diagrams || [])];
+  if (missingDiagrams.length === 0) {
+    missingDiagrams.push("Accurately labelled economic diagram explicitly requested by the question prompt.");
+  }
+
+  let analysisComment = grading.ao_breakdown.analysis.comment;
+  if (!/diagram/i.test(analysisComment)) {
+    analysisComment = `${analysisComment} Because the question explicitly asked for a diagram and none was included, analytical credit is capped under Cambridge 0455 marking rules.`.trim();
+  }
+
+  return {
+    ...grading,
+    total_mark: total,
+    band: updatedBand,
+    examiner_summary: stripScoreFractionsFromText(grading.examiner_summary),
+    ao_breakdown: {
+      ...grading.ao_breakdown,
+      analysis: {
+        ...grading.ao_breakdown.analysis,
+        awarded: ao2,
+        comment: stripScoreFractionsFromText(analysisComment),
+      },
+    },
+    weaknesses,
+    missing_elements: {
+      ...grading.missing_elements,
+      diagrams: missingDiagrams,
+    },
+  };
+}
+
+export function applyEightMarkEvaluationGuardrail(
+  grading: Grading,
+  maxMark: number,
+  split: AoSplit,
+): Grading {
+  if (maxMark !== 8 || split.ao3_marks < 2) {
+    return grading;
+  }
+
+  const ao1 = grading.ao_breakdown.knowledge.awarded;
+  const ao2 = grading.ao_breakdown.analysis.awarded;
+  let ao3 = grading.ao_breakdown.evaluation.awarded;
+
+  const evalComment = grading.ao_breakdown.evaluation.comment || "";
+  const weaknessesText = (grading.weaknesses || []).join(" ").toLowerCase();
+  const missingEval = grading.missing_elements?.evaluation || [];
+
+  const hasEvaluationShortfall =
+    missingEval.length > 0 ||
+    /unmet|incomplete|unsatisfied|missing|unsupported|partially|fail(ed|s)? to|superficial|weak|not fully|room for|could be further|lacks? (?:explicit|thoughtful|reasoned)? evaluation/i.test(evalComment) ||
+    /conclusion.*(missing|weak|unsupported|lacking|incomplete|unsatisfied)|evaluation.*(not fully|partially|lacking|unmet|incomplete|room for)/i.test(weaknessesText);
+
+  // If evaluation shortfall detected, clamp AO3 to max 2 (out of 3) and total to max 7
+  if (hasEvaluationShortfall && (ao3 > 2 || grading.total_mark === 8)) {
+    if (ao3 > 2) {
+      ao3 = 2;
+    }
+    const newTotal = Math.min(7, ao1 + ao2 + ao3);
+    const improvementNotice = "To elevate the evaluation to full marks, provide a more decisive concluding judgement that explicitly weighs the trade-offs in context (such as short-run versus long-run impacts).";
+    const updatedComment = evalComment.includes("decisive concluding judgement")
+      ? evalComment
+      : `${evalComment} ${improvementNotice}`.trim();
+
+    return {
+      ...grading,
+      total_mark: newTotal,
+      band: bandFor(newTotal, maxMark),
+      ao_breakdown: {
+        ...grading.ao_breakdown,
+        evaluation: {
+          ...grading.ao_breakdown.evaluation,
+          awarded: ao3,
+          comment: stripScoreFractionsFromText(updatedComment),
+        },
+      },
+    };
+  }
+
+  // If total is 8, ensure it really has earned full marks in all AOs
+  if (grading.total_mark === 8) {
+    if (ao1 < 2 || ao2 < 3 || ao3 < 3) {
+      const fixedTotal = Math.min(7, ao1 + ao2 + ao3);
+      return {
+        ...grading,
+        total_mark: fixedTotal,
+        band: bandFor(fixedTotal, maxMark),
+      };
+    }
+  }
+
+  return grading;
+}
+
+export function applyEconomicMechanicsGuardrail(
+  grading: Grading,
+  maxMark: number,
+  split: AoSplit,
+  _essayText?: string,
+): Grading {
+  const weaknessesText = (grading.weaknesses || []).join(" ").toLowerCase();
+  const summaryText = (grading.examiner_summary || "").toLowerCase();
+  const commentsText = `${grading.ao_breakdown.knowledge?.comment || ""} ${grading.ao_breakdown.analysis?.comment || ""}`.toLowerCase();
+  const combinedFeedback = `${weaknessesText} ${summaryText} ${commentsText}`;
+
+  const hasFatalMisconception =
+    /\b(fundamental misconception|fatal economic error|inverted definition|inverted concept|claims? that an? increase in supply (causes?|leads? to|results? in) (higher|rising) price)\b/i.test(combinedFeedback) ||
+    /\b(claims? that (a )?subsid(y|ies) shifts? demand|claims? that (a )?tax shifts? demand to the right)\b/i.test(combinedFeedback) ||
+    Boolean(grading.mechanism_validation?.fatal_misconceptions_found);
+
+  const hasInvertedCausalTransmission =
+    /\b(broken causal transmission|inverted transmission chain|reversed cause and effect|mechanism operates in reverse)\b/i.test(combinedFeedback);
+
+  if (!hasFatalMisconception && !hasInvertedCausalTransmission) {
+    return grading;
+  }
+
+  let { knowledge, analysis, evaluation } = grading.ao_breakdown;
+  let ao1 = knowledge.awarded;
+  let ao2 = analysis.awarded;
+  let ao3 = evaluation.awarded;
+  let modified = false;
+
+  // 1. Inverted definition / fatal concept error: AO1 capped at 1
+  if (hasFatalMisconception && ao1 > 1) {
+    ao1 = 1;
+    modified = true;
+  }
+
+  // 2. Broken transmission chain: AO2 Analysis cannot exceed Level 1
+  const maxAo2 = maxMark === 8 ? 1 : maxMark === 6 ? 2 : Math.max(1, Math.floor(split.ao2_marks * 0.35));
+  if (hasInvertedCausalTransmission && ao2 > maxAo2) {
+    ao2 = maxAo2;
+    modified = true;
+  }
+
+  // 3. Overall mark ceiling: fatal misconceptions disqualify essay from Top Band
+  const maxTotalAllowed = maxMark === 8 ? 4 : maxMark === 6 ? 3 : Math.round(maxMark * 0.5);
+  let total = ao1 + ao2 + ao3;
+
+  if (total > maxTotalAllowed) {
+    const excess = total - maxTotalAllowed;
+    ao3 = Math.max(0, ao3 - excess);
+    total = ao1 + ao2 + ao3;
+    if (total > maxTotalAllowed) {
+      ao2 = Math.max(1, ao2 - (total - maxTotalAllowed));
+      total = ao1 + ao2 + ao3;
+    }
+    modified = true;
+  }
+
+  if (!modified) {
+    return grading;
+  }
+
+  return {
+    ...grading,
+    total_mark: total,
+    band: bandFor(total, maxMark),
+    ao_breakdown: {
+      knowledge: { ...knowledge, awarded: ao1 },
+      analysis: { ...analysis, awarded: ao2 },
+      evaluation: { ...evaluation, awarded: ao3 },
+    },
+  };
+}
+
 /**
  * Deterministic calibration failsafe for Cambridge IGCSE 0455 responses.
  */
@@ -281,12 +489,33 @@ export function applyWritingQualityGuardrail(
   maxMark: number,
   split: AoSplit,
   essayText?: string,
+  questionText?: string,
 ): Grading {
   // 1. Scrutinise text for verified fatal economic misconceptions and inverted mechanisms
   let updated = applyMisconceptionGuardrail(grading, maxMark, split, essayText || "");
 
+  // 2. Official Cambridge required-diagram cap (when question explicitly asks for a diagram & none is present)
+  updated = applyRequiredDiagramGuardrail(updated, questionText, essayText, maxMark, split);
+
+  // 3. Authoritative 8-mark evaluative essay failsafe (keeps at 7 if evaluation criteria unmet or conclusion unsatisfied)
+  updated = applyEightMarkEvaluationGuardrail(updated, maxMark, split);
+
+  // 4. Economic mechanics & causal integrity guardrail
+  updated = applyEconomicMechanicsGuardrail(updated, maxMark, split, essayText);
+
   // Never artificially penalize concise 2-mark / 4-mark answers that aren't severely undersized
   if (maxMark <= 4 && !quality.isSeverelyUndersized) {
+    const sumAo =
+      updated.ao_breakdown.knowledge.awarded +
+      updated.ao_breakdown.analysis.awarded +
+      updated.ao_breakdown.evaluation.awarded;
+    if (updated.total_mark !== sumAo) {
+      updated = {
+        ...updated,
+        total_mark: sumAo,
+        band: bandFor(sumAo, maxMark),
+      };
+    }
     return cleanStars(updated);
   }
 
@@ -320,6 +549,14 @@ export function applyWritingQualityGuardrail(
   }
 
   if (!modified && quality.qualityIssues.length === 0) {
+    const sumAo = ao1 + ao2 + ao3;
+    if (updated.total_mark !== sumAo) {
+      updated = {
+        ...updated,
+        total_mark: sumAo,
+        band: bandFor(sumAo, maxMark),
+      };
+    }
     return cleanStars(updated);
   }
 
@@ -338,10 +575,11 @@ export function applyWritingQualityGuardrail(
     }
   }
 
+  const finalTotal = ao1 + ao2 + ao3;
   updated = {
     ...updated,
-    total_mark: total,
-    band: bandFor(total, maxMark),
+    total_mark: finalTotal,
+    band: bandFor(finalTotal, maxMark),
     ao_breakdown: {
       knowledge: { ...updated.ao_breakdown.knowledge, awarded: ao1 },
       analysis: { ...updated.ao_breakdown.analysis, awarded: ao2 },

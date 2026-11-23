@@ -757,3 +757,160 @@ export function bandFor(total: number, maxMark: number): string {
   if (ratio >= 0.4) return "Level 2 (Sound economic analysis)";
   return "Level 1 (Basic knowledge attempt)";
 }
+
+/**
+ * Cross-section deduplication for Cambridge IGCSE 0455 examiner reports:
+ * 1. Enforces strict non-overlapping roles across Strengths, Weaknesses, Missing Elements, and Actionable Steps.
+ * 2. Purges unrequested diagram critiques when the question did not ask for a diagram.
+ * 3. Eliminates duplicate or near-duplicate advice so candidates never read the same criticism multiple times.
+ */
+export function deduplicateAcrossSections(grading: Grading, questionText?: string): Grading {
+  const asksDiagram = questionText
+    ? /\b(diagram|draw\s+a|using\s+a\s+(?:demand|supply|ppc|production\s+possibility))\b/i.test(questionText)
+    : false;
+
+  const isUnrequestedDiagramCritique = (text: string): boolean => {
+    if (asksDiagram) return false;
+    return (
+      /\b(?:absence|lack|omission)\s+of\s+(?:a\s+|an\s+|any\s+)?(?:well-labeled\s+|labeled\s+|clear\s+)?diagrams?\b/i.test(text) ||
+      /\b(?:include|add|draw|insert)\s+(?:a\s+|an\s+)?(?:well-labeled\s+|labeled\s+|clear\s+)?(?:demand\s+and\s+supply\s+|economic\s+|ppc\s+)?diagrams?\b/i.test(text) ||
+      /\bwithout\s+(?:a\s+|any\s+)?diagrams?\b/i.test(text)
+    );
+  };
+
+  const fixTopBandPhrasing = (text: string): string => {
+    const isTopBand = grading.band?.includes("Level 3") || grading.band?.includes("Top Band");
+    if (!isTopBand) return text;
+    return text
+      .replace(/\bto\s+(?:reach|achieve|enter|elevate\s+(?:the\s+)?(?:analysis|evaluation|essay|response)\s+to)\s+(?:the\s+)?(?:top\s+band|level\s+3)\b/gi, "to push toward full marks")
+      .replace(/\bin\s+order\s+to\s+reach\s+(?:the\s+)?(?:top\s+band|level\s+3)\b/gi, "to push toward full marks");
+  };
+
+  const strengths = deduplicateFeedbackPoints(
+    (grading.strengths || []).map(fixTopBandPhrasing),
+    4,
+  );
+
+  let weaknesses = deduplicateFeedbackPoints(
+    (grading.weaknesses || [])
+      .filter((w) => !isUnrequestedDiagramCritique(w))
+      .map(fixTopBandPhrasing),
+    4,
+  );
+
+  // Filter any missing_elements item that repeats an already-stated weakness or another missing item
+  const seenMissing: string[] = [];
+  const filterMissingList = (items: string[]): string[] => {
+    const out: string[] = [];
+    for (const raw of deduplicateFeedbackPoints(items || [], 2)) {
+      const cleaned = fixTopBandPhrasing(raw);
+      if (!cleaned || isUnrequestedDiagramCritique(cleaned)) continue;
+      const repeatsWeakness = weaknesses.some((w) => {
+        const sim = feedbackSimilarity(w, cleaned);
+        return sim.jaccard >= 0.30 || sim.overlap >= 0.48;
+      });
+      const repeatsEarlierMissing = seenMissing.some((m) => {
+        const sim = feedbackSimilarity(m, cleaned);
+        return sim.jaccard >= 0.30 || sim.overlap >= 0.48;
+      });
+      if (!repeatsWeakness && !repeatsEarlierMissing) {
+        out.push(cleaned);
+        seenMissing.push(cleaned);
+      }
+    }
+    return out;
+  };
+
+  const missingElements: MissingElements = {
+    definitions: filterMissingList(grading.missing_elements?.definitions || []),
+    analysis: filterMissingList(grading.missing_elements?.analysis || []),
+    evaluation:
+      grading.ao_breakdown.evaluation.out_of === 0
+        ? []
+        : filterMissingList(grading.missing_elements?.evaluation || []),
+    examples: filterMissingList(grading.missing_elements?.examples || []),
+    diagrams: asksDiagram ? filterMissingList(grading.missing_elements?.diagrams || []) : [],
+  };
+
+  // Deduplicate actionable_feedback internally
+  const dedupedRawActions: string[] = [];
+  for (const item of (grading.actionable_feedback || []).filter((a) => !isUnrequestedDiagramCritique(a)).map(fixTopBandPhrasing)) {
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const isDup = dedupedRawActions.some((existing) => {
+      const sim = feedbackSimilarity(existing, trimmed);
+      if (sim.jaccard >= 0.28 || sim.overlap >= 0.44) return true;
+      const bothRankEval =
+        /\b(?:in\s+(?:the|your)\s+evaluation|conclusion).*\b(?:rank|prioriti[sz]e|most\s+decisive)\b/i.test(existing) &&
+        /\b(?:in\s+(?:the|your)\s+evaluation|conclusion).*\b(?:rank|prioriti[sz]e|most\s+decisive)\b/i.test(trimmed);
+      const bothCounterEval =
+        /\bevaluation\b.*\bcounter[- ]?argument\b/i.test(existing) &&
+        /\bevaluation\b.*\bcounter[- ]?argument\b/i.test(trimmed);
+      return bothRankEval || bothCounterEval;
+    });
+    if (!isDup) {
+      dedupedRawActions.push(trimmed);
+      if (dedupedRawActions.length >= 4) break;
+    }
+  }
+
+  const rawActions = dedupedRawActions;
+  const distinctActions = rawActions.filter((action) => {
+    const repeatsWeakness = weaknesses.some((w) => {
+      const sim = feedbackSimilarity(w, action);
+      return sim.jaccard >= 0.34 || sim.overlap >= 0.52;
+    });
+    const repeatsMissing = seenMissing.some((m) => {
+      const sim = feedbackSimilarity(m, action);
+      return sim.jaccard >= 0.34 || sim.overlap >= 0.52;
+    });
+    return !repeatsWeakness && !repeatsMissing;
+  });
+
+  // Always keep at least 1 actionable step
+  let actionableFeedback = distinctActions.slice(0, 3);
+  if (actionableFeedback.length === 0 && rawActions.length > 0) {
+    const ranked = rawActions
+      .map((a) => ({
+        a,
+        maxSim: Math.max(
+          0,
+          ...weaknesses.map((w) => feedbackSimilarity(w, a).overlap),
+          ...seenMissing.map((m) => feedbackSimilarity(m, a).overlap),
+        ),
+      }))
+      .sort((x, y) => x.maxSim - y.maxSim);
+    actionableFeedback = [ranked[0].a];
+  }
+
+  if (weaknesses.length === 0 && grading.weaknesses?.length > 0) {
+    weaknesses = [fixTopBandPhrasing(grading.weaknesses[0])];
+  }
+
+  // Final pass: strip any missing_elements checklist bullet that repeats an actionable_feedback step
+  const stripActionDupes = (items: string[]): string[] =>
+    items.filter(
+      (m) =>
+        !actionableFeedback.some((a) => {
+          const sim = feedbackSimilarity(m, a);
+          return sim.jaccard >= 0.34 || sim.overlap >= 0.50;
+        }),
+    );
+
+  const finalMissingElements: MissingElements = {
+    definitions: stripActionDupes(missingElements.definitions),
+    analysis: stripActionDupes(missingElements.analysis),
+    evaluation: stripActionDupes(missingElements.evaluation),
+    examples: stripActionDupes(missingElements.examples),
+    diagrams: stripActionDupes(missingElements.diagrams),
+  };
+
+  return {
+    ...grading,
+    strengths,
+    weaknesses,
+    missing_elements: finalMissingElements,
+    actionable_feedback: actionableFeedback,
+    next_step_feedback: actionableFeedback,
+  };
+}

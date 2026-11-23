@@ -13,7 +13,12 @@ import { cleanStars } from "@/lib/utils";
 import { chat } from "../ai.server";
 import { MODEL_EXAMINER, SYLLABUS_CODE, type AoSplit } from "./config";
 import { extractFirstJsonObject } from "./json";
-import { normaliseGrading, purgeContradictions, type Grading } from "./types";
+import {
+  deduplicateAcrossSections,
+  normaliseGrading,
+  purgeContradictions,
+  type Grading,
+} from "./types";
 import { analyzeEssayQuality, applyWritingQualityGuardrail } from "./writing-quality.server";
 
 export const REPORT_REFINER_PROMPT = `You are a Senior Principal Examiner for Cambridge IGCSE Economics (syllabus ${SYLLABUS_CODE}).
@@ -22,15 +27,24 @@ STRICT PLAIN TEXT DIRECTIVE: NEVER use markdown asterisks (*, **, or ***) anywhe
 
 Your mission:
 1. AUDIT ECONOMIC ACCURACY & PROTECT SOUND ANSWERS (IGCSE 0455 UNITS 1–6):
+   - Catch & correct false praise or inverted causal mechanisms:
+     * Interest rates & Exchange rates: Higher domestic interest rates attract foreign hot-money inflows -> currency APPRECIATES (stronger exchange rate) -> exports become dearer, imports cheaper. Lower interest rates cause DEPRECIATION. NEVER claim higher interest rates depreciate a currency!
+     * Net exports (X - M) affect the CURRENT account of the balance of payments.
+     * Scarcity & Opportunity Cost: Standard IGCSE definitions (scarcity = finite resources vs unlimited wants; opportunity cost = next best alternative forgone) are foundational and correct; NEVER call them vague or tautological.
    - NEVER invent phantom errors or penalise valid IGCSE phrasing ("owtte").
    - Only flag a misconception if you verify an explicit economic falsehood in the student's text.
-   - If the draft report hallucinated a false criticism (e.g. calling standard scarcity or opportunity cost definitions wrong), OVERTURN and REMOVE it.
+   - If the draft report hallucinated a false criticism, OVERTURN and REMOVE it.
    - STRICT IGCSE 0455 BOUNDARY: Purge any mention or expectation of A-Level-only topics (indifference curves, marginal utility, diminishing marginal returns, MRPL, kinked demand curve, Keynesian cross, multiplier formula k=1/MPW, Paper 3/4, AS/A Level).
-   - Keep the total_mark and AO breakdown consistent with the examiner's verified assessment — do NOT invent arbitrary mark changes unless fixing a clear contradiction or verified error.
 
-2. ELIMINATE ALL INTERNAL CONTRADICTIONS:
-   - Never allow strengths to praise an example, definition, or conclusion while weaknesses or missing_elements claim it is missing.
-   - For non-evaluative questions (AO3 out_of = 0, e.g. 2m Define, 4m Explain, 6m Analyse), ensure weaknesses and missing_elements NEVER ask for evaluation or conclusions.
+2. ZERO REPETITION — DISTINCT NON-OVERLAPPING ROLES FOR EVERY SECTION:
+   - Eliminate ALL duplicate or near-duplicate points inside "strengths", "weaknesses", "missing_elements.*", and "actionable_feedback".
+   - Enforce STRICT NON-OVERLAPPING ROLES across sections so the student NEVER reads the same criticism three times:
+     * "examiner_summary" (2–3 concise sentences): High-level verdict explaining why the essay sits in its band.
+     * "ao_breakdown.*.comment" (1–2 sentences each): Concise justification specific to THAT AO only.
+     * "strengths" (2–4 distinct bullets): Specific things done well with verified verbatim quotes.
+     * "weaknesses" (2–4 distinct bullets): Diagnostic issues in what was written (each bullet = a DIFFERENT economic issue).
+     * "missing_elements": Ultra-concise checklist phrases (8–18 words, MAX 2 items per category, [] if none) listing ONLY omitted concepts/steps NOT already explained in full in "weaknesses".
+     * "actionable_feedback" (2–3 concrete bullets): Concrete HOW-TO rewrite instructions (specific paragraph, causal chain, or weighing criterion to write next), phrased distinctly from "weaknesses" and "missing_elements".
 
 3. CLEAN HUMAN CAMBRIDGE VOICE:
    - Purge all internal retrieval codes ([S1], [S2], etc.) and score fractions in prose (e.g. "(3/4)", "held at 5", "cost you marks").
@@ -96,7 +110,7 @@ export async function refineExaminerReport(options: RefineReportOptions): Promis
     }
 
     const quality = analyzeEssayQuality(essayText, maxMark, split);
-    refined = applyWritingQualityGuardrail(refined, quality, maxMark, split, essayText);
+    refined = applyWritingQualityGuardrail(refined, quality, maxMark, split, essayText, question);
 
     // Preserve structured metadata from examiner passes
     refined.sources = draftGrading.sources;
@@ -119,9 +133,9 @@ export async function refineExaminerReport(options: RefineReportOptions): Promis
       refined.suggested_practice = draftGrading.suggested_practice;
     }
 
-    return cleanStars(purgeContradictions(refined));
+    return cleanStars(deduplicateAcrossSections(purgeContradictions(refined), question));
   } catch (err) {
     console.warn("[refine.server] Pass 3 refinement skipped, returning cleansed draft:", err);
-    return cleanStars(purgeContradictions(draftGrading));
+    return cleanStars(deduplicateAcrossSections(purgeContradictions(draftGrading), question));
   }
 }
