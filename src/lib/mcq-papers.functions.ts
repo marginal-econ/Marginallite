@@ -99,18 +99,27 @@ export const listMcqPapers = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return {
-      papers: (data ?? []).map((p) => ({
-        id: p.id as string,
-        title: p.title as string,
-        level: p.level === "as" ? "legacy" : (p.level as string),
-        examYear: (p.exam_year ?? null) as number | null,
-        examSeries: (p.exam_series ?? null) as string | null,
-        questionCount: p.question_count as number,
-        qpUrl: p.qp_url as string,
-        msUrl: p.ms_url as string | null,
-        answerKey: (p.answer_key ?? {}) as Record<string, "A" | "B" | "C" | "D">,
-        createdAt: p.created_at as string,
-      })),
+      papers: (data ?? []).map((p) => {
+        const keyObj = (p.answer_key ?? {}) as Record<string, "A" | "B" | "C" | "D">;
+        const qCount = (p.question_count ?? 0) as number;
+        const hasCompleteKey =
+          qCount > 0 &&
+          Array.from({ length: qCount }, (_, i) => keyObj[String(i + 1)]).every(Boolean);
+
+        return {
+          id: p.id as string,
+          title: p.title as string,
+          level: (p.level ?? "as") as "as" | "a2",
+          examYear: (p.exam_year ?? null) as number | null,
+          examSeries: (p.exam_series ?? null) as string | null,
+          questionCount: qCount,
+          qpUrl: p.qp_url as string,
+          msUrl: (p.ms_url ?? null) as string | null,
+          hasCompleteKey,
+          answerKey: keyObj,
+          createdAt: p.created_at as string,
+        };
+      }),
     };
   });
 

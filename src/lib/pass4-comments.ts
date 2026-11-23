@@ -463,11 +463,10 @@ function extractBestHighlightSentence(
   const rawSentences = paraText
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 8);
+    .filter((s) => s.length >= 6);
 
   if (rawSentences.length <= 1) {
-    const single = (rawSentences[0] || paraText).trim();
-    return single.length > 140 ? `${single.slice(0, 137)}…` : single;
+    return (rawSentences[0] || paraText).trim();
   }
 
   const { words, phrases } = extractDiagnosticKeywords(diagnosticText);
@@ -508,8 +507,150 @@ function extractBestHighlightSentence(
     }
   });
 
-  const trimmed = bestSentence.trim();
-  return trimmed.length > 140 ? `${trimmed.slice(0, 137)}…` : trimmed;
+  return bestSentence.trim();
+}
+
+/**
+ * Robust in-situ highlight locator that guarantees finding the exact or best
+ * matching sentence/phrase in the manuscript paragraph, even with whitespace,
+ * quotation, ellipsis, or punctuation variations.
+ */
+export function findHighlightSpanInText(
+  paragraphText: string,
+  targetQuery?: string | null,
+): { before: string; match: string; after: string } {
+  const rawPara = paragraphText || "";
+  const cleanTarget = (targetQuery || "").trim();
+  if (!rawPara || !cleanTarget) {
+    return { before: "", match: rawPara, after: "" };
+  }
+
+  // 1. Exact substring match
+  const exactIdx = rawPara.indexOf(cleanTarget);
+  if (exactIdx !== -1) {
+    return {
+      before: rawPara.slice(0, exactIdx),
+      match: rawPara.slice(exactIdx, exactIdx + cleanTarget.length),
+      after: rawPara.slice(exactIdx + cleanTarget.length),
+    };
+  }
+
+  // 2. Strip surrounding quotes, ellipses (… or ...), and trailing punctuation
+  const stripped = cleanTarget
+    .replace(/^[“"'\s]+|[”"'\s]+$/g, "")
+    .replace(/(?:\.{2,}|…)$/, "")
+    .trim();
+
+  if (stripped.length >= 6) {
+    const strippedIdx = rawPara.indexOf(stripped);
+    if (strippedIdx !== -1) {
+      return {
+        before: rawPara.slice(0, strippedIdx),
+        match: rawPara.slice(strippedIdx, strippedIdx + stripped.length),
+        after: rawPara.slice(strippedIdx + stripped.length),
+      };
+    }
+  }
+
+  // 3. Case-insensitive match
+  const lowerPara = rawPara.toLowerCase();
+  const lowerTarget = (stripped || cleanTarget).toLowerCase();
+  const lowerIdx = lowerPara.indexOf(lowerTarget);
+  if (lowerIdx !== -1) {
+    const matchLen = (stripped || cleanTarget).length;
+    return {
+      before: rawPara.slice(0, lowerIdx),
+      match: rawPara.slice(lowerIdx, lowerIdx + matchLen),
+      after: rawPara.slice(lowerIdx + matchLen),
+    };
+  }
+
+  // 4. Word sequence regex match (handles variable whitespace and newlines)
+  const words = (stripped || cleanTarget)
+    .split(/\s+/)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean);
+
+  if (words.length >= 3) {
+    const prefixWords = words.slice(0, Math.min(words.length, 8));
+    const regex = new RegExp(prefixWords.join("\\s+"), "i");
+    const m = regex.exec(rawPara);
+    if (m && m.index !== undefined) {
+      const start = m.index;
+      const rest = rawPara.slice(start);
+      const sentenceEnd = rest.search(/(?<=[.!?])\s+|$/);
+      const end =
+        sentenceEnd !== -1 && sentenceEnd >= m[0].length
+          ? start + sentenceEnd
+          : start + m[0].length;
+      return {
+        before: rawPara.slice(0, start),
+        match: rawPara.slice(start, end),
+        after: rawPara.slice(end),
+      };
+    }
+  }
+
+  // 5. Best sentence overlap: split paragraph into sentences and find highest token overlap
+  const sentences = rawPara
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  if (sentences.length > 0) {
+    const queryTokens = new Set(
+      cleanTarget
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length >= 3),
+    );
+
+    let bestSentence = sentences[0];
+    let maxOverlap = -1;
+
+    for (const sent of sentences) {
+      const sentTokens = sent
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length >= 3);
+      let overlap = 0;
+      for (const t of sentTokens) {
+        if (queryTokens.has(t)) overlap++;
+      }
+      if (overlap > maxOverlap) {
+        maxOverlap = overlap;
+        bestSentence = sent;
+      }
+    }
+
+    const sentIdx = rawPara.indexOf(bestSentence);
+    if (sentIdx !== -1) {
+      return {
+        before: rawPara.slice(0, sentIdx),
+        match: rawPara.slice(sentIdx, sentIdx + bestSentence.length),
+        after: rawPara.slice(sentIdx + bestSentence.length),
+      };
+    }
+  }
+
+  // 6. Sentence fallback: match the first sentence
+  const firstSentence = sentences[0] || rawPara;
+  const fallbackIdx = rawPara.indexOf(firstSentence);
+  if (fallbackIdx !== -1) {
+    return {
+      before: rawPara.slice(0, fallbackIdx),
+      match: rawPara.slice(fallbackIdx, fallbackIdx + firstSentence.length),
+      after: rawPara.slice(fallbackIdx + firstSentence.length),
+    };
+  }
+
+  return {
+    before: "",
+    match: rawPara,
+    after: "",
+  };
 }
 
 /**

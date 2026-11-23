@@ -55,7 +55,7 @@ import { ChainedChamber } from "@/components/app/chained-chamber";
 import { CompactProgressBar, GradingProgress, type ProgressStage } from "@/components/app/grading-progress";
 import { HandwritingUpload } from "@/components/app/handwriting-upload";
 import { MarkBreakdown } from "@/components/app/mark-breakdown";
-import { generatePass4Comments, parseParagraphBlocks, type Pass4Comment, type ParagraphBlock } from "@/lib/pass4-comments";
+import { generatePass4Comments, parseParagraphBlocks, findHighlightSpanInText, type Pass4Comment, type ParagraphBlock } from "@/lib/pass4-comments";
 import { DiagramCheckDialog } from "@/components/app/diagram-check-dialog";
 import { SampleEssayBanner } from "@/components/app/sample-essay-banner";
 import { InSituTour, type TourStep } from "@/components/app/in-situ-tour";
@@ -2074,57 +2074,82 @@ function GradePage() {
                                       }
                                     }}
                                     className={cn(
-                                      "relative rounded-xl transition-all duration-200 leading-[1.95] tracking-tight",
-                                      paraComments.length > 0 && "cursor-pointer group",
+                                      "relative rounded-xl transition-all duration-200 leading-[1.95] tracking-tight p-3 sm:p-4",
+                                      paraComments.length > 0 ? "cursor-pointer group border-l-2" : "border-l-2 border-transparent",
                                       isParaActive
-                                        ? "bg-amber-400/15 ring-2 ring-amber-400/80 p-3.5 shadow-sm border-l-4 border-amber-500"
+                                        ? "border-primary bg-primary/[0.03] dark:bg-primary/[0.06] shadow-xs"
                                         : paraComments.length > 0
-                                          ? "border-l-3 border-amber-400/60 pl-3.5 py-1 hover:bg-amber-400/[0.06]"
-                                          : "p-0.5",
+                                          ? "border-border/80 hover:border-primary/50 hover:bg-muted/10"
+                                          : "",
                                     )}
                                   >
                                     {paraComments.length > 0 && (
-                                      <div className="flex items-center justify-between gap-2 pb-1 text-xs select-none">
-                                        <span
-                                          className={cn(
-                                            "inline-flex items-center gap-1 text-[11px] font-sans font-semibold rounded-md px-2 py-0.5 transition-colors",
-                                            isParaActive
-                                              ? "bg-amber-500 text-black font-bold shadow-xs"
-                                              : "bg-amber-500/15 text-amber-500 group-hover:bg-amber-500/25",
-                                          )}
-                                        >
-                                          <MessageSquare className="size-3" />
-                                          <span>
-                                            {paraComments.length} {paraComments.length === 1 ? "Examiner Flag" : "Examiner Flags"} ({block.label})
+                                      <div className="flex items-center justify-between gap-2 pb-1.5 text-xs select-none">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-sans text-muted-foreground group-hover:text-foreground transition-colors">
+                                          <span
+                                            className={cn(
+                                              "inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full text-[9px] font-mono font-bold transition-all",
+                                              isParaActive
+                                                ? "bg-primary text-primary-foreground shadow-2xs"
+                                                : "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary",
+                                            )}
+                                          >
+                                            {paraComments.length}
                                           </span>
-                                        </span>
+                                          <span className="font-medium text-[11px] text-muted-foreground">
+                                            {block.label}
+                                          </span>
+                                        </div>
                                         {isParaActive && (
-                                          <span className="text-[10px] text-amber-500 font-mono font-medium animate-pulse">
-                                            ● Active In-Situ Focus
+                                          <span className="text-[10px] font-mono font-semibold text-primary/90 flex items-center gap-1">
+                                            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                                            Active Passage
                                           </span>
                                         )}
                                       </div>
                                     )}
                                     {(() => {
                                       const activeComment = paraComments.find((c) => c.id === activeCommentId);
-                                      const hl = activeComment?.highlightText?.trim();
-                                      if (isParaActive && hl && block.text.includes(hl)) {
-                                        const parts = block.text.split(hl);
+
+                                      if (isParaActive && activeComment) {
+                                        const span = findHighlightSpanInText(block.text, activeComment.highlightText);
+                                        const category = activeComment.category;
                                         return (
                                           <p className="text-foreground/95">
-                                            {parts.map((part, i) => (
-                                              <span key={i}>
-                                                {part}
-                                                {i < parts.length - 1 && (
-                                                  <mark className="bg-amber-400/35 dark:bg-amber-400/30 text-foreground font-semibold px-1 py-0.5 rounded shadow-2xs">
-                                                    {hl}
-                                                  </mark>
-                                                )}
-                                              </span>
-                                            ))}
+                                            <span>{span.before}</span>
+                                            <span
+                                              className={cn(
+                                                "font-bold text-foreground transition-all duration-150 inline rounded-sm px-1 py-0.5",
+                                                category === "diagram"
+                                                  ? "bg-emerald-500/15 dark:bg-emerald-500/25 underline decoration-emerald-500 decoration-2 underline-offset-4 ring-1 ring-emerald-500/30 text-emerald-950 dark:text-emerald-100"
+                                                  : category === "evaluation"
+                                                    ? "bg-sky-500/15 dark:bg-sky-500/25 underline decoration-sky-500 decoration-2 underline-offset-4 ring-1 ring-sky-500/30 text-sky-950 dark:text-sky-100"
+                                                    : category === "knowledge"
+                                                      ? "bg-indigo-500/15 dark:bg-indigo-500/25 underline decoration-indigo-500 decoration-2 underline-offset-4 ring-1 ring-indigo-500/30 text-indigo-950 dark:text-indigo-100"
+                                                      : "bg-amber-500/15 dark:bg-amber-500/25 underline decoration-amber-500 decoration-2 underline-offset-4 ring-1 ring-amber-500/30 text-amber-950 dark:text-amber-100",
+                                              )}
+                                            >
+                                              {span.match}
+                                            </span>
+                                            <span>{span.after}</span>
                                           </p>
                                         );
                                       }
+
+                                      if (paraComments.length > 0) {
+                                        const firstComment = paraComments[0];
+                                        const span = findHighlightSpanInText(block.text, firstComment.highlightText);
+                                        return (
+                                          <p className="text-foreground/95">
+                                            <span>{span.before}</span>
+                                            <span className="font-semibold text-foreground/90 underline decoration-muted-foreground/35 decoration-dashed underline-offset-4 hover:decoration-primary transition-colors cursor-pointer">
+                                              {span.match}
+                                            </span>
+                                            <span>{span.after}</span>
+                                          </p>
+                                        );
+                                      }
+
                                       return <p className="text-foreground/95">{block.text}</p>;
                                     })()}
                                   </div>
@@ -2218,8 +2243,8 @@ function GradePage() {
                                   </h5>
 
                                   {comment.highlightText && (
-                                    <div className="text-[11px] font-serif italic text-muted-foreground bg-background/50 border-l-2 border-primary/50 pl-2 py-1 rounded-r-md">
-                                      "{comment.highlightText}"
+                                    <div className="text-[11px] font-serif italic text-muted-foreground/90 bg-muted/30 border-l-2 border-primary/60 pl-2.5 py-1 rounded-r-md">
+                                      "{comment.highlightText.length > 130 ? `${comment.highlightText.slice(0, 127)}…` : comment.highlightText}"
                                     </div>
                                   )}
 

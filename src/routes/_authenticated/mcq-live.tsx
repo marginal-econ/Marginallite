@@ -3818,9 +3818,15 @@ function paperCode(paper: McqPaperSummary): string {
 }
 
 function hasCompleteAnswerKey(paper: McqPaperSummary): boolean {
+  if (!paper) return false;
+  if (typeof (paper as any).hasCompleteKey === "boolean") {
+    return (paper as any).hasCompleteKey;
+  }
+  const key = (paper as any).answerKey;
+  if (!key) return false;
   return Array.from(
-    { length: paper.questionCount },
-    (_, index) => paper.answerKey[String(index + 1)],
+    { length: paper.questionCount || 0 },
+    (_, index) => Boolean(key[String(index + 1)]),
   ).every(Boolean);
 }
 

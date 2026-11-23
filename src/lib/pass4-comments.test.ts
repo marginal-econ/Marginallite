@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generatePass4Comments } from "./pass4-comments";
+import { generatePass4Comments, findHighlightSpanInText } from "./pass4-comments";
 import type { Grading } from "./examiner/types";
 
 describe("generatePass4Comments", () => {
@@ -388,5 +388,43 @@ Paragraph 5: In the long run, once consumers switch to domestic goods, the trade
     const analysisComment = comments.find((c) => c.category === "analysis");
     expect(analysisComment).toBeDefined();
     expect(analysisComment?.paragraphLabel).toBe("¶ Paragraph 3");
+  });
+});
+
+describe("findHighlightSpanInText", () => {
+  const paragraph =
+    "A maximum price is a legally set price ceiling below the market equilibrium. This causes demand to exceed supply, creating a chronic market shortage. Consequently, informal black markets may emerge where goods are traded above legal limits.";
+
+  it("finds exact sentence matches cleanly without altering paragraph text", () => {
+    const query = "This causes demand to exceed supply, creating a chronic market shortage.";
+    const span = findHighlightSpanInText(paragraph, query);
+    expect(span.match).toBe(query);
+    expect(span.before + span.match + span.after).toBe(paragraph);
+  });
+
+  it("handles stripped quotes and trailing ellipses without failing", () => {
+    const queryWithEllipsis = '"This causes demand to exceed supply, creating a chronic market shortage..."';
+    const span = findHighlightSpanInText(paragraph, queryWithEllipsis);
+    expect(span.match).toContain("This causes demand to exceed supply");
+    expect(span.before + span.match + span.after).toBe(paragraph);
+  });
+
+  it("handles whitespace and case differences", () => {
+    const queryDiff = "CONSEQUENTLY,  informal black markets may emerge";
+    const span = findHighlightSpanInText(paragraph, queryDiff);
+    expect(span.match.toLowerCase()).toContain("informal black markets");
+    expect(span.before + span.match + span.after).toBe(paragraph);
+  });
+
+  it("falls back to highest sentence overlap when query is paraphrased", () => {
+    const paraphrased = "informal underground black markets flourish above ceilings";
+    const span = findHighlightSpanInText(paragraph, paraphrased);
+    expect(span.match).toContain("informal black markets may emerge");
+    expect(span.before + span.match + span.after).toBe(paragraph);
+  });
+
+  it("always preserves 100% of paragraph text even for empty or mismatched query", () => {
+    const span = findHighlightSpanInText(paragraph, "completely unrelated string 123456789");
+    expect(span.before + span.match + span.after).toBe(paragraph);
   });
 });
