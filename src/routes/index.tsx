@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, type PublicSettings } from "@/lib/site-settings";
-import { cn } from "@/lib/utils";
+import { cn, copyTextToClipboard } from "@/lib/utils";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
@@ -430,21 +430,25 @@ function Index() {
   const shareUrl = `${shareOrigin}${invitedBy ? `?ref=${encodeURIComponent(invitedBy)}` : ""}`;
   const shareMessage = `Hey! I'm using Marginalite for Cambridge IGCSE Economics (0455). It gives real-time Essay Grader coaching, breaks down essays into AO1/AO2/AO3 marks grounded in official Cambridge mark schemes, and offers full MCQ past paper practice with resume. Grade unlimited essays free:\n${shareUrl}`;
 
-  const handleCopyLink = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
+  const handleCopyLink = async () => {
+    const ok = await copyTextToClipboard(shareUrl);
+    if (ok) {
       setCopiedLink(true);
       toast.success("Invite link copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 2000);
+    } else {
+      toast.error("Could not copy link to clipboard.");
     }
   };
 
-  const handleCopyMessage = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(shareMessage);
+  const handleCopyMessage = async () => {
+    const ok = await copyTextToClipboard(shareMessage);
+    if (ok) {
       setCopiedMessage(true);
       toast.success("Study group message copied to clipboard!");
       setTimeout(() => setCopiedMessage(false), 2000);
+    } else {
+      toast.error("Could not copy message to clipboard.");
     }
   };
 

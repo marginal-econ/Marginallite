@@ -42,7 +42,7 @@ import {
   type QuizSourceType,
 } from "@/lib/mcq-quiz.types";
 import { TOPICAL_MCQ_PAPERS } from "@/lib/topical-mcq-papers";
-import { cn } from "@/lib/utils";
+import { cn, copyTextToClipboard } from "@/lib/utils";
 
 export type HostablePaperSummary = {
   id: string;
@@ -300,7 +300,7 @@ export function McqQuizHostModal({
       const res = await createQuizFn({ data: payload });
       const shareUrl = `${window.location.origin}/quiz/${res.pin}`;
       try {
-        await navigator.clipboard.writeText(shareUrl);
+        await copyTextToClipboard(shareUrl);
         toast.success(`Live Quiz PIN ${formatQuizPin(res.pin)} created — invite link copied!`);
       } catch {
         toast.success(`Live Quiz PIN ${formatQuizPin(res.pin)} created!`);

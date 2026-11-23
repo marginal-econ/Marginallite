@@ -189,7 +189,7 @@ function RootShell({ children }: { children: ReactNode }) {
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem("marginal-theme");document.documentElement.classList.toggle("dark",s!=="light")}catch(e){document.documentElement.classList.add("dark")}document.documentElement.classList.add("motion-ready")})()`,
+            __html: `(function(){try{var s=localStorage.getItem("marginal-theme");document.documentElement.classList.toggle("dark",s!=="light")}catch(e){document.documentElement.classList.add("dark")}document.documentElement.classList.add("motion-ready");try{if(typeof window!=="undefined"&&window.crypto&&!window.crypto.randomUUID){window.crypto.randomUUID=function(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==="x"?r:(r&0x3|0x8);return v.toString(16);});};}}catch(e){}})()`,
           }}
         />
       </head>

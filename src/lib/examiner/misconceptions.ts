@@ -25,7 +25,8 @@ export function detectExplicitMisconceptions(essayText: string): DetectedMisconc
   const detected: DetectedMisconception[] = [];
   const sentences = essayText
     .replace(/\n+/g, " ")
-    .split(/(?<=[.?!])\s+/)
+    .replace(/([.?!])\s+/g, "$1\0")
+    .split("\0")
     .map((s) => s.trim())
     .filter((s) => s.length > 10);
 

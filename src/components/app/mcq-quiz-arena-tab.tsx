@@ -26,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { deleteMcqQuiz, listMyHostedQuizzes } from "@/lib/mcq-quiz.functions";
 import { formatQuizPin, normalizeQuizPin } from "@/lib/mcq-quiz.types";
-import { cn } from "@/lib/utils";
+import { cn, copyTextToClipboard } from "@/lib/utils";
 
 export function McqQuizArenaTab({
   onOpenHostModal,
@@ -60,7 +60,7 @@ export function McqQuizArenaTab({
   async function handleCopyLink(pin: string) {
     const url = `${window.location.origin}/quiz/${pin}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await copyTextToClipboard(url);
       toast.success(`Quiz link copied! PIN: ${formatQuizPin(pin)}`);
     } catch {
       toast.info(`Share link: ${url}`);

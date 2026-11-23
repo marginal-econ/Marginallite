@@ -20,10 +20,15 @@ export function useReveal<T extends HTMLElement>(options?: { rootMargin?: string
       return;
     }
 
+    // Cross-browser safety net: guarantees content becomes visible after 1.2s
+    // even if Safari / WebKit or mobile low-power mode delays or drops IO callbacks.
+    const timer = window.setTimeout(reveal, 1200);
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
+            window.clearTimeout(timer);
             reveal();
             observer.disconnect();
           }
@@ -33,7 +38,10 @@ export function useReveal<T extends HTMLElement>(options?: { rootMargin?: string
     );
 
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
   }, [options?.rootMargin]);
 
   return ref;

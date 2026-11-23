@@ -23,12 +23,14 @@ export function splitSentences(text: string): string[] {
   protectedText = protectedText.replace(/\b(e\.g|i\.e|etc|approx|vs)\.\s+/gi, (match) => {
     return match.replace(/\./g, "\u2062");
   });
-  protectedText = protectedText.replace(/(?:^|(?<=\n|\s))([0-9]+|[IVXLCDMivxlcdm]+|[A-Za-z])\.\s+/g, (match) => {
+  // Cross-browser safe regex without lookbehinds (compatible with Safari/WebKit on iOS & older macOS)
+  protectedText = protectedText.replace(/(^|[\n\s])([0-9]+|[IVXLCDMivxlcdm]+|[A-Za-z])\.\s+/g, (match) => {
     return match.replace(/\./g, "\u2062");
   });
 
   const rough = protectedText
-    .split(/(?<=[.!?])\s+|\n+/g)
+    .replace(/([.!?])\s+|\n+/g, (_match, punct) => (punct ? `${punct}\0` : "\0"))
+    .split("\0")
     .map((sentence) => sentence.replace(/\u2062/g, ".").trim())
     .filter(Boolean);
 

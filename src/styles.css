@@ -2370,3 +2370,22 @@ html.theme-shifting * {
 
 
 
+
+/* Mobile & tablet viewport ergonomics: prevent iOS Safari & iPadOS auto-zoom on input focus */
+@media screen and (max-width: 840px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS & iPadOS smooth momentum scrolling */
+@supports (-webkit-overflow-scrolling: touch) {
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto,
+  [data-radix-scroll-area-viewport] {
+    -webkit-overflow-scrolling: touch;
+  }
+}

@@ -60,7 +60,10 @@ export function formatEconomicsMathText(text: unknown): string {
   if (typeof text !== "string" || !text) return "";
   let s = text;
 
-  // 1. Common LaTeX commands
+  // 1. Display math blocks $$...$$
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => inner.trim());
+
+  // 2. Common LaTeX commands
   s = s.replace(/\\text\{([^}]+)\}/g, "$1");
   s = s.replace(/\\mathrm\{([^}]+)\}/g, "$1");
   s = s.replace(/\\mathbf\{([^}]+)\}/g, "$1");
@@ -78,29 +81,31 @@ export function formatEconomicsMathText(text: unknown): string {
   s = s.replace(/\\leftarrow\b/g, "←");
   s = s.replace(/\\%/g, "%");
 
-  // 2. Subscripts inside dollar signs or parentheses or standalone:
+  // 3. Subscripts inside dollar signs or parentheses or standalone:
   // e.g. ($P_x$) -> (Pₓ), $P_{x}$ -> Pₓ, $Q_1$ -> Q₁, $AD_1$ -> AD₁
   s = s.replace(/\(\$([A-Za-z]+)_\{?([A-Za-z0-9]+)\}?\$\)/g, (_, v, sub) => `(${v}${toSubscript(sub)})`);
   s = s.replace(/\$([A-Za-z]+)_\{?([A-Za-z0-9]+)\}?\$/g, (_, v, sub) => `${v}${toSubscript(sub)}`);
 
-  // 3. Subscripts outside dollar signs on economic variables:
+  // 4. Subscripts outside dollar signs on economic variables:
   // e.g. P_x, P_m, Q_1, Q_2, AD_1, AS_1, SRAS_1, LRAS_1, MSB_1, Y_1, etc.
   s = s.replace(/\b([A-Za-z]{1,4})_\{?([A-Za-z0-9]+)\}?\b/g, (_, v, sub) => `${v}${toSubscript(sub)}`);
 
-  // 4. Unwrap math expressions inside $...$
+  // 5. Unwrap math expressions inside $...$
   // Math expressions start with a letter, Greek/operator symbol, or parenthesis (never digits like currency $100)
-  s = s.replace(/\$([A-Za-zΔ×·÷≤≥≠≈→←\\(][^$\n]{0,100}?)\$/g, (match, inner) => {
+  s = s.replace(/\$([A-Za-zΔ×·÷≤≥≠≈→←\\(][^$\n]{0,120}?)\$/g, (match, inner) => {
     // If it looks like currency (e.g. "$10 to $20"), don't match
     if (/\$\d/.test(inner)) return match;
     // Format inner subscripts if any remain
-    const formatted = inner.replace(/\b([A-Za-z]{1,4})_\{?([A-Za-z0-9]+)\}?\b/g, (_, v, sub) => `${v}${toSubscript(sub)}`);
+    const formatted = inner.replace(/\b([A-Za-z]{1,4})_\{?([A-Za-z0-9]+)\}?\b/g, (_: string, v: string, sub: string) => `${v}${toSubscript(sub)}`);
     return formatted.trim();
   });
 
-  // 5. Clean up any remaining stray math dollar signs wrapping single tokens or parenthesized tokens
+  // 6. Clean up any remaining stray math dollar signs wrapping single tokens or parenthesized tokens
   // e.g. $(P_x)$ -> (Pₓ), $(AD)$ -> (AD), $(X-M)$ -> (X-M), ($P$) -> (P)
   s = s.replace(/\$\(([^)]+)\)\$/g, "($1)");
   s = s.replace(/\(\$([^$]+)\$\)/g, "($1)");
+  s = s.replace(/\$([A-Za-z])/g, "$1");
+  s = s.replace(/([A-Za-z])\$/g, "$1");
 
   return s;
 }
@@ -124,7 +129,7 @@ export function cleanMathDollarSigns(text: unknown): string {
     return `(${cleaned.trim()})`;
   });
   // 4. Unwrap math expressions in $...$
-  s = s.replace(/\$([A-Za-z\u0394][^$\n]*?)\$/g, (match, inner) => {
+  s = s.replace(/\$([A-Za-zΔ][^$\n]*?)\$/g, (match, inner) => {
     if (/^\d/.test(inner.trim())) return match;
     const cleaned = inner.replace(/_([A-Za-z0-9]+)/g, "$1");
     return cleaned.trim();
@@ -202,9 +207,14 @@ export function autoParagraphText(text: unknown): string {
   }
 
   // 1. First attempt: Split at Cambridge discourse & transition markers that follow sentence endings (.!?)
-  const transitionPattern = /(?<=[.!?])\s+(?=(?:However|In contrast|Conversely|On the other hand|Furthermore|Moreover|In addition|Additionally|Alternatively|Secondly|Thirdly|Finally|In evaluation|To evaluate|In conclusion|Overall|Ultimately|Consequently|Therefore|From an evaluative standpoint|Examining this policy|With regard to|With regards to|Turning to|A government can|Monetary policy|Fiscal policy|Supply-side policy)\b)/i;
+  // Avoid RegExp lookbehinds for broad browser compatibility (older Safari/WebKit & iPads)
+  const transitionPattern = /([.!?])\s+(?=(?:However|In contrast|Conversely|On the other hand|Furthermore|Moreover|In addition|Additionally|Alternatively|Secondly|Thirdly|Finally|In evaluation|To evaluate|In conclusion|Overall|Ultimately|Consequently|Therefore|From an evaluative standpoint|Examining this policy|With regard to|With regards to|Turning to|A government can|Monetary policy|Fiscal policy|Supply-side policy)\b)/gi;
 
-  const splitByTransitions = raw.split(transitionPattern).map((p) => p.trim()).filter(Boolean);
+  const splitByTransitions = raw
+    .replace(transitionPattern, "$1\n\n")
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   if (splitByTransitions.length >= 2) {
     return splitByTransitions.join("\n\n");
@@ -241,4 +251,65 @@ export function autoParagraphText(text: unknown): string {
   }
 
   return paragraphs.length >= 2 ? paragraphs.join("\n\n") : raw;
+}
+
+/**
+ * Universal cross-browser clipboard copy with fallback.
+ * Reliable on Safari (iOS / iPadOS / macOS), Firefox, Chrome, Edge, and webviews.
+ */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fallback to execCommand below */
+  }
+
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    textArea.style.opacity = "0";
+    textArea.setAttribute("readonly", "");
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, textArea.value.length);
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Universal UUID generator with fallback for Safari iOS, macOS Monterey/Big Sur,
+ * and insecure/local IP network contexts.
+ */
+export function safeRandomUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Fallback below
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }

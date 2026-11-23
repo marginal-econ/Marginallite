@@ -459,9 +459,10 @@ function extractBestHighlightSentence(
 ): string {
   if (!paraText.trim()) return "";
 
-  // Split into sentences using punctuation delimiters while preserving text
+  // Split into sentences using punctuation delimiters without lookbehinds (compatible with Safari/WebKit)
   const rawSentences = paraText
-    .split(/(?<=[.!?])\s+/)
+    .replace(/([.!?])\s+/g, "$1\0")
+    .split("\0")
     .map((s) => s.trim())
     .filter((s) => s.length >= 6);
 
@@ -578,7 +579,8 @@ export function findHighlightSpanInText(
     if (m && m.index !== undefined) {
       const start = m.index;
       const rest = rawPara.slice(start);
-      const sentenceEnd = rest.search(/(?<=[.!?])\s+|$/);
+      const punctMatch = rest.match(/[.!?](?:\s+|$)/);
+      const sentenceEnd = punctMatch && punctMatch.index !== undefined ? punctMatch.index + 1 : rest.length;
       const end =
         sentenceEnd !== -1 && sentenceEnd >= m[0].length
           ? start + sentenceEnd
@@ -591,9 +593,10 @@ export function findHighlightSpanInText(
     }
   }
 
-  // 5. Best sentence overlap: split paragraph into sentences and find highest token overlap
+  // 5. Best sentence overlap: split paragraph into sentences and find highest token overlap (no lookbehinds)
   const sentences = rawPara
-    .split(/(?<=[.!?])\s+/)
+    .replace(/([.!?])\s+/g, "$1\0")
+    .split("\0")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
