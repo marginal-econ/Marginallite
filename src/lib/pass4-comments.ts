@@ -159,24 +159,51 @@ export interface ParagraphBlock {
 }
 
 /**
- * Robust detection of inline diagram blocks (e.g. [DIAGRAM: ...], (Diagram: ...)).
+ * Robust detection of standalone inline diagram blocks (e.g. [DIAGRAM: ...], (Diagram: ...)).
+ * A text block is ONLY a diagram block if it is primarily a diagram tag, not a normal
+ * paragraph that happens to reference a diagram in passing.
  */
 export function isDiagramBlock(
   text: string,
   diagramMatches: { matchText: string }[] = [],
 ): boolean {
   const t = text.trim();
-  if (/^\[\s*(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:/i.test(t)) return true;
-  if (/^\(\s*(?:Diagram|Figure|Fig|Graph)\s*:/i.test(t)) return true;
+  if (t.length === 0) return false;
+
+  // Standalone square bracket diagram tag: e.g. [DIAGRAM: Maximum Price], [FIGURE 1: LRAS]
+  if (/^\[\s*(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:[^\]]+\]$/i.test(t)) return true;
+  // Standalone parenthesis diagram tag: e.g. (Diagram: Maximum Price), (Figure: J-Curve)
+  if (/^\(\s*(?:Diagram|Figure|Fig|Graph)\s*:[^)]+\)$/i.test(t)) return true;
+  // Short standalone bracket with explicit diagram words: e.g. (Maximum Price Diagram)
   if (/^\([^)]{3,80}\)$/.test(t) && /\b(?:diagram|curve|equilibrium|shortage|surplus|ppc|ppf)\b/i.test(t)) return true;
-  if (diagramMatches.some((m) => t.includes(m.matchText) || m.matchText.includes(t))) return true;
+
+  // Exact match against detected diagram tags
+  if (
+    diagramMatches.some((m) => {
+      const mt = m.matchText.trim();
+      return (
+        t === mt ||
+        t.toLowerCase() === mt.toLowerCase() ||
+        t === mt.replace(/^[(\[]|[)\]]$/g, "").trim()
+      );
+    })
+  ) {
+    return true;
+  }
+
+  // If the text has multiple sentences or is long (>120 chars), it is a text paragraph, NOT a diagram block
+  if (t.length > 120 || /[.!?]\s+[A-Z]/.test(t)) {
+    return false;
+  }
+
   return false;
 }
 
 /**
  * Splits essay text into discrete paragraph blocks with unified indexing and syllabus labels.
- * Guarantees that diagram labels (e.g. "Diagram (after ¶2)") reflect actual preceding text paragraphs,
- * eliminating phantom numbering.
+ * Handles both double-newline (\n\n) and single-newline paragraph breaks cleanly,
+ * and ensures standalone diagram lines are isolated into discrete blocks without corrupting
+ * surrounding text paragraph counts.
  */
 export function parseParagraphBlocks(
   essayText: string,
@@ -184,10 +211,26 @@ export function parseParagraphBlocks(
 ): ParagraphBlock[] {
   if (!essayText.trim()) return [];
 
-  const rawChunks = essayText
-    .split(/\n\s*\n/)
+  const normalized = essayText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+
+  // Ensure diagram tags on their own line are isolated by double-newlines
+  const diagramDelimited = normalized.replace(
+    /(^|\n)\s*(\[(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:[^\]]+\]|\((?:Diagram|Figure|Fig|Graph)\s*:[^)]+\))\s*($|\n)/gi,
+    "\n\n$2\n\n",
+  );
+
+  let rawChunks = diagramDelimited
+    .split(/\n\s*\n+/)
     .map((chunk) => chunk.trim())
     .filter((chunk) => chunk.length > 0);
+
+  // If user used single newlines without blank lines, split by single newline if chunks <= 1
+  if (rawChunks.length <= 1 && normalized.split(/\n+/).filter((l) => l.trim().length > 0).length > 1) {
+    rawChunks = normalized
+      .split(/\n+/)
+      .map((chunk) => chunk.trim())
+      .filter((chunk) => chunk.length > 0);
+  }
 
   let textCounter = 0;
   return rawChunks.map((text, index) => {
@@ -203,7 +246,10 @@ export function parseParagraphBlocks(
       };
     } else {
       const matchingDiag = diagramMatches.find(
-        (m) => text.includes(m.matchText) || m.matchText.includes(text),
+        (m) =>
+          text.includes(m.matchText) ||
+          m.matchText.includes(text) ||
+          text.toLowerCase().includes(m.title.toLowerCase()),
       );
       return {
         index,
@@ -215,6 +261,255 @@ export function parseParagraphBlocks(
       };
     }
   });
+}
+
+/**
+ * Common English and general evaluation stopwords that should not count
+ * toward specific economic topic keyword matching.
+ */
+const STOP_WORDS = new Set([
+  "the", "and", "for", "that", "this", "with", "from", "have", "been",
+  "would", "could", "should", "also", "some", "more", "most", "than",
+  "their", "they", "then", "them", "into", "over", "such", "only", "very",
+  "much", "each", "which", "what", "when", "where", "candidate", "lacks",
+  "lacking", "weakness", "requires", "needed", "needs", "mark", "marks",
+  "level", "credit", "comment", "response", "answer", "essay", "point",
+  "points", "discussion", "explanation", "explain", "analyse", "analyze",
+  "analysis", "evaluate", "evaluation", "knowledge", "well", "good", "poor",
+  "does", "not", "show", "shows", "about", "there", "these", "those",
+  "give", "gives", "given", "using", "uses", "used", "make", "makes",
+  "made", "state", "states", "stated", "detail", "details", "briefly",
+  "clear", "clearly", "further", "order", "push", "toward", "full",
+]);
+
+/**
+ * Extracts high-information economic keywords and bigrams from diagnostic feedback text.
+ */
+function extractDiagnosticKeywords(text: string): { words: string[]; phrases: string[] } {
+  const clean = text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ");
+  const rawWords = clean.split(/\s+/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+
+  // Extract key 2-word collocations (e.g. "price ceiling", "black market", "deadweight loss")
+  const tokens = clean.split(/\s+/).filter(Boolean);
+  const phrases: string[] = [];
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const w1 = tokens[i];
+    const w2 = tokens[i + 1];
+    if (w1.length >= 3 && w2.length >= 3 && !STOP_WORDS.has(w1) && !STOP_WORDS.has(w2)) {
+      phrases.push(`${w1} ${w2}`);
+    }
+  }
+
+  return { words: Array.from(new Set(rawWords)), phrases: Array.from(new Set(phrases)) };
+}
+
+/**
+ * Checks for explicit examiner paragraph references (e.g. "in paragraph 3", "the second paragraph", "conclusion").
+ */
+function findExplicitParagraphIndex(
+  diagnosticText: string,
+  textBlocks: ParagraphBlock[],
+): ParagraphBlock | null {
+  if (textBlocks.length === 0) return null;
+  const lower = diagnosticText.toLowerCase();
+
+  // Explicit number: paragraph 1, paragraph 2, paragraph 3, etc.
+  const numMatch = lower.match(/\b(?:paragraph|para|¶)\s*([1-9]\d?)\b/i);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    const target = textBlocks.find((b) => b.textParagraphNumber === num);
+    if (target) return target;
+  }
+
+  // Ordinal word references
+  if (/\b(?:the\s+)?(?:first|1st|opening|introductory)\s+paragraph\b/i.test(lower)) {
+    return textBlocks[0];
+  }
+  if (/\b(?:the\s+)?(?:second|2nd)\s+paragraph\b/i.test(lower)) {
+    return textBlocks[1] || textBlocks[0];
+  }
+  if (/\b(?:the\s+)?(?:third|3rd)\s+paragraph\b/i.test(lower)) {
+    return textBlocks[2] || textBlocks[textBlocks.length - 1];
+  }
+  if (/\b(?:the\s+)?(?:fourth|4th)\s+paragraph\b/i.test(lower)) {
+    return textBlocks[3] || textBlocks[textBlocks.length - 1];
+  }
+  if (/\b(?:the\s+)?(?:fifth|5th)\s+paragraph\b/i.test(lower)) {
+    return textBlocks[4] || textBlocks[textBlocks.length - 1];
+  }
+  if (/\b(?:concluding\s+paragraph|final\s+paragraph|last\s+paragraph|in\s+conclusion)\b/i.test(lower)) {
+    return textBlocks[textBlocks.length - 1];
+  }
+
+  return null;
+}
+
+/**
+ * Robustly matches an examiner diagnostic / weakness comment to the most accurate
+ * paragraph block in the candidate manuscript, calibrated against Cambridge syllabus categories.
+ */
+function findBestMatchingParagraphBlock(
+  diagnosticText: string,
+  category: "diagram" | "analysis" | "evaluation" | "knowledge",
+  allBlocks: ParagraphBlock[],
+  usedBlockIndices: Set<number>,
+): ParagraphBlock {
+  const textBlocks = allBlocks.filter((b) => !b.isDiagram);
+  if (textBlocks.length === 0) {
+    return allBlocks[0] || {
+      index: 0,
+      text: "",
+      isDiagram: false,
+      textParagraphNumber: 1,
+      label: "¶ Paragraph 1",
+    };
+  }
+
+  // 1. Direct explicit reference check
+  const explicit = findExplicitParagraphIndex(diagnosticText, textBlocks);
+  if (explicit) return explicit;
+
+  // 2. Extract keywords and bigram phrases
+  const { words, phrases } = extractDiagnosticKeywords(diagnosticText);
+
+  // 3. Score each candidate text paragraph
+  let bestBlock = textBlocks[0];
+  let highestScore = -Infinity;
+
+  textBlocks.forEach((block, idx) => {
+    let score = 0;
+    const lowerPara = block.text.toLowerCase();
+
+    // Phrase matches: +12 points each
+    for (const phrase of phrases) {
+      if (lowerPara.includes(phrase)) {
+        score += 12;
+      }
+    }
+
+    // Keyword matches: +3 points each
+    for (const word of words) {
+      if (lowerPara.includes(word)) {
+        score += 3;
+      }
+    }
+
+    // Category-specific calibration
+    if (category === "evaluation") {
+      // Evaluative markers: "however", "depends on", "in conclusion", "short run vs long run", etc.
+      const hasEvalMarker =
+        /\b(?:however|on the other hand|in contrast|nevertheless|alternatively|depends?\s+(?:on|upon)|short[\s-]run|long[\s-]run|in conclusion|overall|weighing|on balance|to what extent)\b/i.test(
+          lowerPara,
+        );
+      if (hasEvalMarker) score += 10;
+      // Evaluation is naturally in latter half of essay
+      if (idx >= Math.floor(textBlocks.length / 2)) score += 4;
+      // If starts with "however" or "in conclusion", extra confidence
+      if (/^(?:however|on the other hand|in conclusion|overall)/i.test(block.text.trim())) score += 8;
+    } else if (category === "analysis") {
+      // Causal transmission markers: "leads to", "consequently", "causes", "therefore", "shifts"
+      const hasCausalMarker =
+        /\b(?:leads?\s+to|causes?|consequently|therefore|as a result|shifts?|creates?|results?\s+in|transmission|contracts?|extends?|multiplier)\b/i.test(
+          lowerPara,
+        );
+      if (hasCausalMarker) score += 6;
+      // Analytical body paragraphs are typically ¶2 and later, but not the final conclusion paragraph
+      if (idx >= 1 && idx < textBlocks.length - 1) score += 5;
+      // Slight deduction for introductory definition paragraph
+      if (idx === 0) score -= 6;
+    } else if (category === "knowledge") {
+      // General definitions are usually in opening paragraph unless a specific term matched later
+      if (idx === 0 && score === 0) score += 6;
+    } else if (category === "diagram") {
+      // For diagram omission: paragraph discussing equilibrium, shifts, curves, or market mechanisms
+      if (
+        /\b(?:equilibrium|supply|demand|curve|shift|shortage|surplus|price|quantity|deadweight|cost|revenue|output|gdp)\b/i.test(
+          lowerPara,
+        )
+      ) {
+        score += 8;
+      }
+      if (idx >= 1) score += 4;
+    }
+
+    // Collision avoidance: if another comment already targeted this paragraph,
+    // apply a minor penalty to encourage diverse annotations across the essay,
+    // but allow it if keyword score is substantially higher
+    if (usedBlockIndices.has(block.index)) {
+      score -= 8;
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestBlock = block;
+    }
+  });
+
+  return bestBlock;
+}
+
+/**
+ * Extracts the single most relevant sentence inside the targeted paragraph
+ * to quote on the Pass 4 card and highlight in the manuscript.
+ */
+function extractBestHighlightSentence(
+  paraText: string,
+  diagnosticText: string,
+  category: "diagram" | "analysis" | "evaluation" | "knowledge",
+): string {
+  if (!paraText.trim()) return "";
+
+  // Split into sentences using punctuation delimiters while preserving text
+  const rawSentences = paraText
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 8);
+
+  if (rawSentences.length <= 1) {
+    const single = (rawSentences[0] || paraText).trim();
+    return single.length > 140 ? `${single.slice(0, 137)}…` : single;
+  }
+
+  const { words, phrases } = extractDiagnosticKeywords(diagnosticText);
+  let bestSentence = rawSentences[0];
+  let highestScore = -Infinity;
+
+  rawSentences.forEach((sentence) => {
+    let score = 0;
+    const lower = sentence.toLowerCase();
+
+    // Phrase matches
+    for (const phrase of phrases) {
+      if (lower.includes(phrase)) score += 10;
+    }
+
+    // Word matches
+    for (const word of words) {
+      if (lower.includes(word)) score += 3;
+    }
+
+    // Category clues
+    if (category === "evaluation") {
+      if (/^(?:however|on the other hand|in conclusion|overall|nevertheless|in contrast)/i.test(sentence)) {
+        score += 8;
+      }
+      if (/\b(?:depends?\s+(?:on|upon)|short[\s-]run|long[\s-]run|weigh|trade-off)\b/i.test(lower)) {
+        score += 6;
+      }
+    } else if (category === "analysis") {
+      if (/\b(?:leads?\s+to|causes?|consequently|therefore|as a result|shifts?|transmission)\b/i.test(lower)) {
+        score += 6;
+      }
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestSentence = sentence;
+    }
+  });
+
+  const trimmed = bestSentence.trim();
+  return trimmed.length > 140 ? `${trimmed.slice(0, 137)}…` : trimmed;
 }
 
 /**
@@ -236,6 +531,8 @@ export function generatePass4Comments(
 
   // Track weakness texts already mapped to prevent duplicate diagnostics across categories
   const usedWeaknessTexts = new Set<string>();
+  // Track block indices already targeted by a comment to disperse annotations
+  const usedBlockIndices = new Set<number>();
 
   // Full marks check (12/12, 20/20, 8/8)
   const isFullMarks = (grading.total_mark ?? 0) >= (grading.max_mark ?? 12);
@@ -260,7 +557,11 @@ export function generatePass4Comments(
     diagramMatches.forEach((m, idx) => {
       // Find the specific block where this diagram sits
       let targetBlock = blocks.find(
-        (b) => b.isDiagram && (b.text.includes(m.matchText) || m.matchText.includes(b.text)),
+        (b) =>
+          b.isDiagram &&
+          (b.text.includes(m.matchText) ||
+            m.matchText.includes(b.text) ||
+            b.text.toLowerCase().includes(m.title.toLowerCase())),
       );
       if (!targetBlock) {
         targetBlock = blocks.find((b) => b.text.includes(m.matchText));
@@ -271,6 +572,7 @@ export function generatePass4Comments(
 
       const targetIndex = targetBlock ? targetBlock.index : 0;
       const targetLabel = targetBlock ? targetBlock.label : "Diagram";
+      usedBlockIndices.add(targetIndex);
       const nextBlock = blocks[targetIndex + 1];
 
       // Check whether subsequent analysis explains this diagram
@@ -321,15 +623,21 @@ export function generatePass4Comments(
     });
   } else {
     // If no diagram was included at all, highlight where a diagram should be integrated
-    const targetBlock =
-      blocks.find((b) => !b.isDiagram && b.textParagraphNumber === 2) ||
-      blocks.find((b) => !b.isDiagram) ||
-      blocks[0];
+    const targetBlock = findBestMatchingParagraphBlock(
+      "diagram curves shifts market equilibrium transmission mechanism",
+      "diagram",
+      blocks,
+      usedBlockIndices,
+    );
 
     const targetIndex = targetBlock ? targetBlock.index : 0;
     const targetLabel = targetBlock ? targetBlock.label : "¶ Paragraph 1";
-    const paraText = targetBlock?.text || "";
-    const firstSentence = paraText.split(/[.!?]\s+/)[0] || paraText.slice(0, 80);
+    usedBlockIndices.add(targetIndex);
+    const firstSentence = extractBestHighlightSentence(
+      targetBlock?.text || "",
+      "diagram equilibrium curves shift",
+      "diagram",
+    );
 
     comments.push({
       id: "pass4-diagram-missing",
@@ -361,36 +669,17 @@ export function generatePass4Comments(
   if (analysisWeakness) {
     usedWeaknessTexts.add(analysisWeakness);
 
-    // Identify best matching analytical non-diagram paragraph
-    let bestBlock = blocks.find(
-      (b) =>
-        !b.isDiagram &&
-        b.textParagraphNumber !== 1 &&
-        b.index !== blocks.length - 1 &&
-        (b.text.toLowerCase().includes("because") ||
-          b.text.toLowerCase().includes("leads to") ||
-          b.text.toLowerCase().includes("consequently") ||
-          b.text.toLowerCase().includes("shifts") ||
-          b.text.toLowerCase().includes("demand") ||
-          b.text.toLowerCase().includes("supply") ||
-          b.text.toLowerCase().includes("interest rate") ||
-          b.text.toLowerCase().includes("spending") ||
-          b.text.toLowerCase().includes("tax") ||
-          b.text.toLowerCase().includes("depreciation") ||
-          b.text.toLowerCase().includes("inflation")),
+    const bestBlock = findBestMatchingParagraphBlock(
+      analysisWeakness,
+      "analysis",
+      blocks,
+      usedBlockIndices,
     );
-
-    if (!bestBlock) {
-      bestBlock =
-        blocks.find((b) => !b.isDiagram && (b.textParagraphNumber ?? 0) >= 2) ||
-        blocks.find((b) => !b.isDiagram) ||
-        blocks[0];
-    }
 
     const targetIndex = bestBlock.index;
     const targetLabel = bestBlock.label;
-    const paraText = bestBlock.text;
-    const firstSentence = paraText.split(/[.!?]\s+/)[0] || paraText.slice(0, 90);
+    usedBlockIndices.add(targetIndex);
+    const highlightSentence = extractBestHighlightSentence(bestBlock.text, analysisWeakness, "analysis");
 
     const rawSuggestion =
       grading.actionable_feedback?.find((f) => /chain|reasoning|transmission|mechanism/i.test(f)) ||
@@ -404,7 +693,7 @@ export function generatePass4Comments(
       color: isFullMarks ? "sky" : "amber",
       paragraphIndex: targetIndex,
       paragraphLabel: targetLabel,
-      highlightText: firstSentence,
+      highlightText: highlightSentence,
       critique: stripScoreFractionsFromText(stripStars(analysisWeakness)),
       suggestion: stripScoreFractionsFromText(stripStars(formatSuggestion(rawSuggestion, "Consider detailing secondary economic feedbacks (e.g. wage pressures or capacity limits)."))),
     });
@@ -429,28 +718,17 @@ export function generatePass4Comments(
   if (evalWeakness && blocks.filter((b) => !b.isDiagram).length >= 2) {
     usedWeaknessTexts.add(evalWeakness);
 
-    // Identify evaluative non-diagram paragraph
-    let evalBlock = blocks
-      .slice()
-      .reverse()
-      .find(
-        (b) =>
-          !b.isDiagram &&
-          (b.text.toLowerCase().startsWith("however") ||
-            b.text.toLowerCase().startsWith("on the other hand") ||
-            b.text.toLowerCase().startsWith("in conclusion") ||
-            b.text.toLowerCase().startsWith("overall") ||
-            b.text.toLowerCase().includes("depends on")),
-      );
-
-    if (!evalBlock) {
-      evalBlock = blocks.slice().reverse().find((b) => !b.isDiagram) || blocks[blocks.length - 1];
-    }
+    const evalBlock = findBestMatchingParagraphBlock(
+      evalWeakness,
+      "evaluation",
+      blocks,
+      usedBlockIndices,
+    );
 
     const targetIndex = evalBlock.index;
     const targetLabel = evalBlock.label;
-    const paraText = evalBlock.text;
-    const firstSentence = paraText.split(/[.!?]\s+/)[0] || paraText.slice(0, 90);
+    usedBlockIndices.add(targetIndex);
+    const highlightSentence = extractBestHighlightSentence(evalBlock.text, evalWeakness, "evaluation");
 
     const rawSuggestion =
       grading.actionable_feedback?.find((f) => /evaluat|weigh|criterion|conclusion/i.test(f)) ||
@@ -464,7 +742,7 @@ export function generatePass4Comments(
       color: isFullMarks ? "emerald" : "sky",
       paragraphIndex: targetIndex,
       paragraphLabel: targetLabel,
-      highlightText: firstSentence,
+      highlightText: highlightSentence,
       critique: stripScoreFractionsFromText(stripStars(evalWeakness)),
       suggestion: stripScoreFractionsFromText(stripStars(formatSuggestion(rawSuggestion, "Explicitly weigh competing viewpoints against a defined economic criterion (e.g. time frame or elasticity bounds)."))),
     });
@@ -493,31 +771,17 @@ export function generatePass4Comments(
   if (knowledgeWeakness) {
     usedWeaknessTexts.add(knowledgeWeakness);
 
-    // Locate matching non-diagram paragraph that actually mentions the concept or default to paragraph 1
-    let knowledgeBlock = blocks.find((b) => !b.isDiagram && b.textParagraphNumber === 1);
-    const lowerWeakness = knowledgeWeakness.toLowerCase();
-    for (const b of blocks) {
-      if (b.isDiagram) continue;
-      const pText = b.text.toLowerCase();
-      if (
-        (lowerWeakness.includes("exchange rate") && pText.includes("exchange rate")) ||
-        (lowerWeakness.includes("inflation") && pText.includes("inflation")) ||
-        (lowerWeakness.includes("elasticity") && pText.includes("elasticity")) ||
-        (lowerWeakness.includes("balance of payments") && pText.includes("balance of payments"))
-      ) {
-        knowledgeBlock = b;
-        break;
-      }
-    }
-
-    if (!knowledgeBlock) {
-      knowledgeBlock = blocks.find((b) => !b.isDiagram) || blocks[0];
-    }
+    const knowledgeBlock = findBestMatchingParagraphBlock(
+      knowledgeWeakness,
+      "knowledge",
+      blocks,
+      usedBlockIndices,
+    );
 
     const targetIndex = knowledgeBlock.index;
     const targetLabel = knowledgeBlock.label;
-    const paraText = knowledgeBlock.text;
-    const firstSentence = paraText.split(/[.!?]\s+/)[0] || paraText.slice(0, 90);
+    usedBlockIndices.add(targetIndex);
+    const highlightSentence = extractBestHighlightSentence(knowledgeBlock.text, knowledgeWeakness, "knowledge");
 
     comments.push({
       id: "pass4-knowledge-gap",
@@ -527,7 +791,7 @@ export function generatePass4Comments(
       color: "indigo",
       paragraphIndex: targetIndex,
       paragraphLabel: targetLabel,
-      highlightText: firstSentence,
+      highlightText: highlightSentence,
       critique: stripScoreFractionsFromText(stripStars(knowledgeWeakness)),
       suggestion: isFullMarks
         ? "Full marks secured. For academic distinction: provide formal mathematical or textbook bounds for all economic variables."

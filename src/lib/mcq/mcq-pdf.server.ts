@@ -300,75 +300,194 @@ export async function savePaperExplanationServer(
  * (concept, key rule, worked derivation, distractor trap analysis, speed tip).
  */
 export async function explainPdfMcqAnswer(options: {
-  level?: string;
+  paperId?: string | null;
+  level?: "igcse" | "as" | "a2" | string;
   number: number;
   stemText: string;
   correctAnswer: "A" | "B" | "C" | "D";
   userAnswer: "A" | "B" | "C" | "D" | null;
+  topic?: string;
+  subtopic?: string;
+  mistakeType?: McqMistakeType | null;
+  questionImageDataUrl?: string | null;
+  userId?: string | null;
 }): Promise<McqExplanationResult> {
-  const { number, stemText, correctAnswer, userAnswer } = options;
+  const {
+    paperId,
+    level,
+    number,
+    stemText,
+    correctAnswer,
+    userAnswer,
+    topic,
+    subtopic,
+    mistakeType,
+    questionImageDataUrl,
+    userId,
+  } = options;
+
+  // If paperId is provided and no mistakeType override is requested, check if we already have the stored explanation!
+  if (paperId && !mistakeType) {
+    const memoryHit = inMemoryExplanationCache.get(`${paperId}:${number}`);
+    if (memoryHit) {
+      return memoryHit;
+    }
+    const stored = await getStoredPaperExplanationsServer(paperId);
+    if (stored[number]) {
+      return stored[number];
+    }
+  }
+  const inferred = classifyMcqQuestion({
+    level: "AS",
+    number,
+    text: stemText,
+    existingTopic: topic,
+    existingSubtopic: subtopic,
+  });
+
+  const mistakeMeta = mistakeType ? MCQ_MISTAKE_META_MAP[mistakeType] : null;
+  const hasImage =
+    typeof questionImageDataUrl === "string" &&
+    questionImageDataUrl.startsWith("data:image/");
+  const isStudentCorrect = userAnswer !== null && userAnswer === correctAnswer;
 
   const systemPrompt = [
-    "You are a Principal Examiner for Cambridge IGCSE Economics (0455) Paper 1 (Multiple Choice)",
-    "explaining a past multiple-choice question to a student reviewing their finished paper attempt.",
-    "The question stem was extracted from a real past paper.",
-    "Deliver an advanced, authoritative diagnostic breakdown.",
+    "You are a Principal Examiner for Cambridge IGCSE Economics (0455)",
+    `(${"IGCSE Paper 1"}) delivering a strictly accurate, question-specific diagnostic breakdown for a real past paper multiple-choice question.`,
     "",
-    "Return ONLY a single valid JSON object with these exact keys:",
-    '- "concept": short syllabus unit & topic reference (e.g. "Unit 2: Price Elasticity of Demand (PED)")',
-    '- "keyRule": the core economic principle, equation, or golden rule governing this question',
-    '- "correctReasoning": clear step-by-step worked derivation of why the correct option is uniquely true',
-    '- "distractorTrap": detailed diagnosis of why the student\'s choice was wrong or the common distractor trap Cambridge sets for this item',
-    '- "speedTip": rapid elimination shortcut to solve or reject options in < 45 seconds on Paper 1',
-    '- "summary": a cohesive 3-5 sentence explanation paragraph walking through the question',
+    "STRICT ACCURACY & GROUNDING RULES:",
+    hasImage
+      ? "1. READ THE ATTACHED OFFICIAL PDF IMAGE FIRST. Inspect EVERY word of the stem, ALL axis labels, curve labels (e.g. D1->D2, S1->S2, AD/AS, MC/MR), shaded areas (e.g. W, X, Y, Z), table numbers, and the EXACT wording of Options A, B, C, and D directly from the image. If the OCR text excerpt below is incomplete or garbled, TRUST THE PDF IMAGE 100%."
+      : "1. Base your explanation strictly on the exact question stem and options provided. Never invent numbers, curve labels, or statements that do not appear in the question.",
+    `2. The official Cambridge IGCSE 0455 mark scheme answer is Option ${correctAnswer}. Never contradict the mark scheme; prove rigorously why Option ${correctAnswer} is uniquely true under Cambridge IGCSE 0455 conventions.`,
+    "3. QUOTE OR REFERENCE THE ACTUAL OPTION CONTENT: In correctReasoning, explicitly state what Option " +
+      correctAnswer +
+      " says (or depicts in the diagram/table) and derive step-by-step why it is true. For any calculation, show exact formula, substituted numbers, sign, and final value.",
+    isStudentCorrect
+      ? `4. THE STUDENT ANSWERED CORRECTLY (Option ${correctAnswer}). In distractorTrap, identify the #1 most tempting WRONG option from this exact question (naming its exact letter A/B/C/D and quoting/describing what it says) and explain precisely why that distractor fails so the student reinforces their mastery.`
+      : userAnswer
+        ? `4. THE STUDENT ANSWERED INCORRECTLY (picked Option ${userAnswer} instead of ${correctAnswer}). In distractorTrap, specifically quote/describe what Option ${userAnswer} says and explain the exact economic flaw in Option ${userAnswer}, then briefly note why the remaining wrong options fail.`
+        : "4. In distractorTrap, identify the #1 most deceptive wrong option letter in this question and explain why candidates fall for it.",
+    "5. In concept, name the EXACT Cambridge IGCSE 0455 syllabus topic actually tested by THIS question (do not blindly repeat the fallback topic hint if the PDF image tests a different topic).",
+    "6. In speedTip, give a concrete, question-specific elimination shortcut referencing an exact keyword, qualifier, axis, or calculation check from THIS question (no vague generic advice).",
+    "7. NO ASTERISKS: Never use asterisks (* or **) anywhere in any JSON string. Do not use markdown bold, italics, or asterisk bullets. Return plain text only with zero asterisks.",
+    "",
+    "Return ONLY a single valid JSON object (no markdown fences, no commentary outside JSON) with these exact keys:",
+    '- "concept": exact Cambridge IGCSE 0455 syllabus unit & specific concept tested in this question',
+    '- "keyRule": the core economic principle, formula, or Cambridge rule governing this exact question',
+    '- "correctReasoning": exact step-by-step worked proof quoting Option ' +
+      correctAnswer +
+      " and showing every diagram/table/calculation step",
+    '- "distractorTrap": specific diagnosis of ' +
+      (isStudentCorrect
+        ? "the top tempting wrong option letter the student successfully avoided"
+        : userAnswer
+          ? `why Option ${userAnswer} is wrong and how Cambridge set that trap`
+          : "the main distractor trap Cambridge set in this question"),
+    '- "speedTip": concrete elimination shortcut specific to this question (< 45 seconds)',
+    '- "summary": a concise 3-4 sentence explanation walking straight through this exact question',
   ].join("\n");
 
   const userMessage = [
-    `Question ${number}:`,
-    stemText.slice(0, 1400) ||
-      "(question text unavailable — explain generally from the answer key)",
+    `Official Cambridge IGCSE 0455 Question ${number} (${"IGCSE Paper 1"}):`,
+    hasImage
+      ? "(High-resolution official PDF image of Question " +
+        number +
+        " is attached — read the exact stem, diagrams, tables, and Options A–D directly from the image.)"
+      : "",
+    stemText.trim()
+      ? `Extracted PDF text reference (use only to assist; trust the attached PDF image if any diagram/table differs):\n${stemText.trim().slice(0, 1600)}`
+      : hasImage
+        ? "(No PDF text layer extracted — read the entire question directly from the attached PDF image.)"
+        : `(Full diagram/stem text not captured — explain based on Cambridge IGCSE 0455 Question ${number} in ${inferred.unit}: ${inferred.topic} / ${inferred.subtopic} and why Option ${correctAnswer} is the mark scheme answer)`,
     "",
-    `Correct mark scheme answer: Option ${correctAnswer}`,
+    `Rough syllabus hint (override if image shows a different topic): ${inferred.unit} — ${inferred.topic} / ${inferred.subtopic}`,
+    `Official Cambridge mark scheme answer: Option ${correctAnswer}`,
     userAnswer
-      ? `Student selected: Option ${userAnswer} (${userAnswer === correctAnswer ? "CORRECT" : "INCORRECT"})`
+      ? `Student selected: Option ${userAnswer} (${isStudentCorrect ? "CORRECT" : "INCORRECT"})`
       : "Student left this question unattempted.",
-  ].join("\n");
+    mistakeMeta && !isStudentCorrect
+      ? `Student self-diagnosed mistake type: ${mistakeMeta.label} (${mistakeMeta.tagline}). Tailor distractorTrap and speedTip to directly repair this exact error pattern.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const result = await chat({
-    model: MODEL_EXAMINER,
-    temperature: 0.2,
-    json: true,
-    reasoningEffort: "none",
-    maxCompletionTokens: 1000,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-  });
+  let resultText = "";
+  let visionGrounded = false;
 
-  const parsed = extractFirstJsonObject(result.text);
+  if (hasImage) {
+    try {
+      const visionRes = await visionChat({
+        model: MODEL_EXAMINER,
+        systemPrompt,
+        prompt: userMessage,
+        imageDataUrls: [questionImageDataUrl],
+        maxCompletionTokens: 1600,
+        userId: userId ?? null,
+        feature: "mcq_explain_vision",
+      });
+      if (visionRes.text && visionRes.text.trim().length > 20) {
+        resultText = visionRes.text;
+        visionGrounded = true;
+      }
+    } catch (visionErr) {
+      console.warn(
+        `Vision MCQ explanation failed for Q${number}, falling back to text chat:`,
+        visionErr instanceof Error ? visionErr.message : visionErr,
+      );
+    }
+  }
+
+  if (!resultText) {
+    const result = await chat({
+      model: MODEL_EXAMINER,
+      temperature: 0.1,
+      json: true,
+      reasoningEffort: "low",
+      maxCompletionTokens: 1400,
+      userId: userId ?? null,
+      feature: "mcq_explain_text",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+    resultText = result.text;
+  }
+
+  const parsed = extractFirstJsonObject(resultText);
   if (parsed && typeof parsed === "object") {
     const p = parsed as Record<string, unknown>;
     const summary = typeof p.summary === "string" && p.summary.trim() ? p.summary.trim() : "";
     const correctReasoning =
       typeof p.correctReasoning === "string" ? p.correctReasoning.trim() : "";
-    const text = summary || correctReasoning || result.text.trim();
+    const text = summary || correctReasoning || resultText.trim();
 
     const diagnostic: McqDiagnostic = {
       concept:
         typeof p.concept === "string" && p.concept.trim()
           ? p.concept.trim()
-          : `Cambridge 0455 Question ${number}`,
+          : `${inferred.unit}: ${inferred.subtopic}`,
       keyRule: typeof p.keyRule === "string" ? p.keyRule.trim() : "",
       correctReasoning: correctReasoning || text,
       distractorTrap: typeof p.distractorTrap === "string" ? p.distractorTrap.trim() : "",
       speedTip: typeof p.speedTip === "string" ? p.speedTip.trim() : "",
     };
 
-    return { text, diagnostic };
+    const finalResult = cleanStars({ text, diagnostic, visionGrounded });
+    if (paperId && !mistakeType) {
+      await savePaperExplanationServer(paperId, number, finalResult).catch(() => {});
+    }
+    return finalResult;
   }
 
-  return {
-    text: result.text.trim(),
-  };
+  const fallbackResult = cleanStars({
+    text: resultText.trim(),
+    visionGrounded,
+  });
+  if (paperId && !mistakeType) {
+    await savePaperExplanationServer(paperId, number, fallbackResult).catch(() => {});
+  }
+  return fallbackResult;
 }

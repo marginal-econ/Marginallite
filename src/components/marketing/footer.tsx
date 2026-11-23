@@ -164,7 +164,7 @@ export function SiteFooter({ onToggleMinimalist }: { onToggleMinimalist?: () => 
               About Marginalite
             </p>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Built by Saikrish and Suthir for one syllabus — IGCSE 0455 Economics (0455). We
+              Founded and created by Saikrish Karthikeyan, alongside Suthir and Athithya, for one syllabus — Cambridge IGCSE Economics (0455). We
               are closing the gap between writing an essay and knowing exactly how to improve it.
             </p>
             <div className="mt-4 flex flex-wrap gap-2" aria-label="Marginalite facts">

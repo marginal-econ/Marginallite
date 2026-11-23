@@ -854,10 +854,13 @@ export async function useQuizPowerUpServer(input: {
   playerId: string;
   powerUpId: string;
   targetPlayerId?: string;
+  questionNumber?: number;
 }): Promise<{
   ok: true;
   event: QuizGameEvent;
   state: McqQuizPublicState;
+  eliminatedOptions?: QuizLetter[];
+  questionNumber?: number;
 }> {
   const pin = normalizeQuizPin(input.pin);
   const meta = await QUIZ_STORE.get<McqQuizMeta>(metaKey(pin));
@@ -891,6 +894,8 @@ export async function useQuizPowerUpServer(input: {
   const now = new Date().toISOString();
 
   let event: QuizGameEvent;
+  let eliminatedOptions: QuizLetter[] | undefined;
+  let targetQuestionNumber: number | undefined;
 
   if (powerUp.type === "shield") {
     actor.activeShield = true;
@@ -917,6 +922,24 @@ export async function useQuizPowerUpServer(input: {
       description: `${actor.avatar} ${actor.name} activated 2x Productivity Surge for their next question! ⚡`,
     };
   } else if (powerUp.type === "fifty_fifty") {
+    const qNum = input.questionNumber ?? actor.currentQuestion ?? meta.questionNumbers[0] ?? 1;
+    targetQuestionNumber = qNum;
+
+    // Authoritative answer resolution from Cambridge answer key / paper metadata
+    const { correctAnswer } = await resolveCorrectAnswerForQuestion(meta, qNum);
+    const allLetters: QuizLetter[] = ["A", "B", "C", "D"];
+
+    if (correctAnswer && allLetters.includes(correctAnswer)) {
+      // Pick 2 wrong letters out of the 3 incorrect options to eliminate
+      const wrongOptions = allLetters.filter((l) => l !== correctAnswer);
+      const shuffled = [...wrongOptions].sort(() => Math.random() - 0.5);
+      eliminatedOptions = shuffled.slice(0, 2);
+    } else {
+      // Edge fallback if answer key is not yet recorded for this question
+      const shuffled = [...allLetters].sort(() => Math.random() - 0.5);
+      eliminatedOptions = shuffled.slice(0, 2);
+    }
+
     await QUIZ_STORE.set(playerKey(pin, actor.id), actor);
     event = {
       id: `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -925,7 +948,7 @@ export async function useQuizPowerUpServer(input: {
       actorName: actor.name,
       actorAvatar: actor.avatar,
       type: "fifty_fifty",
-      description: `${actor.avatar} ${actor.name} executed a 50/50 Market Clear! ✂️`,
+      description: `${actor.avatar} ${actor.name} executed a 50/50 Market Clear on Q${qNum}! ✂️`,
     };
   } else if (powerUp.type === "steal") {
     let targetId = input.targetPlayerId;
@@ -1116,7 +1139,13 @@ export async function useQuizPowerUpServer(input: {
 
   const state = await getMcqQuizStateServer(pin, { userId: actor.userId });
   if (!state) throw new Error("Failed to load updated state.");
-  return { ok: true, event, state };
+  return {
+    ok: true,
+    event,
+    state,
+    eliminatedOptions,
+    questionNumber: targetQuestionNumber,
+  };
 }
 
 /**

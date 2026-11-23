@@ -150,6 +150,45 @@ type LastAnswerFeedback = {
   explanation?: McqExplanationResult | null;
 };
 
+// Cross-browser clipboard helper with fallback for Safari iOS, Firefox, and insecure/in-app webviews
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fallback to execCommand below */
+  }
+
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    textArea.style.opacity = "0";
+    textArea.setAttribute("readonly", "");
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, textArea.value.length);
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
 function LiveQuizRoomPage() {
   const { pin: rawPin } = Route.useParams();
   const cleanPin = normalizeQuizPin(rawPin);
@@ -188,8 +227,48 @@ function LiveQuizRoomPage() {
     return null;
   });
 
-  // Host can toggle "Join & Play Too" if they want to test or play alongside class
-  const [hostPlayingAsStudent, setHostPlayingAsStudent] = useState(false);
+  // Host can toggle "Join & Play Too" / "Player View" if they want to test or play alongside class
+  const [hostPlayingAsStudent, setHostPlayingAsStudent] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !cleanPin) return false;
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const mode = searchParams.get("mode");
+      const play = searchParams.get("play");
+      if (mode === "host") return false;
+      if (mode === "player" || play === "1" || play === "true") return true;
+
+      const cachedView = sessionStorage.getItem(`quiz_view_${cleanPin}`);
+      if (cachedView === "player") return true;
+      if (cachedView === "host") return false;
+
+      const raw = localStorage.getItem(playerStorageKey(cleanPin));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.id) return true;
+      }
+    } catch {
+      /* ignore */
+    }
+    return false;
+  });
+
+  const switchToPlayerView = useCallback(() => {
+    try {
+      sessionStorage.setItem(`quiz_view_${cleanPin}`, "player");
+    } catch {
+      /* ignore */
+    }
+    setHostPlayingAsStudent(true);
+  }, [cleanPin]);
+
+  const switchToHostView = useCallback(() => {
+    try {
+      sessionStorage.setItem(`quiz_view_${cleanPin}`, "host");
+    } catch {
+      /* ignore */
+    }
+    setHostPlayingAsStudent(false);
+  }, [cleanPin]);
 
   // Student join form state
   const [nickname, setNickname] = useState("");
@@ -345,20 +424,48 @@ function LiveQuizRoomPage() {
 
   const remainingSeconds = useMemo(() => {
     if (!meta?.timeLimitSeconds || !meta.startedAt) return null;
-    const elapsed = Math.floor((nowMs - new Date(meta.startedAt).getTime()) / 1000);
+    const startedMs = Date.parse(meta.startedAt);
+    if (isNaN(startedMs)) return null;
+    const elapsed = Math.floor((nowMs - startedMs) / 1000);
     return Math.max(0, meta.timeLimitSeconds - elapsed);
   }, [meta?.timeLimitSeconds, meta?.startedAt, nowMs]);
 
   const elapsedGameSeconds = useMemo(() => {
     if (!meta?.startedAt) return 0;
-    return Math.max(0, Math.floor((nowMs - new Date(meta.startedAt).getTime()) / 1000));
+    const startedMs = Date.parse(meta.startedAt);
+    if (isNaN(startedMs)) return 0;
+    return Math.max(0, Math.floor((nowMs - startedMs) / 1000));
   }, [meta?.startedAt, nowMs]);
 
-  // Identify current player object on server leaderboard
+  // Identify current player object on server leaderboard (by saved seat or signed-in user id)
   const mePlayer: QuizPlayer | null = useMemo(() => {
-    if (!savedPlayer) return null;
-    return players.find((p) => p.id === savedPlayer.id) ?? null;
-  }, [players, savedPlayer]);
+    if (savedPlayer) {
+      const match = players.find((p) => p.id === savedPlayer.id);
+      if (match) return match;
+    }
+    if (currentUser?.id) {
+      const matchByUser = players.find((p) => p.userId && p.userId === currentUser.id);
+      if (matchByUser) return matchByUser;
+    }
+    return null;
+  }, [players, savedPlayer, currentUser?.id]);
+
+  // Sync persisted seat if player was identified via account ID
+  useEffect(() => {
+    if (!savedPlayer && mePlayer) {
+      const stored = {
+        id: mePlayer.id,
+        name: mePlayer.name,
+        avatar: mePlayer.avatar,
+      };
+      try {
+        localStorage.setItem(playerStorageKey(cleanPin), JSON.stringify(stored));
+      } catch {
+        /* ignore */
+      }
+      setSavedPlayer(stored);
+    }
+  }, [savedPlayer, mePlayer, cleanPin]);
 
   const myRank = useMemo(() => {
     if (!mePlayer) return null;
@@ -391,25 +498,25 @@ function LiveQuizRoomPage() {
     }
   }, [savedPlayer, state, players, meta?.status, quizQuery.isFetching, cleanPin]);
 
-  // Copy helpers
+  // Copy helpers with multi-browser clipboard fallback
   const shareUrl =
     typeof window !== "undefined" ? `${window.location.origin}/quiz/${cleanPin}` : `/quiz/${cleanPin}`;
 
   async function copyShareLink() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
+    const ok = await copyTextToClipboard(shareUrl);
+    if (ok) {
       toast.success("Quiz invite link copied! Paste it in class chat.");
-    } catch {
+    } else {
       toast.info(shareUrl);
     }
   }
 
   async function copyPinCode() {
-    try {
-      await navigator.clipboard.writeText(cleanPin);
+    const ok = await copyTextToClipboard(cleanPin);
+    if (ok) {
       toast.success(`Game PIN ${formatQuizPin(cleanPin)} copied!`);
-    } catch {
-      toast.info(cleanPin);
+    } else {
+      toast.info(`PIN: ${formatQuizPin(cleanPin)}`);
     }
   }
 
@@ -584,7 +691,7 @@ function LiveQuizRoomPage() {
     const finishedCount = players.filter((p) => p.finished).length;
 
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-primary/[0.02] to-muted/20 touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-primary/[0.02] to-muted/20 touch-manipulation">
         {/* Top Host Bar */}
         <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md px-4 sm:px-6 py-3">
           <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-3">
@@ -627,19 +734,17 @@ function LiveQuizRoomPage() {
                 <Link2 className="h-3.5 w-3.5 text-primary" />
                 Copy Student Link
               </Button>
-              {meta.status !== "ended" ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setHostPlayingAsStudent(true)}
-                  className="h-8 gap-1.5 text-xs"
-                  title="Join and play the paper alongside your class"
-                >
-                  <Gamepad2 className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Play Too</span>
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant={mePlayer ? "default" : "outline"}
+                onClick={switchToPlayerView}
+                className="h-8 gap-1.5 text-xs font-bold"
+                title={mePlayer ? "Switch to your active player seat" : "Join this quiz as a participant to play"}
+              >
+                <Gamepad2 className="h-3.5 w-3.5" />
+                <span>{mePlayer ? `Player Seat (${mePlayer.avatar} ${mePlayer.name})` : "Play Quiz"}</span>
+              </Button>
               {meta.status === "in_progress" ? (
                 <Button
                   type="button"
@@ -951,7 +1056,7 @@ function LiveQuizRoomPage() {
   // 1. Not joined yet (and quiz is ended -> show public podium)
   if (!mePlayer && meta.status === "ended") {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-background touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-background touch-manipulation">
         <header className="border-b border-border px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 font-extrabold">
             <Gamepad2 className="h-5 w-5 text-primary" />
@@ -979,7 +1084,7 @@ function LiveQuizRoomPage() {
   // 2. Student Join Screen (Nickname + Avatar Picker)
   if (!mePlayer) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background via-primary/[0.04] to-amber-500/[0.05] touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-br from-background via-primary/[0.04] to-amber-500/[0.05] touch-manipulation">
         <header className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-background/80 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <Link to="/quiz">
@@ -993,7 +1098,7 @@ function LiveQuizRoomPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setHostPlayingAsStudent(false)}
+                onClick={switchToHostView}
                 className="h-8 text-xs font-semibold"
               >
                 Back to Host Board
@@ -1129,7 +1234,7 @@ function LiveQuizRoomPage() {
   // 3. Student Waiting Lobby
   if (meta.status === "lobby") {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background via-emerald-500/[0.04] to-primary/[0.05] touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-br from-background via-emerald-500/[0.04] to-primary/[0.05] touch-manipulation">
         <header className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-background/80 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <Badge className="bg-emerald-600 text-white font-bold gap-1">
@@ -1146,7 +1251,7 @@ function LiveQuizRoomPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setHostPlayingAsStudent(false)}
+                onClick={switchToHostView}
                 className="h-8 text-xs font-semibold"
               >
                 Host Control Board
@@ -1204,7 +1309,7 @@ function LiveQuizRoomPage() {
   // 4. Countdown overlay (3 - 2 - 1 - GO!)
   if (countdown !== null) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-br from-primary/15 via-background to-emerald-500/15 p-6 text-center touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-br from-primary/15 via-background to-emerald-500/15 p-6 text-center touch-manipulation">
         <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3">
           Get Ready — {meta.title}
         </p>
@@ -1221,7 +1326,7 @@ function LiveQuizRoomPage() {
     const accuracy = Math.round((mePlayer.correctCount / totalQ) * 100);
 
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-amber-500/[0.03] to-muted/20 touch-manipulation">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-amber-500/[0.03] to-muted/20 touch-manipulation">
         <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur-sm px-5 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xl">{mePlayer.avatar}</span>
@@ -1238,7 +1343,7 @@ function LiveQuizRoomPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setHostPlayingAsStudent(false)}
+                onClick={switchToHostView}
                 className="h-8 text-xs font-semibold"
               >
                 Host Board
@@ -1375,7 +1480,7 @@ function LiveQuizRoomPage() {
       myRank={myRank}
       remainingSeconds={remainingSeconds}
       isHost={isHost}
-      onBackToHostBoard={() => setHostPlayingAsStudent(false)}
+      onBackToHostBoard={switchToHostView}
       submitAnswerFn={submitAnswerFn}
       finishPlayerFn={finishPlayerFn}
       fetchPdfFn={fetchPdfFn}
@@ -1722,14 +1827,6 @@ function StudentLiveGameplayView({
   async function handleActivatePowerUp(powerUp: QuizPowerUp, targetPlayerId?: string) {
     if (usingPowerUpId || isFrozen) return;
 
-    if (powerUp.type === "fifty_fifty") {
-      const allLetters: QuizLetter[] = ["A", "B", "C", "D"];
-      const correct = customQuestion?.correctAnswer;
-      const wrong = correct ? allLetters.filter((l) => l !== correct) : allLetters.slice(0, 3);
-      const eliminated = new Set<QuizLetter>(wrong.slice(0, 2));
-      setEliminatedOptions((prev) => ({ ...prev, [currentNumber]: eliminated }));
-    }
-
     setUsingPowerUpId(powerUp.id);
     try {
       const res = await usePowerUpFn({
@@ -1738,8 +1835,18 @@ function StudentLiveGameplayView({
           playerId: mePlayer.id,
           powerUpId: powerUp.id,
           targetPlayerId,
+          questionNumber: currentNumber,
         },
       });
+
+      if (res.eliminatedOptions && Array.isArray(res.eliminatedOptions) && res.eliminatedOptions.length > 0) {
+        const qNum = res.questionNumber ?? currentNumber;
+        setEliminatedOptions((prev) => ({
+          ...prev,
+          [qNum]: new Set(res.eliminatedOptions as QuizLetter[]),
+        }));
+      }
+
       broadcastPowerUp(res.event);
       if (res.event.blocked) {
         toast.warning(res.event.description);
@@ -1813,7 +1920,7 @@ function StudentLiveGameplayView({
   );
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-muted/15 to-background overflow-x-hidden w-full select-none touch-manipulation">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-muted/15 to-background overflow-x-hidden w-full select-none touch-manipulation">
       {/* Top HUD (Responsive across iPhone, iPad, Desktop) */}
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md px-3 sm:px-5 py-2.5 shadow-2xs">
         <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-2">

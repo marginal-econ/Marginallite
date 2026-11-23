@@ -43,6 +43,21 @@ export const classifyMcqTopics = createServerFn({ method: "POST" })
  * screen — typically opened for a question the student got wrong. Never
  * called before an attempt is marked, and never used to grade anything.
  */
+/**
+ * Fetches pre-computed/cached Cambridge examiner explanations for an entire past paper
+ * so question-by-question tutor mode can display expert derivations instantly with zero loading delay.
+ */
+export const getStoredPaperExplanations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ paperId: z.string().min(1) }).parse(unwrapData(input)),
+  )
+  .handler(async ({ data }) => {
+    const { getStoredPaperExplanationsServer } = await import("./mcq/mcq-pdf.server");
+    const explanations = await getStoredPaperExplanationsServer(data.paperId);
+    return { explanations };
+  });
+
 export const explainMcqAnswer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -55,7 +70,9 @@ export const explainMcqAnswer = createServerFn({ method: "POST" })
         userAnswer: z.enum(["A", "B", "C", "D"]).nullable(),
         topic: z.string().max(300).optional(),
         subtopic: z.string().max(300).optional(),
+        paperId: z.string().optional(),
         mistakeType: MistakeTypeSchema.nullable().optional(),
+        questionImageDataUrl: z.string().max(1_500_000).nullable().optional(),
       })
       .parse(unwrapData(input)),
   )

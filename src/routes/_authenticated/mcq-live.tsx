@@ -829,6 +829,37 @@ function McqLivePage() {
   const classifyTopicsFn = useServerFn(classifyMcqTopics);
   const submitAttemptFn = useServerFn(submitPdfMcqAttempt);
   const explainFn = useServerFn(explainMcqAnswer);
+  const getStoredExplanationsFn = useServerFn(getStoredPaperExplanations);
+
+  /** Encodes a rendered PDF question canvas as a crisp compact JPEG for Gemini Vision grounding. */
+  function encodeCanvasForVision(canvas: HTMLCanvasElement | undefined | null): string | null {
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+    try {
+      const MAX_WIDTH = 960;
+      const QUALITY = 0.78;
+      let dataUrl: string;
+      if (canvas.width <= MAX_WIDTH) {
+        dataUrl = canvas.toDataURL("image/jpeg", QUALITY);
+      } else {
+        const ratio = MAX_WIDTH / canvas.width;
+        const scaled = document.createElement("canvas");
+        scaled.width = MAX_WIDTH;
+        scaled.height = Math.max(1, Math.round(canvas.height * ratio));
+        const ctx = scaled.getContext("2d");
+        if (!ctx) {
+          dataUrl = canvas.toDataURL("image/jpeg", QUALITY);
+        } else {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, scaled.width, scaled.height);
+          ctx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+          dataUrl = scaled.toDataURL("image/jpeg", QUALITY);
+        }
+      }
+      return dataUrl.length <= 900_000 ? dataUrl : null;
+    } catch {
+      return null;
+    }
+  }
   const fetchPaperPdfFn = useServerFn(fetchPaperPdf);
   const getAnswerKeyFn = useServerFn(getMcqPaperAnswerKey);
 
@@ -866,8 +897,13 @@ function McqLivePage() {
         overrideMistakeType !== undefined
           ? overrideMistakeType
           : (mistakeTypesRef.current[number] ?? q?.mistake_type ?? null);
+      const sliceCanvas = questionCanvasRefs.current[number] ?? null;
+      const fallbackPageCanvas = pageCanvasRefs.current[1] ?? null;
+      const questionImageDataUrl = encodeCanvasForVision(sliceCanvas ?? fallbackPageCanvas);
+
       const { explanation } = await explainFn({
         data: {
+          paperId: selectedPaperId ?? undefined,
           level,
           number,
           stemText: stem,
@@ -876,6 +912,7 @@ function McqLivePage() {
           topic: q?.topic ?? inferred.topic,
           subtopic: q?.subtopic ?? inferred.subtopic,
           mistakeType: resolvedMistakeType,
+          questionImageDataUrl: questionImageDataUrl ?? undefined,
         },
       });
       setExplanations((prev) => ({
@@ -941,6 +978,7 @@ function McqLivePage() {
     try {
       const { explanation } = await explainFn({
         data: {
+          paperId: historyAttempt.data.paper_id ?? undefined,
           level: historyAttempt.data.level,
           number,
           stemText: q?.stem_text ?? "",
@@ -1072,6 +1110,15 @@ function fillMissingQuestionPages(
     }
     setSelectedPaperId(paper.id);
     selectedPaperIdRef.current = paper.id;
+
+    // Pre-warm stored explanations for instant 1-by-1 tutor derivations
+    void getStoredExplanationsFn({ data: { paperId: paper.id } })
+      .then((res) => {
+        if (res?.explanations && Object.keys(res.explanations).length > 0) {
+          setExplanations((prev) => ({ ...res.explanations, ...prev }));
+        }
+      })
+      .catch(() => {});
     setPaperTitle(paper.title);
     paperTitleRef.current = paper.title;
     setLevel((paper.level === "a2" ? "a2" : "as") as Level);

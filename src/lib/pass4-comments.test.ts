@@ -296,4 +296,97 @@ Paragraph 5: In the long run, once consumers switch to domestic goods, the trade
     expect(diagramComment?.critique).not.toMatch(/surplus/i);
     expect(diagramComment?.suggestion).not.toMatch(/deadweight loss/i);
   });
+
+  it("accurately targets the specific paragraph by topic keywords rather than defaulting to paragraph 2", () => {
+    const multiTopicEssay = [
+      "Maximum price is a government-imposed price ceiling set below the equilibrium price.",
+      "The ceiling causes consumer demand to expand while producer supply contracts, resulting in an immediate market shortage.",
+      "Because of the persistent shortage, unrationed consumers turn to illegal black markets where goods are traded above legal limits.",
+      "However, in the long run, price elasticity of supply determines whether producers permanently exit the market or reduce capital investment.",
+      "In conclusion, maximum price controls require government rationing coupons to prevent market failure.",
+    ].join("\n\n");
+
+    const targetedGrading: Grading = {
+      total_mark: 9,
+      max_mark: 12,
+      band: "Level 3",
+      ao_breakdown: {
+        knowledge: { awarded: 2, out_of: 2 },
+        analysis: { awarded: 4, out_of: 6 },
+        evaluation: { awarded: 3, out_of: 4 },
+      },
+      examiner_summary: "Good response but missing detailed black market transmission analysis.",
+      strengths: ["Clear definition"],
+      weaknesses: [
+        "The causal mechanism explaining black markets and illegal rationing lacked depth regarding producer enforcement costs.",
+      ],
+      missing_elements: { definitions: [], analysis: [], evaluation: [], examples: [], diagrams: [] },
+      actionable_feedback: ["Detail how black markets emerge when rationing mechanisms fail."],
+      suggested_resources: [],
+      suggested_practice: [],
+      confidence: 0.94,
+      audited: true,
+      sources: [],
+      anchorsUsed: 2,
+    };
+
+    const comments = generatePass4Comments(
+      multiTopicEssay,
+      "Evaluate maximum price controls [12]",
+      targetedGrading,
+      [],
+    );
+
+    const analysisComment = comments.find((c) => c.category === "analysis");
+    expect(analysisComment).toBeDefined();
+
+    // Must target Paragraph 3 (which discusses black markets), NOT Paragraph 2!
+    expect(analysisComment?.paragraphLabel).toBe("¶ Paragraph 3");
+    expect(analysisComment?.highlightText).toMatch(/black market/i);
+  });
+
+  it("respects explicit paragraph references made by the examiner report", () => {
+    const essay = [
+      "Introduction to tariffs and protectionism.",
+      "Domestic producers benefit from higher domestic prices and gain producer surplus.",
+      "In the third paragraph, consumer surplus decreases significantly as domestic consumers pay higher prices.",
+      "However, the net welfare loss depends on whether foreign retaliatory tariffs are enacted.",
+      "In conclusion, tariffs cause deadweight welfare loss unless terms of trade improve.",
+    ].join("\n\n");
+
+    const explicitGrading: Grading = {
+      total_mark: 8,
+      max_mark: 12,
+      band: "Level 2",
+      ao_breakdown: {
+        knowledge: { awarded: 2, out_of: 2 },
+        analysis: { awarded: 4, out_of: 6 },
+        evaluation: { awarded: 2, out_of: 4 },
+      },
+      examiner_summary: "Uneven analysis across paragraphs.",
+      strengths: [],
+      weaknesses: [
+        "In paragraph 3, the analysis of deadweight consumer surplus loss lacks intermediate price transmission steps.",
+      ],
+      missing_elements: { definitions: [], analysis: [], evaluation: [], examples: [], diagrams: [] },
+      actionable_feedback: [],
+      suggested_resources: [],
+      suggested_practice: [],
+      confidence: 0.9,
+      audited: true,
+      sources: [],
+      anchorsUsed: 2,
+    };
+
+    const comments = generatePass4Comments(
+      essay,
+      "Evaluate tariffs on imported goods [12]",
+      explicitGrading,
+      [],
+    );
+
+    const analysisComment = comments.find((c) => c.category === "analysis");
+    expect(analysisComment).toBeDefined();
+    expect(analysisComment?.paragraphLabel).toBe("¶ Paragraph 3");
+  });
 });

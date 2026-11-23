@@ -80,6 +80,45 @@ function formatTimeAgo(isoString?: string | null): string {
   return `${diffDays}d ago`;
 }
 
+// Multi-browser clipboard helper
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fallback to execCommand below */
+  }
+
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    textArea.style.opacity = "0";
+    textArea.setAttribute("readonly", "");
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, textArea.value.length);
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
 export function AdminMcqQuizPanel() {
   const queryClient = useQueryClient();
   const fetchAdminSessions = useServerFn(listAdminQuizSessions);
@@ -125,18 +164,26 @@ export function AdminMcqQuizPanel() {
     onError: (err: Error) => toast.error(`Failed to delete room: ${err.message}`),
   });
 
-  const handleCopyPin = (pin: string) => {
-    navigator.clipboard.writeText(pin);
+  const handleCopyPin = async (pin: string) => {
+    const ok = await copyTextToClipboard(pin);
     setCopiedPin(pin);
-    toast.success(`Room PIN ${pin} copied to clipboard!`);
+    if (ok) {
+      toast.success(`Room PIN ${pin} copied to clipboard!`);
+    } else {
+      toast.info(`PIN: ${pin}`);
+    }
     setTimeout(() => setCopiedPin(null), 2000);
   };
 
-  const handleCopyLink = (pin: string) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://marginal-econ.com";
+  const handleCopyLink = async (pin: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://lite.marginal-econ.com";
     const link = `${origin}/quiz/${pin}`;
-    navigator.clipboard.writeText(link);
-    toast.success(`Direct Join Link copied: ${link}`);
+    const ok = await copyTextToClipboard(link);
+    if (ok) {
+      toast.success(`Direct Join Link copied: ${link}`);
+    } else {
+      toast.info(`Link: ${link}`);
+    }
   };
 
   const rooms = data?.rooms ?? [];
@@ -220,7 +267,7 @@ export function AdminMcqQuizPanel() {
             size="sm"
             className="gap-1.5 text-xs font-bold h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
           >
-            <Link to="/quiz" target="_blank">
+            <Link to="/mcq-live" target="_blank">
               <Plus className="h-3.5 w-3.5" />
               <span>Launch Quiz Host</span>
               <ExternalLink className="h-3 w-3 opacity-70 ml-0.5" />
@@ -407,7 +454,7 @@ export function AdminMcqQuizPanel() {
                 </p>
               </div>
               <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs font-bold">
-                <Link to="/quiz" target="_blank">
+                <Link to="/mcq-live" target="_blank">
                   <Play className="h-3.5 w-3.5 text-emerald-500" />
                   <span>Host First Quiz Room</span>
                 </Link>
@@ -525,10 +572,24 @@ export function AdminMcqQuizPanel() {
                             asChild
                             size="sm"
                             className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground"
+                            title="Spectate Host Dashboard"
                           >
-                            <Link to="/quiz/$pin" params={{ pin: room.pin }} target="_blank">
+                            <Link to="/quiz/$pin" params={{ pin: room.pin }} search={{ mode: "host" } as any} target="_blank">
                               <ExternalLink className="h-3.5 w-3.5" />
-                              <span>Join / Spectate</span>
+                              <span>Spectate</span>
+                            </Link>
+                          </Button>
+
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 text-xs font-bold gap-1.5"
+                            title="Join and play this quiz as a participant"
+                          >
+                            <Link to="/quiz/$pin" params={{ pin: room.pin }} search={{ mode: "player" } as any} target="_blank">
+                              <Gamepad2 className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Play</span>
                             </Link>
                           </Button>
 

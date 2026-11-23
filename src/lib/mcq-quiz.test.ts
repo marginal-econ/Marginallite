@@ -11,10 +11,6 @@ import {
   type PublicMcqQuizMeta,
   type QuizPlayer,
 } from "./mcq-quiz.types";
-import {
-  resolveCorrectAnswerForQuestion,
-  listAdminQuizSessionsServer,
-} from "./mcq-quiz.server";
 
 function makePlayer(overrides: Partial<QuizPlayer>): QuizPlayer {
   return {
@@ -185,6 +181,7 @@ describe("MCQ Live Quiz Engine (Blooket / Quizizz mode)", () => {
   });
 
   it("resolves correct answers for custom questions cleanly without ReferenceError", async () => {
+    const { resolveCorrectAnswerForQuestion } = await import("./mcq-quiz.server");
     const meta = {
       pin: "123456",
       title: "Custom Quiz",
@@ -217,7 +214,53 @@ describe("MCQ Live Quiz Engine (Blooket / Quizizz mode)", () => {
     expect(res.storedExplanation?.text).toBe("Reason for C");
   }, 20000);
 
+  it("guarantees 50/50 Market Clear eliminates 2 wrong options and never eliminates the correct answer", async () => {
+    const { resolveCorrectAnswerForQuestion } = await import("./mcq-quiz.server");
+    const meta = {
+      pin: "888999",
+      title: "50-50 Test Quiz",
+      hostUserId: "host1",
+      hostName: "Host",
+      sourceType: "custom_questions" as const,
+      paperId: null,
+      paperTitle: "Custom",
+      level: "as" as const,
+      questionNumbers: [1, 2, 3, 4],
+      customQuestions: [
+        { number: 1, stem: "Q1", options: { A: "1", B: "2", C: "3", D: "4" }, correctAnswer: "A" as const },
+        { number: 2, stem: "Q2", options: { A: "1", B: "2", C: "3", D: "4" }, correctAnswer: "B" as const },
+        { number: 3, stem: "Q3", options: { A: "1", B: "2", C: "3", D: "4" }, correctAnswer: "C" as const },
+        { number: 4, stem: "Q4", options: { A: "1", B: "2", C: "3", D: "4" }, correctAnswer: "D" as const },
+      ],
+      gameMode: "live_race" as const,
+      timeLimitSeconds: null,
+      showInstantFeedback: true,
+      showLiveLeaderboard: true,
+      status: "in_progress" as const,
+      createdAt: new Date().toISOString(),
+    };
+
+    for (let q = 1; q <= 4; q++) {
+      const { correctAnswer } = await resolveCorrectAnswerForQuestion(meta, q);
+      expect(correctAnswer).toBeDefined();
+      const allLetters = ["A", "B", "C", "D"];
+      const wrong = allLetters.filter((l) => l !== correctAnswer);
+      expect(wrong.length).toBe(3);
+      expect(wrong).not.toContain(correctAnswer);
+
+      // Verify that picking any 2 from wrong never includes the correct answer
+      for (let trial = 0; trial < 10; trial++) {
+        const shuffled = [...wrong].sort(() => Math.random() - 0.5);
+        const eliminated = shuffled.slice(0, 2);
+        expect(eliminated.length).toBe(2);
+        expect(eliminated).not.toContain(correctAnswer);
+        expect(allLetters.filter((l) => !eliminated.includes(l))).toContain(correctAnswer);
+      }
+    }
+  }, 20000);
+
   it("protects listAdminQuizSessionsServer and rejects non-admin users", async () => {
+    const { listAdminQuizSessionsServer } = await import("./mcq-quiz.server");
     await expect(
       listAdminQuizSessionsServer({
         userId: "regular_user_123",

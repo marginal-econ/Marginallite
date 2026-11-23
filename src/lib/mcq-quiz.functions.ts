@@ -282,6 +282,7 @@ export const useQuizPowerUp = createServerFn({ method: "POST" })
         playerId: z.string().min(1).max(120),
         powerUpId: z.string().min(1).max(120),
         targetPlayerId: z.string().max(120).optional(),
+        questionNumber: z.number().int().positive().max(100).optional(),
       })
       .parse(input),
   )
