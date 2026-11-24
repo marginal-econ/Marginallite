@@ -354,25 +354,32 @@ export function applyEightMarkEvaluationGuardrail(
   }
 
   const ao1 = grading.ao_breakdown.knowledge.awarded;
-  const ao2 = grading.ao_breakdown.analysis.awarded;
+  let ao2 = grading.ao_breakdown.analysis.awarded;
   let ao3 = grading.ao_breakdown.evaluation.awarded;
 
   const evalComment = grading.ao_breakdown.evaluation.comment || "";
   const weaknessesText = (grading.weaknesses || []).join(" ").toLowerCase();
   const missingEval = grading.missing_elements?.evaluation || [];
 
+  const summaryText = (grading.examiner_summary || "").toLowerCase();
+
   const hasEvaluationShortfall =
     missingEval.length > 0 ||
-    /unmet|incomplete|unsatisfied|missing|unsupported|partially|fail(ed|s)? to|superficial|weak|not fully|room for|could be further|lacks? (?:explicit|thoughtful|reasoned)? evaluation/i.test(evalComment) ||
-    /conclusion.*(missing|weak|unsupported|lacking|incomplete|unsatisfied)|evaluation.*(not fully|partially|lacking|unmet|incomplete|room for)/i.test(weaknessesText);
+    /unmet|incomplete|unsatisfied|missing|unsupported|partially|fail(ed|s)? to|superficial|weak|not fully|room for|could be further|could be strengthened|could have pushed|lacks? (?:explicit|thoughtful|reasoned|deeper)? evaluation|brief|generic/i.test(evalComment) ||
+    /conclusion.*(missing|weak|unsupported|lacking|incomplete|unsatisfied|brief|generic|vague|underdeveloped)|evaluation.*(not fully|partially|lacking|unmet|incomplete|room for|could be|underdeveloped|lacks depth)/i.test(weaknessesText) ||
+    /conclusion.*(brief|generic|vague|underdeveloped)|evaluation.*(could be strengthened|could be deeper|underdeveloped|lacks depth)|could have pushed (?:this )?to 7/i.test(summaryText);
 
-  // If evaluation shortfall detected, clamp AO3 to max 2 (out of 3) and total to max 7
-  if (hasEvaluationShortfall && (ao3 > 2 || grading.total_mark === 8)) {
-    if (ao3 > 2) {
-      ao3 = 2;
+  // If evaluation shortfall detected, clamp total to max 6 (Cambridge Table A Level 3 Entry)
+  if (hasEvaluationShortfall && grading.total_mark > 6) {
+    const newTotal = 6;
+    if (ao3 > 1) {
+      ao3 = 1;
     }
-    const newTotal = Math.min(7, ao1 + ao2 + ao3);
-    const improvementNotice = "To elevate the evaluation to full marks, provide a more decisive concluding judgement that explicitly weighs the trade-offs in context (such as short-run versus long-run impacts).";
+    if (ao1 + ao2 + ao3 > 6) {
+      ao2 = Math.max(1, 6 - ao1 - ao3);
+    }
+    const improvementNotice =
+      "To elevate the evaluation to full marks (7–8/8), provide a more decisive concluding judgement that explicitly weighs the trade-offs in context (such as short-run versus long-run impacts).";
     const updatedComment = evalComment.includes("decisive concluding judgement")
       ? evalComment
       : `${evalComment} ${improvementNotice}`.trim();
@@ -383,6 +390,10 @@ export function applyEightMarkEvaluationGuardrail(
       band: bandFor(newTotal, maxMark),
       ao_breakdown: {
         ...grading.ao_breakdown,
+        analysis: {
+          ...grading.ao_breakdown.analysis,
+          awarded: ao2,
+        },
         evaluation: {
           ...grading.ao_breakdown.evaluation,
           awarded: ao3,
@@ -400,6 +411,159 @@ export function applyEightMarkEvaluationGuardrail(
         ...grading,
         total_mark: fixedTotal,
         band: bandFor(fixedTotal, maxMark),
+      };
+    }
+  }
+
+  return grading;
+}
+
+export function applySixMarkDiscussGuardrail(
+  grading: Grading,
+  maxMark: number,
+  split: AoSplit,
+): Grading {
+  if (maxMark !== 6 || split.ao3_marks < 1) {
+    return grading;
+  }
+  const summaryText = (grading.examiner_summary || "").toLowerCase();
+  const evalComment = (grading.ao_breakdown.evaluation?.comment || "").toLowerCase();
+  const weaknessesText = (grading.weaknesses || []).join(" ").toLowerCase();
+  const combined = `${summaryText} ${evalComment} ${weaknessesText}`;
+
+  const hasOffPolicyCounter =
+    /\b(counter[- ]argument\s+(?:is\s+)?(?:weak|uncredited|too\s+weak|unrelated|off[- ]topic|superficial)|unrelated\s+polic(?:y|ies)|fails?\s+to\s+provide\s+a\s+valid\s+counter|supply[- ]side\s+subsidies\s+(?:instead\s+of|rather\s+than)\s+fiscal|alternative\s+polic(?:y|ies)\s+rather\s+than)\b/i.test(
+      combined,
+    );
+
+  if (hasOffPolicyCounter && grading.total_mark > 4) {
+    const ao1 = Math.min(split.ao1_marks, grading.ao_breakdown.knowledge.awarded);
+    const ao2 = Math.min(split.ao2_marks, grading.ao_breakdown.analysis.awarded);
+    const ao3 = 0;
+    const newTotal = Math.min(4, ao1 + ao2);
+    return {
+      ...grading,
+      total_mark: newTotal,
+      band: bandFor(newTotal, maxMark),
+      ao_breakdown: {
+        ...grading.ao_breakdown,
+        evaluation: {
+          ...grading.ao_breakdown.evaluation,
+          awarded: ao3,
+        },
+      },
+    };
+  }
+
+  return grading;
+}
+
+export function applyFourMarkExplainGuardrail(
+  grading: Grading,
+  maxMark: number,
+  split: AoSplit,
+  essayText?: string,
+): Grading {
+  if (maxMark !== 4 || split.ao3_marks > 0) {
+    return grading;
+  }
+  const summaryText = (grading.examiner_summary || "").toLowerCase();
+  const analysisComment = (grading.ao_breakdown.analysis?.comment || "").toLowerCase();
+  const weaknessesText = (grading.weaknesses || []).join(" ").toLowerCase();
+  const combined = `${summaryText} ${analysisComment} ${weaknessesText}`;
+
+  const isCircular =
+    /\b(circular\s+(?:explanation|reasoning|statements?)|tautolog(?:y|ical)|neither\s+causal\s+mechanism\s+was\s+developed|stating\s+that\s+more\s+demanded\s+means\s+higher\s+income|re-?states?\s+the\s+premise)\b/i.test(
+      combined,
+    );
+
+  if (isCircular && grading.total_mark > 2) {
+    const ao1 = Math.min(split.ao1_marks, 2);
+    const ao2 = 0;
+    const newTotal = 2;
+    return {
+      ...grading,
+      total_mark: newTotal,
+      band: bandFor(newTotal, maxMark),
+      ao_breakdown: {
+        ...grading.ao_breakdown,
+        knowledge: { ...grading.ao_breakdown.knowledge, awarded: ao1 },
+        analysis: { ...grading.ao_breakdown.analysis, awarded: ao2 },
+      },
+    };
+  }
+
+  if (grading.total_mark === 0 && essayText) {
+    const identifiesFactors =
+      /\b(land\b.*labour\b|labour\b.*capital\b|capital\b.*enterprise\b|internal\b.*external\b|fixed\b.*variable\b)/i.test(
+        essayText,
+      );
+    if (identifiesFactors) {
+      const ao1 = 2;
+      const ao2 = 0;
+      const newTotal = 2;
+      return {
+        ...grading,
+        total_mark: newTotal,
+        band: bandFor(newTotal, maxMark),
+        ao_breakdown: {
+          ...grading.ao_breakdown,
+          knowledge: {
+            ...grading.ao_breakdown.knowledge,
+            awarded: ao1,
+            comment:
+              "Valid identification of syllabus factors (credited up to 2 marks for identification without development under Cambridge 0455 rules).",
+          },
+          analysis: {
+            ...grading.ao_breakdown.analysis,
+            awarded: ao2,
+            comment:
+              "No causal explanation or development was provided to explain how these factors function in production.",
+          },
+        },
+      };
+    }
+  }
+
+  return grading;
+}
+
+export function applyTwoMarkDefinitionGuardrail(
+  grading: Grading,
+  maxMark: number,
+  essayText?: string,
+): Grading {
+  if (maxMark !== 2) return grading;
+  const rawText = (essayText || "").toLowerCase();
+  const summaryText = (grading.examiner_summary || "").toLowerCase();
+  const knowledgeComment = (grading.ao_breakdown.knowledge?.comment || "").toLowerCase();
+  const combined = `${summaryText} ${knowledgeComment}`;
+
+  const mentionsMeritOrGov =
+    /\b(provided\s+by\s+(?:the\s+)?government|helps?\s+the\s+public|education\s+and\s+healthcare|healthcare\s+and\s+education)\b/i.test(
+      rawText,
+    );
+  const mentionsNonRivalOrExcludable = /\b(non[- ]rival|non[- ]exclud)/i.test(rawText);
+  const mentionsMisconception =
+    /\b(confuses?\s+(?:public\s+goods\s+with\s+)?(?:government[- ]provided|state[- ]provided|merit\s+goods)|failed\s+to\s+include\s+the\s+essential\s+economic\s+characteristics|not\s+a\s+valid\s+definition\s+under\s+cambridge)\b/i.test(
+      combined,
+    );
+
+  if ((mentionsMeritOrGov && !mentionsNonRivalOrExcludable) || mentionsMisconception) {
+    if (grading.total_mark > 0) {
+      return {
+        ...grading,
+        total_mark: 0,
+        band: bandFor(0, maxMark),
+        ao_breakdown: {
+          ...grading.ao_breakdown,
+          knowledge: {
+            ...grading.ao_breakdown.knowledge,
+            awarded: 0,
+            comment:
+              "Public goods are defined by non-excludability and non-rivalry. Government provision is not a defining characteristic; education and healthcare are merit goods, not public goods.",
+          },
+        },
       };
     }
   }
@@ -497,10 +661,19 @@ export function applyWritingQualityGuardrail(
   // 2. Official Cambridge required-diagram cap (when question explicitly asks for a diagram & none is present)
   updated = applyRequiredDiagramGuardrail(updated, questionText, essayText, maxMark, split);
 
-  // 3. Authoritative 8-mark evaluative essay failsafe (keeps at 7 if evaluation criteria unmet or conclusion unsatisfied)
+  // 3. Authoritative 8-mark evaluative essay failsafe (caps at 6 if conclusion is brief/generic or evaluation criteria unmet)
   updated = applyEightMarkEvaluationGuardrail(updated, maxMark, split);
 
-  // 4. Economic mechanics & causal integrity guardrail
+  // 4. Section A 6-mark Discuss off-policy counter-argument cap
+  updated = applySixMarkDiscussGuardrail(updated, maxMark, split);
+
+  // 5. 4-mark Explain circular reasoning cap and factor identification crediting
+  updated = applyFourMarkExplainGuardrail(updated, maxMark, split, essayText);
+
+  // 6. 2-mark definition public good merit misconception cap
+  updated = applyTwoMarkDefinitionGuardrail(updated, maxMark, essayText);
+
+  // 7. Economic mechanics & causal integrity guardrail
   updated = applyEconomicMechanicsGuardrail(updated, maxMark, split, essayText);
 
   // Never artificially penalize concise 2-mark / 4-mark answers that aren't severely undersized

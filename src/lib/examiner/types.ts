@@ -565,8 +565,12 @@ function findVerbatimStudentQuote(quote: string, essayText?: string): string {
 
   let finalMark = aoTotal;
   if (pointsTotal > 0 && maxMark <= 6) {
-    const pointCap = maxMark === 4 ? 4 : maxMark === 6 ? 6 : maxMark;
-    finalMark = Math.min(pointCap, pointsTotal);
+    if (maxMark === 2 && declaredTotal === 2 && knowledge.awarded === 2) {
+      finalMark = 2;
+    } else {
+      const pointCap = maxMark === 4 ? 4 : maxMark === 6 ? 6 : maxMark;
+      finalMark = Math.min(pointCap, pointsTotal);
+    }
     // Reconcile AO breakdown to match authoritative point total
     if (finalMark !== aoTotal) {
       if (split.ao1_marks === 0 && split.ao3_marks === 0) {
@@ -598,6 +602,14 @@ function findVerbatimStudentQuote(quote: string, essayText?: string): string {
       evaluation.awarded = 0;
       finalMark = Math.min(finalMark, knowledge.awarded + analysis.awarded);
     }
+    const conclusionIsBriefOrWeak = /\b(conclusion\s+(?:is\s+)?(?:brief|underdeveloped|lacks\s+(?:deeper|evaluative|decisive)|does\s+not\s+(?:fully\s+integrate|explicitly\s+balance|weigh)|generic|vague)|evaluation\s+(?:could\s+be\s+(?:deeper|strengthened)|is\s+underdeveloped|lacks\s+depth)|could\s+have\s+pushed\s+(?:this\s+)?to\s+7\/?8\s+with\s+deeper)\b/i.test(diagText);
+    if (conclusionIsBriefOrWeak && finalMark > 6) {
+      finalMark = 6;
+      if (evaluation.awarded > 1) evaluation.awarded = 1;
+      if (knowledge.awarded + analysis.awarded + evaluation.awarded > 6) {
+        analysis.awarded = Math.max(0, 6 - knowledge.awarded - evaluation.awarded);
+      }
+    }
   }
 
   // 2. On 6-mark Analyse questions: Cambridge mark schemes strictly enforce a maximum of 3 marks for listing points without causal analysis.
@@ -607,6 +619,16 @@ function findVerbatimStudentQuote(quote: string, essayText?: string): string {
     if (isListingOnly && finalMark > 3) {
       finalMark = 3;
       analysis.awarded = 3;
+    }
+  }
+
+  // 3. On 6-mark Section A Discuss questions: off-policy counter-arguments cap evaluation at 0 (max 4/6).
+  if (maxMark === 6 && split.ao3_marks > 0) {
+    const diagText = `${raw.examiner_summary || ""} ${evaluation.comment || ""} ${(Array.isArray(raw.weaknesses) ? raw.weaknesses : []).join(" ")}`;
+    const counterIsOffPolicyOrWeak = /\b(counter[- ]argument\s+(?:is\s+)?(?:weak|uncredited|too\s+weak|unrelated|off[- ]topic|superficial)|unrelated\s+polic(?:y|ies)|fails?\s+to\s+provide\s+a\s+valid\s+counter|supply[- ]side\s+subsidies\s+(?:instead\s+of|rather\s+than)\s+fiscal)\b/i.test(diagText);
+    if (counterIsOffPolicyOrWeak && finalMark > 4) {
+      finalMark = 4;
+      if (evaluation.awarded > 0) evaluation.awarded = 0;
     }
   }
 

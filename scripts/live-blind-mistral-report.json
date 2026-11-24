@@ -1,9 +1,9 @@
 {
   "summary": {
     "total": 33,
-    "exact": 18,
-    "within1": 28,
-    "mae": 0.6060606060606061
+    "exact": 24,
+    "within1": 31,
+    "mae": 0.3333333333333333
   },
   "results": [
     {
@@ -15,8 +15,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (1/2)",
-      "latencyMs": 14293,
-      "examinerSummary": "You have correctly identified one valid cause of an increase in demand for bank loans ('higher income'). However, the other two points ('low interest rates' and 'consumer confidence high') describe static levels rather than directional changes. For a 2-mark question, you must state how these factors change to cause an increase in demand (e.g., 'fall in interest rates' or 'rise in consumer confidence'). This is a common oversight in IGCSE Economics: always use directional language (increase/decrease/fall/rise) when discussing causes of change."
+      "latencyMs": 13103,
+      "examinerSummary": "Your response identifies one valid cause of an increase in demand for bank loans ('higher income'), which is correct. However, the other points ('low interest rates' and 'consumer confidence high') are static descriptions rather than directional changes. The question requires two causes of an increase in demand, so you need to describe factors that cause demand to rise (e.g., 'fall in interest rates', 'rise in consumer confidence'). Keep your answers concise and ensure you address the command word directly."
     },
     {
       "candidate": "Saikrish (User)",
@@ -27,8 +27,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (4/4)",
-      "latencyMs": 22233,
-      "examinerSummary": "This is a strong, well-structured response that fully satisfies the 4-mark requirement. The candidate demonstrates excellent knowledge of supply-side policy tools (education/training and subsidies) and provides clear, logical explanations of their economic impacts. The response is concise, accurate, and directly answers the question without unnecessary elaboration. Well done!"
+      "latencyMs": 20316,
+      "examinerSummary": "This response earns full marks by correctly identifying two distinct supply-side policies and explaining their mechanisms to increase aggregate supply. The economic reasoning is sound, with accurate causal links and IGCSE-appropriate terminology. The answer directly addresses the question without redundancy or misconceptions."
     },
     {
       "candidate": "Saikrish (User)",
@@ -39,8 +39,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (6/6)",
-      "latencyMs": 27473,
-      "examinerSummary": "This is an excellent response that fully satisfies the 6-mark 'Analyse' question. The candidate demonstrates a strong understanding of how state-owned firms can benefit a country's population by addressing three key economic dimensions: lower prices improving consumer welfare, job creation reducing poverty and unemployment, and fringe benefits enhancing worker productivity and quality of life. Each point is clearly identified and developed with logical economic reasoning, adhering strictly to Cambridge IGCSE 0455 syllabus expectations. The response is well-structured, concise, and directly answers the question without unnecessary elaboration or evaluation (which is not required)."
+      "latencyMs": 24832,
+      "examinerSummary": "This is an excellent response that fully meets the 6-mark 'Analyse' criteria for Cambridge IGCSE 0455. The candidate demonstrates a strong understanding of how state-owned firms can benefit a country's population by providing lower prices, job security, and fringe benefits. Each point is clearly developed with logical economic reasoning, showing a deep grasp of microeconomic principles related to firms and production (Unit 3.3: Workers). The response is well-structured, concise, and directly addresses the question without unnecessary repetition or off-topic material."
     },
     {
       "candidate": "Saikrish (User)",
@@ -51,8 +51,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 28848,
-      "examinerSummary": "This is an outstanding Level 3 response. The candidate demonstrates comprehensive knowledge of fixed exchange rate mechanisms, develops clear causal chains for both advantages and disadvantages, and provides a thoughtful evaluation weighing conditions and alternatives. The conclusion is well-reasoned and directly addresses the question. The response is well-structured, economically sound, and meets all Cambridge IGCSE 0455 criteria for an 8-mark discuss question."
+      "latencyMs": 33232,
+      "examinerSummary": "This is an excellent Level 3 response. The candidate demonstrates a thorough understanding of fixed exchange rates, presenting clear advantages (business confidence, FDI, reduced speculation) and disadvantages (administrative costs, policy constraints, reserve requirements) with well-developed causal reasoning. The conclusion is thoughtful, weighing trade-offs and conditions for effectiveness. Minor missed points (inflation trade-offs, long-term export competitiveness) do not detract from the overall high standard."
     },
     {
       "candidate": "Saikrish (User)",
@@ -63,8 +63,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (2/2)",
-      "latencyMs": 12585,
-      "examinerSummary": "This is an excellent response. You have perfectly recalled the formula for price elasticity of supply, including the correct use of percentage changes in both quantity supplied and price. Your answer is concise, accurate, and fully satisfies the requirements of the question. Well done!"
+      "latencyMs": 9060,
+      "examinerSummary": "Your response is excellent. You have correctly provided the formula for price elasticity of supply, including both the numerator (% change in quantity supplied) and the denominator (% change in price). This is exactly what was asked for in the question, and you have earned full marks. Well done!"
     },
     {
       "candidate": "Saikrish (User)",
@@ -75,8 +75,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (4/4)",
-      "latencyMs": 27176,
-      "examinerSummary": "This is a strong, well-structured response that fully meets the requirements of the 4-mark Explain question. The candidate demonstrates clear understanding of economic incentives (financial and non-financial) and logically connects these to the decision to work long hours. The response is concise, accurate, and directly answers the question without unnecessary elaboration or digression. Well done!"
+      "latencyMs": 22113,
+      "examinerSummary": "This response fully meets the 4-mark requirement with two accurate and well-explained reasons for working long hours. The candidate demonstrates clear economic understanding and logical development of points, adhering strictly to the question's requirements."
     },
     {
       "candidate": "Saikrish (User)",
@@ -87,8 +87,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (6/6)",
-      "latencyMs": 25857,
-      "examinerSummary": "This is a strong, well-structured response that fully meets the 6-mark 'analyse' criteria. You have accurately identified and developed three key differences between competitive and monopoly markets: number of firms and price-setting power, barriers to entry, and product differentiation. Your use of economic terminology (price takers, price makers, barriers to entry) and real-world examples (patents, control of raw materials) demonstrates a clear understanding of the topic. Well done!"
+      "latencyMs": 25302,
+      "examinerSummary": "This is a strong response that fully satisfies the 6-mark requirement for analysing the differences between competitive and monopoly markets. The candidate demonstrates a clear understanding of key economic concepts, including the number of firms, barriers to entry, and product differentiation. Each point is well-developed with economic reasoning, and the response is concise yet comprehensive. The analysis is accurate and aligns well with the Cambridge IGCSE 0455 syllabus expectations for a 6-mark 'Analyse' question."
     },
     {
       "candidate": "Saikrish (User)",
@@ -99,8 +99,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 32331,
-      "examinerSummary": "This is a strong Level 3 response that enters the top band by addressing both sides of the argument with clear economic reasoning. The candidate demonstrates sound knowledge of trade union economics (AO1) and develops logical causal chains (AO2). However, the evaluation (AO3) is underdeveloped: the conclusion does not weigh decisive factors or assess uncertainties (e.g., how wage demands interact with labour market conditions). To reach 7–8 marks, the candidate should explicitly evaluate trade-offs (e.g., 'While training may boost membership, higher fees could offset this in low-income sectors') and reach a justified verdict."
+      "latencyMs": 30173,
+      "examinerSummary": "This is a well-structured response that enters Level 3 by addressing both sides of the argument with logical economic reasoning. The analysis of factors increasing and decreasing membership is sound, but the conclusion is brief and lacks evaluative weighing of trade-offs (e.g., whether the benefits of training outweigh the costs of fees, or if industrial action risks outweigh wage gains). The response satisfies the command word by discussing both possibilities but could strengthen its evaluation to reach the top of Level 3 (7–8 marks)."
     },
     {
       "candidate": "Saikrish (User)",
@@ -111,8 +111,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (2/2)",
-      "latencyMs": 10444,
-      "examinerSummary": "Your response is excellent. You have correctly defined a public good by identifying both essential characteristics: non-rivalry and non-excludability. The inclusion of street lights as an example further demonstrates your understanding of how public goods function in real-world contexts. This is a complete and accurate answer that fully satisfies the requirements of the question."
+      "latencyMs": 9794,
+      "examinerSummary": "This is a well-constructed definition of a public good. The candidate accurately identifies both essential characteristics (non-rival and non-excludable) and provides a relevant example (street lights). The response is concise, clear, and fully meets the requirements of the question."
     },
     {
       "candidate": "Saikrish (User)",
@@ -123,8 +123,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (4/4)",
-      "latencyMs": 23674,
-      "examinerSummary": "This response earns full marks for accurately explaining two distinct reasons why young workers may be more mobile than older workers. The candidate demonstrates sound economic reasoning by linking fewer family ties to geographical mobility and greater skill adaptability to occupational mobility, both developed logically. The response is concise, directly answers the question, and avoids any misconceptions."
+      "latencyMs": 20889,
+      "examinerSummary": "This is a strong 4/4 response that fully satisfies the question requirements. The candidate demonstrates excellent knowledge of labour mobility concepts (geographical and occupational) and provides clear, logical explanations for why young workers may be more mobile than older workers. The response is concise, accurate, and directly addresses the command word 'Explain' with two distinct, well-developed points. Well done!"
     },
     {
       "candidate": "Saikrish (User)",
@@ -135,44 +135,44 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (6/6)",
-      "latencyMs": 31962,
-      "examinerSummary": "This is a strong, well-structured response that fully satisfies the 6-mark 'Analyse' question. The candidate demonstrates a clear understanding of government intervention tools to reduce pollution, using three distinct policy mechanisms: indirect taxation, subsidies, and regulations. Each point is developed with logical economic reasoning, showing how policies affect prices, production, and consumer behavior. The response aligns perfectly with Cambridge IGCSE 0455 Unit 2.11 on market failure and government intervention. Well done!"
+      "latencyMs": 28687,
+      "examinerSummary": "This is an excellent 6-mark response that fully satisfies the Cambridge IGCSE 0455 'Analyse' command. You have demonstrated a clear understanding of how government policies can reduce pollution by using three distinct, well-developed economic mechanisms: indirect taxation, subsidies, and regulations. Your analysis is precise, logically structured, and directly addresses the question. Well done!"
     },
     {
       "candidate": "Saikrish (User)",
       "questionNumber": "5(d)",
       "tariff": 8,
       "cambridgeMark": 6,
-      "mistralMark": 8,
-      "diff": 2,
-      "absErr": 2,
+      "mistralMark": 6,
+      "diff": 0,
+      "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 30950,
-      "examinerSummary": "This is a strong Level 3 response that meets all Cambridge IGCSE 0455 criteria for an 8-mark evaluative discussion. The candidate demonstrates excellent knowledge of HDI components and develops clear causal mechanisms linking emigration to living standards. Both sides of the argument are accurately addressed, with the disadvantages section (cost-of-living, political barriers) providing valid counterpoints. The conclusion effectively summarizes dependencies on host country conditions, fulfilling AO3 evaluation requirements. Minor development opportunities exist in the political barriers point (e.g., wage impact mechanism) and could have pushed this to 7/8 with deeper analysis."
+      "latencyMs": 30145,
+      "examinerSummary": "This is a well-structured, two-sided discussion that meets Level 3 criteria for knowledge and analysis. The response accurately examines both why emigrants might and might not enjoy higher living standards, using HDI components and real-world examples (Dubai, USA, Netherlands, California). However, the evaluation is brief and lacks explicit weighing of trade-offs or conditions (e.g., 'under what circumstances would emigration guarantee higher living standards?'). The conclusion could benefit from deeper comparative analysis of how factors like cost of living or visa policies interact with HDI indices. Overall, this is a strong 6/8 response that demonstrates clear understanding of economic development concepts (Unit 5.2: Poverty) and macroeconomic indicators (HDI)."
     },
     {
       "candidate": "Saikrish (User)",
       "questionNumber": "1(g)",
       "tariff": 6,
       "cambridgeMark": 4,
-      "mistralMark": 6,
-      "diff": 2,
-      "absErr": 2,
-      "band": "Point Marked (6/6)",
-      "latencyMs": 28131,
-      "examinerSummary": "This is a well-structured, balanced response that fulfils the 'Discuss' command word. The candidate demonstrates strong knowledge of fiscal policy tools and their impact on HDI components (AO1). Analysis is rigorous, with clear causal chains linking taxation, government spending, and HDI indices (AO2). The evaluation is present but could be strengthened by deeper exploration of how inflation or tax burden specifically erodes HDI metrics (e.g., reduced purchasing power for education/healthcare). The response earns full marks for its two-sided argument and economic accuracy."
+      "mistralMark": 5,
+      "diff": 1,
+      "absErr": 1,
+      "band": "Point Marked (5/6)",
+      "latencyMs": 33299,
+      "examinerSummary": "Your response demonstrates a clear understanding of how fiscal policy can improve HDI through lower taxes and increased spending on healthcare/education (AO1/AO2). You also attempt a counter-argument about opportunity costs and long-term sustainability (AO3). To reach full marks, develop the opportunity cost point with specific economic mechanisms (e.g., how reduced subsidies lower agricultural productivity or wages) and strengthen your evaluation by explicitly weighing the trade-offs between short-term HDI gains and long-term risks like inflation or debt. Avoid vague statements like 'lower production'—link directly to HDI components (e.g., GDP per capita, life expectancy)."
     },
     {
       "candidate": "Saikrish (User)",
       "questionNumber": "1(h)",
       "tariff": 6,
       "cambridgeMark": 5,
-      "mistralMark": 4,
-      "diff": -1,
-      "absErr": 1,
-      "band": "Point Marked (4/6)",
-      "latencyMs": 30613,
-      "examinerSummary": "Your response demonstrates a good understanding of the factors affecting price elasticity of demand (PED), such as income and substitutes. However, it lacks a balanced discussion weighing both sides of the argument (why demand for gold might become inelastic vs. why it might not). Additionally, the conclusion is not evaluative or reasoned. To improve, ensure you address both perspectives clearly and provide a justified conclusion based on economic reasoning. For example, you could discuss how the time period (short run vs long run) or the relative expense of gold might influence PED, as these are key factors in Cambridge IGCSE 0455 Unit 2.7."
+      "mistralMark": 3,
+      "diff": -2,
+      "absErr": 2,
+      "band": "Point Marked (3/6)",
+      "latencyMs": 27973,
+      "examinerSummary": "The response demonstrates partial understanding of factors affecting PED but contains errors in causal reasoning (e.g., income effect) and lacks a balanced discussion. While substitutes and Veblen goods are correctly identified, the analysis is underdeveloped, and the evaluation is absent. The command word 'Discuss' is not fully satisfied due to the one-sided focus and lack of evaluative weighing. Strengthen by explicitly contrasting reasons why demand might become inelastic (e.g., necessity, time period) versus elastic (e.g., substitutes, Veblen effect), and conclude with a reasoned judgment under what conditions PED would shift."
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -183,32 +183,32 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (2/2)",
-      "latencyMs": 10740,
-      "examinerSummary": "This is a well-constructed response that fully satisfies the requirements of the question. You have accurately defined the economic problem by identifying both unlimited wants and limited resources, which are the two fundamental components of scarcity as outlined in Cambridge IGCSE 0455 Unit 1.1. Your response is concise, clear, and directly answers the question without unnecessary elaboration. Excellent work!"
+      "latencyMs": 9758,
+      "examinerSummary": "Your response is excellent. You have accurately defined the economic problem by identifying both unlimited wants and limited resources, which together create scarcity. This is a complete and correct answer that fulfills all requirements for a 2-mark definition question. Well done!"
     },
     {
       "candidate": "Yuvan Kaarthik",
       "questionNumber": "2(b)",
       "tariff": 4,
       "cambridgeMark": 2,
-      "mistralMark": 4,
-      "diff": 2,
-      "absErr": 2,
-      "band": "Point Marked (4/4)",
-      "latencyMs": 20716,
-      "examinerSummary": "This response is a strong 4-mark answer that fully meets the Cambridge IGCSE 0455 requirements. The candidate demonstrates a clear understanding of labour income determinants by linking skill levels to productivity and demand/supply conditions to wage rates. Both points are distinct, economically sound, and logically explained."
+      "mistralMark": 3,
+      "diff": 1,
+      "absErr": 1,
+      "band": "Point Marked (3/4)",
+      "latencyMs": 23093,
+      "examinerSummary": "Your response shows a clear understanding of how skill levels and productivity affect labour incomes. However, the second point about demand and supply lacks a specific economic mechanism. To improve, provide a clear cause for changes in demand or supply, such as economic growth or technological advancements, rather than stating a circular relationship. This would strengthen your analysis and fully address the question's requirements."
     },
     {
       "candidate": "Yuvan Kaarthik",
       "questionNumber": "2(d)",
       "tariff": 8,
       "cambridgeMark": 6,
-      "mistralMark": 7,
-      "diff": 1,
-      "absErr": 1,
+      "mistralMark": 6,
+      "diff": 0,
+      "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 31846,
-      "examinerSummary": "This is a strong Level 3 response that effectively discusses both sides of the argument about imposing high income tax on the rich. The candidate demonstrates excellent knowledge of progressive taxation, aggregate demand, and enterprise disincentives, with clear causal reasoning. The evaluation is balanced but could be strengthened by explicitly weighing short-run redistribution benefits against long-run growth risks (e.g., capital flight, Laffer curve effects). The unrelated suggestion about reducing unemployment benefits detracts slightly from focus but does not significantly impact the overall mark."
+      "latencyMs": 29972,
+      "examinerSummary": "This is a strong Level 3 response that accurately examines both sides of the argument with clear economic reasoning. The analysis of progressive taxation’s effects on inequality, aggregate demand, and entrepreneurship is well-developed. However, the evaluation could be deeper: a more explicit weighing of trade-offs (e.g., redistribution vs. growth) and consideration of conditions (e.g., tax rate thresholds, elasticity) would elevate this to the top tier. The suggestion to reduce unemployment benefits is unrelated to the original question and does not earn credit. Well done on the balanced discussion!"
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -219,8 +219,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (2/2)",
-      "latencyMs": 10458,
-      "examinerSummary": "The candidate has provided a fully accurate and concise response to the question, earning full marks. The formula for price elasticity of supply (PES) is correctly stated as the percentage change in quantity supplied divided by the percentage change in price, which aligns perfectly with the Cambridge IGCSE 0455 syllabus requirements for Unit 2.8. This demonstrates a strong understanding of the core economic concept."
+      "latencyMs": 12263,
+      "examinerSummary": "Your response is excellent. You have correctly stated the formula for price elasticity of supply (PES) exactly as required by the Cambridge IGCSE 0455 syllabus. This is a precise and accurate answer that fully satisfies the question's requirements. Well done!"
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -231,8 +231,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (4/4)",
-      "latencyMs": 22982,
-      "examinerSummary": "Your response is well-structured and demonstrates a clear understanding of why workers might choose to work longer hours. You identified two valid reasons—earning more money for large purchases and seeking career advancement—and provided logical explanations for each. However, the point about saving due to rising interest rates is not directly relevant to working longer hours, so it was not credited. Keep focusing on clear, direct links between reasons and economic outcomes in your explanations."
+      "latencyMs": 22968,
+      "examinerSummary": "Your response is well-structured and demonstrates a clear understanding of why workers might choose to work longer hours. You identified two strong reasons with logical explanations: saving for a large purchase and seeking job promotion. The third point about saving due to interest rates was partially developed, but you still earned credit for identifying it. To maximise marks, ensure each explanation directly links the reason to the outcome of working longer hours. For example, explicitly state how longer hours lead to higher earnings or career advancement. Keep up the good work!"
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -243,32 +243,32 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (6/6)",
-      "latencyMs": 23589,
-      "examinerSummary": "This is a strong 6-mark response that clearly analyses the differences between competitive and monopoly markets. The candidate demonstrates excellent understanding of price roles (price-takers vs price-makers), barriers to entry, and the impact of competition on efficiency and quality. The response is well-structured and directly addresses the question with economic reasoning. Minor missed opportunities include discussing price elasticity of demand (PED) and monopoly profits, but these do not detract from the overall high quality."
+      "latencyMs": 25742,
+      "examinerSummary": "This is a strong 6-mark response that fully satisfies the Cambridge IGCSE 0455 requirements for a 6-mark 'Analyse' question. The candidate demonstrates a clear understanding of the key differences between competitive and monopoly markets, including price-setting behaviour, barriers to entry, and efficiency implications. The analysis is well-developed, with each point logically connected to economic principles. Minor missed opportunities include discussing price elasticity of demand (PED) and profit implications, but these are not penalised as they are not required for full marks. The response is concise, accurate, and directly addresses the question."
     },
     {
       "candidate": "Yuvan Kaarthik",
       "questionNumber": "4(d)",
       "tariff": 8,
       "cambridgeMark": 6,
-      "mistralMark": 7,
-      "diff": 1,
-      "absErr": 1,
+      "mistralMark": 6,
+      "diff": 0,
+      "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 29053,
-      "examinerSummary": "This is a strong Level 3 response. The candidate demonstrates clear understanding of trade union economics, developing both sides of the argument with logical analysis. The conclusion is well-reasoned, though the final sentence about 'training provided by trade unions' is underdeveloped and does not directly address the question. The misconception about uniform pay in unions is a minor flaw but does not significantly detract from the overall quality."
+      "latencyMs": 25595,
+      "examinerSummary": "This is a well-structured response that enters Level 3 (6–8 marks) by addressing both sides of the argument with clear economic reasoning. The analysis of inflation, working conditions, and individual negotiation is sound, but the conclusion could be strengthened by explicitly weighing the relative importance of these factors or considering conditions under which trade union membership might increase or decrease. The response avoids fatal economic misconceptions and demonstrates a good grasp of Cambridge IGCSE 0455 Unit 3.3: Workers."
     },
     {
       "candidate": "Yuvan Kaarthik",
       "questionNumber": "5(a)",
       "tariff": 2,
       "cambridgeMark": 2,
-      "mistralMark": 1,
-      "diff": -1,
-      "absErr": 1,
-      "band": "Point Marked (1/2)",
-      "latencyMs": 9580,
-      "examinerSummary": "The candidate has provided a precise and accurate definition of a public good, earning full marks. Both required characteristics—non-rivalrous and non-excludable—are correctly stated, demonstrating a clear understanding of the concept as outlined in Cambridge IGCSE 0455 Unit 2.11. This response meets the standard for a concise, point-marked definition question."
+      "mistralMark": 2,
+      "diff": 0,
+      "absErr": 0,
+      "band": "Point Marked (2/2)",
+      "latencyMs": 9069,
+      "examinerSummary": "This is a well-defined and accurate response. The candidate has correctly identified both essential characteristics of a public good: non-rivalry and non-excludability. This meets the Cambridge IGCSE 0455 syllabus requirements for a 2-mark definition question. Well done!"
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -279,8 +279,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Level 3 (Reasoned Two-Sided Discussion & Evaluation)",
-      "latencyMs": 33272,
-      "examinerSummary": "This is a strong Level 3 response that accurately examines both sides of the emigration-living standards argument using clear economic reasoning. The analysis of employment, conflict, and exploitation is well-developed, but the conclusion could better evaluate uncertainties (e.g., 'Are the long-term gains from emigration always greater than the short-term risks?'). To reach 8/8, add a comparative weighing of factors (e.g., 'For skilled emigrants, developed-country opportunities may outweigh risks, but unskilled workers face higher exploitation risks')."
+      "latencyMs": 31478,
+      "examinerSummary": "This is a well-structured Level 3 response that accurately examines both sides of the economic argument regarding emigration and living standards. The candidate demonstrates strong knowledge of economic concepts (AO1) and develops logical causal chains (AO2), particularly for employment, income, and macroeconomic factors. However, the evaluation (AO3) is underdeveloped: while both sides are addressed, the conclusion does not explicitly weigh the relative importance of factors or provide a reasoned verdict on whether emigration benefits living standards under typical conditions. For full marks (7–8/8), the candidate should deepen the evaluative section by comparing the magnitude of benefits (e.g., higher wages in developed countries) against drawbacks (e.g., exploitation, brain drain) and include decisive criteria such as 'this depends on the elasticity of labor demand in the destination country' or 'short-run hardship vs long-run adaptation'."
     },
     {
       "candidate": "Yuvan Kaarthik",
@@ -291,20 +291,20 @@
       "diff": -1,
       "absErr": 1,
       "band": "Point Marked (5/6)",
-      "latencyMs": 27808,
-      "examinerSummary": "Your response demonstrates a clear understanding of fiscal policy and its potential impacts on HDI, particularly through aggregate demand and government spending on healthcare and education. You effectively discuss both positive and negative effects, but the inclusion of supply-side and monetary policy detracts from the focus on fiscal policy. To improve, ensure all points directly relate to fiscal policy and provide a more balanced evaluative conclusion, weighing the strengths and weaknesses of fiscal policy in increasing HDI. Avoid introducing unrelated policies unless explicitly asked."
+      "latencyMs": 30883,
+      "examinerSummary": "Your response demonstrates a solid understanding of fiscal policy and its potential impacts on HDI, earning full marks for knowledge (AO1) and analysis (AO2). You correctly identified how expansionary fiscal policy can boost income and employment while also recognizing the negative effects of reduced spending on healthcare and education. However, your evaluation (AO3) is underdeveloped. The discussion of supply-side and monetary policies, while economically valid, does not directly evaluate the original question about fiscal policy. To improve, focus on weighing the trade-offs of fiscal policy (e.g., inflation vs. HDI gains) and avoid introducing unrelated policies. A clear conclusion summarizing the net impact of fiscal policy on HDI would strengthen your response."
     },
     {
       "candidate": "Cambridge ECR",
       "questionNumber": "5(a) ECR",
       "tariff": 2,
       "cambridgeMark": 0,
-      "mistralMark": 1,
-      "diff": 1,
-      "absErr": 1,
-      "band": "Point Marked (1/2)",
-      "latencyMs": 9363,
-      "examinerSummary": "The candidate partially addressed the question by mentioning government-provided goods but failed to include the essential economic characteristics of a public good: non-rivalry and non-excludability. This is a common mistake when answering definition questions. The response is not a valid definition under Cambridge IGCSE 0455 standards."
+      "mistralMark": 0,
+      "diff": 0,
+      "absErr": 0,
+      "band": "Level 0 (No creditable content)",
+      "latencyMs": 9119,
+      "examinerSummary": "This response is off-syllabus for the definition of a public good. The candidate conflated public goods with government-provided goods (merit goods) and failed to state the two essential economic characteristics: non-rivalry and non-excludability. The response does not meet the Cambridge IGCSE 0455 requirement for a valid definition."
     },
     {
       "candidate": "Cambridge ECR",
@@ -315,20 +315,20 @@
       "diff": 0,
       "absErr": 0,
       "band": "Point Marked (1/2)",
-      "latencyMs": 8901,
-      "examinerSummary": "The candidate attempted to provide the formula for price elasticity of supply but missed the critical requirement of using percentage changes. The response is partially correct but does not meet the full Cambridge IGCSE 0455 standard for this 2-mark question. The formula should be expressed as: percentage change in quantity supplied divided by percentage change in price. This is a common oversight, so focus on ensuring the full formula is memorised for future questions."
+      "latencyMs": 9528,
+      "examinerSummary": "Your response correctly identifies the two key components of the price elasticity of supply formula: quantity supplied and price. However, the formula requires the use of percentage changes in both quantity supplied and price to calculate elasticity accurately. This is a critical detail for Cambridge IGCSE Economics (Unit 2.8: Price elasticity of supply). The correct formula is: percentage change in quantity supplied divided by percentage change in price. This ensures the elasticity value is dimensionless and comparable across different products. Keep practicing the exact wording of economic formulas—it’s a common requirement in IGCSE Economics."
     },
     {
       "candidate": "Cambridge ECR",
       "questionNumber": "2(b) ECR",
       "tariff": 4,
       "cambridgeMark": 2,
-      "mistralMark": 0,
-      "diff": -2,
-      "absErr": 2,
-      "band": "Level 0 (No creditable content)",
-      "latencyMs": 21935,
-      "examinerSummary": "The candidate failed to meet the question's requirements by not explaining two distinct factors of production. To achieve marks, you must select two factors (e.g., land and labour) and explain their roles in production, such as how land provides natural resources or how labour contributes human effort. For example: 'Land includes natural resources like fertile soil and minerals, which are essential for agricultural and industrial production. Labour refers to the human effort and skills used in production, such as workers operating machinery or providing services.' This would address both AO1 (identification) and AO2 (explanation)."
+      "mistralMark": 1,
+      "diff": -1,
+      "absErr": 1,
+      "band": "Point Marked (1/4)",
+      "latencyMs": 17812,
+      "examinerSummary": "The candidate accurately identifies all four factors of production but fails to explain any two of them. The question requires economic reasoning (e.g., definitions, roles, rewards, or examples) for full marks. Focus on developing explanations for future responses."
     },
     {
       "candidate": "Cambridge ECR",
@@ -339,8 +339,8 @@
       "diff": -1,
       "absErr": 1,
       "band": "Point Marked (2/6)",
-      "latencyMs": 26352,
-      "examinerSummary": "Your response identifies key factors (worker skills, productivity, GDP) but does not analyse how these contribute to economic growth or shift aggregate supply. To achieve full marks, develop each point by explaining the economic mechanism (e.g., 'Improved skills raise productivity, which increases aggregate supply and shifts the PPC outward, leading to higher potential GDP'). Focus on causal chains linking education quality to broader economic outcomes."
+      "latencyMs": 26740,
+      "examinerSummary": "Your response identifies key economic factors related to education quality, such as improved worker skills, productivity, and GDP growth. However, to fully analyse the effect on the economy, you need to develop these points further by explaining the economic mechanisms and causal chains. For example, you could explain how improved skills increase productivity, which then shifts the aggregate supply curve to the right, leading to higher GDP. This would demonstrate a deeper understanding of how education quality impacts the economy as a whole. Keep up the good work on identifying relevant factors, and focus on developing these with economic reasoning in your next attempt."
     },
     {
       "candidate": "Cambridge ECR",
@@ -351,8 +351,8 @@
       "diff": 0,
       "absErr": 0,
       "band": "Level 1 (Simple Attempt / Definitions)",
-      "latencyMs": 29644,
-      "examinerSummary": "This response demonstrates basic knowledge of capital and consumer goods but fails to engage with the core economic question of whether resources should be reallocated. The command word 'Discuss' requires analysis and evaluation of both sides of the argument, which are entirely absent. At 49 words, this response is far too brief to earn more than Level 1 marks. The candidate has not explored the opportunity cost, long-term benefits, or conditions under which reallocation might be justified or harmful."
+      "latencyMs": 26328,
+      "examinerSummary": "This response demonstrates basic knowledge of capital and consumer goods but fails to engage with the core economic question of whether resources should be reallocated. The command word 'Discuss' requires a reasoned evaluation of both sides of the argument, including trade-offs, opportunity costs, and long-term implications. At 49 words, the response is far too brief to address an 8-mark question, and it does not meet the criteria for Level 2 or Level 3. The candidate should focus on developing economic arguments, analysing consequences, and evaluating trade-offs to meet the requirements of a 'Discuss' question."
     },
     {
       "candidate": "Cambridge ECR",
@@ -363,8 +363,8 @@
       "diff": -1,
       "absErr": 1,
       "band": "Level 2 (Reasoned Discussion / One-Sided Analysis)",
-      "latencyMs": 25054,
-      "examinerSummary": "This response demonstrates strong knowledge of capital goods and their role in economic growth, with clear analysis of how investment in capital goods enhances productivity and shifts the PPC outward. However, it fails to address the 'Discuss' requirement by only presenting one side of the argument. The opportunity cost of reallocating resources from consumer goods, short-run trade-offs, and conditions for success are entirely missing. To achieve Level 3, you must evaluate both sides of the argument, weigh short-run vs long-run effects, and provide a reasoned conclusion. Well done on the economic concepts—now focus on balancing your discussion and evaluating trade-offs."
+      "latencyMs": 24210,
+      "examinerSummary": "Your response demonstrates strong knowledge of capital goods and their role in economic growth, earning full marks for AO1 and AO2. However, it is one-sided and fails to address the 'Discuss' requirement by not evaluating the trade-offs or considering whether reallocation is always beneficial. To improve, develop a counter-argument (e.g., short-term costs of reduced consumer goods) and weigh the pros and cons to reach a reasoned conclusion. This would elevate your response to Level 3 (6–8 marks)."
     },
     {
       "candidate": "Cambridge ECR",
@@ -375,20 +375,20 @@
       "diff": -2,
       "absErr": 2,
       "band": "Level 1 (Simple Attempt / Definitions)",
-      "latencyMs": 24504,
-      "examinerSummary": "This response is fundamentally flawed due to a fatal economic misconception: it incorrectly asserts that tariffs cause consumers to switch spending to imported goods (when imports become more expensive, consumers switch away from them). The candidate also fails to address the command word 'Discuss' by only presenting one side of the argument (protectionism increases unemployment) without evaluating whether it might reduce unemployment under any conditions. The response is capped at Level 1 due to these errors and the absence of balanced analysis or evaluation."
+      "latencyMs": 25624,
+      "examinerSummary": "This response contains an attempt at both sides of the question, but is capped at Level 2 due to a fundamental economic misconception: claiming that setting a maximum price above equilibrium increases price, revenue, supply, or causes inflation. In official Cambridge IGCSE 0455 economics, a price ceiling set above equilibrium is non-binding and ineffective (the market continues to clear at equilibrium). Accurate analysis is credited for the affordability impact of price ceilings below equilibrium, but Level 3 requires sound economics throughout."
     },
     {
       "candidate": "Cambridge ECR",
       "questionNumber": "4(d) ECR-2",
       "tariff": 8,
       "cambridgeMark": 4,
-      "mistralMark": 5,
-      "diff": 1,
-      "absErr": 1,
+      "mistralMark": 4,
+      "diff": 0,
+      "absErr": 0,
       "band": "Level 2 (Reasoned Discussion / One-Sided Analysis)",
-      "latencyMs": 27549,
-      "examinerSummary": "Your response addresses the question by discussing both the benefits and drawbacks of a national minimum wage. You correctly identify that higher incomes improve living standards and reduce poverty, and you also explain how increased labour costs might lead to unemployment. However, your discussion lacks a balanced evaluation of the trade-offs and a reasoned conclusion. To improve, ensure you weigh the short-run and long-run effects, consider the role of elasticity (e.g., how responsive firms are to wage increases), and provide a clear verdict on whether the benefits outweigh the drawbacks. Your analysis would benefit from deeper economic reasoning, such as how productivity changes or the impact on different sectors of the economy."
+      "latencyMs": 29518,
+      "examinerSummary": "This is Cambridge IGCSE 0455 2 response (3–5 marks) that addresses both sides of the argument but lacks depth in evaluation and a reasoned conclusion. The candidate demonstrates good knowledge and analysis of the economic mechanisms of a national minimum wage, including its benefits (higher incomes, poverty reduction) and drawbacks (unemployment risk, wage differentials). However, the response is capped at Level 2 due to the absence of evaluative weighing (e.g., weighing short-run job losses against long-run productivity gains) and a conclusion that directly answers 'whether or not' a minimum wage benefits workers. The phrase 'will definitely benefit workers' is overly assertive and does not reflect the nuanced economic trade-offs involved."
     },
     {
       "candidate": "Cambridge ECR",
@@ -399,8 +399,8 @@
       "diff": -1,
       "absErr": 1,
       "band": "Level 2 (Reasoned Discussion / One-Sided Analysis)",
-      "latencyMs": 29564,
-      "examinerSummary": "This is a well-structured Level 2 response that accurately identifies and develops key economic arguments for and against free trade in developing nations. The candidate demonstrates strong knowledge (AO1) and analysis (AO2) but fails to evaluate (AO3) the relative importance of these factors or reach a reasoned conclusion. To progress to Level 3, the candidate should weigh the trade-offs (e.g., short-run revenue gains vs long-term structural unemployment), consider stakeholder impacts, and explicitly answer whether free trade benefits developing nations overall. The response is limited in depthdue to the lack of evaluative depth."
+      "latencyMs": 29910,
+      "examinerSummary": "Your response demonstrates a good understanding of the economic arguments for and against free trade in developing nations. You correctly identify key benefits (export revenue, cheaper imports) and drawbacks (infant industry destruction, commodity dependency). However, your analysis is capped at Level 2 because two points lack causal development, and your conclusion does not evaluate which factors dominate or under what conditions free trade might be more beneficial or harmful. To reach Level 3, ensure every point is fully developed with clear economic reasoning, and provide a reasoned conclusion weighing the trade-offs (e.g., short-run vs long-run effects, elasticity of demand for primary commodities, or government policy responses)."
     }
   ]
 }

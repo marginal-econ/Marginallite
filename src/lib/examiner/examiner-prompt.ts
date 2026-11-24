@@ -46,10 +46,12 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
 - 2-MARK QUESTIONS (Define / State / Identify / Calculate):
   * Award 1 mark per accurate knowledge component, formula, or identified factor (max 2).
   * Concise 1–2 sentence answers earn FULL 2/2 marks.
+  * PUBLIC GOOD DEFINITION: A public good is defined exclusively by non-rivalry (1m) and non-excludability (1m). Mentioning government-provided goods or merit goods (e.g. healthcare, education) without non-rivalry and non-excludability earns ZERO marks (0/2).
   * DYNAMIC DIRECTIONALITY ON CHANGE QUESTIONS: When a question asks for causes of an INCREASE or DECREASE (e.g. 'causes of an increase in the demand for bank loans'), each credited factor must describe a directional change (e.g. 'fall in interest rates', 'rise in consumer confidence', 'higher income'). Static adjectives or levels alone (e.g. 'low interest rates', 'consumer confidence high' without a stated movement or change) do NOT earn the mark (award 0) because they do not explain a change.
 - 4-MARK QUESTIONS (Explain):
-  * 2 distinct developed points × 2 marks each (1m valid identification + 1m logical causal explanation/consequence).
-  * Extra points beyond 2 cannot exceed 4 marks.
+  * 2 distinct developed points × 2 marks each (1m valid identification + 1m logical causal explanation/consequence). Extra points beyond 2 cannot exceed 4 marks.
+  * IDENTIFICATION ONLY (NO EXPLANATION): Award 1 mark per valid syllabus factor identified (up to 2/4) even if explanation/development is completely absent. Never award 0/4 when valid factors are correctly named.
+  * CIRCULAR / TAUTOLOGICAL STATEMENTS (ZERO DEVELOPMENT): A development mark REQUIRES a clear economic causal mechanism. Tautological or circular statements that simply restate the premise (e.g. 'wherever labour is more demanded, their income is higher', 'more skilled so income increases') receive IDENTIFICATION ONLY (1 mark) and ZERO development marks. Naming two factors with circular/undeveloped assertions is strictly capped at 2/4.
 - 6-MARK ANALYSE QUESTIONS (Pure AO2 Analysis: AO1=0, AO2=6, AO3=0):
   * Full 6 marks via EITHER:
     (A) 3 developed analysis points (3 × 2m = 6m: 1m cause/factor + 1m economic development/consequence), OR
@@ -60,12 +62,15 @@ CAMBRIDGE IGCSE 0455 MARKING METHODOLOGY
   * When a [DIAGRAM: ...] tag appears in the candidate text, evaluate its technical accuracy and integration positively.
 - 6-MARK SECTION A DISCUSS QUESTIONS (AO1=2, AO2=2, AO3=2):
   * Up to 4 marks for why it might + up to 4 marks for why it might not (maximum 6 total). One-sided responses capped at 4/6.
+  * ON-POLICY COUNTER-ARGUMENT: Counter-arguments must evaluate the specific policy in the question. Proposing or discussing an unrelated alternative policy (e.g. discussing supply-side subsidies on a fiscal policy question) does not earn evaluation credit and is capped at max 4/6.
 - Separate identify and development credit: never award development if the core point is economically wrong.
 - NO DOUBLE CREDIT for repeating the same point or mirror statements.
 - Respect official conventions: "owtte" (accept equivalent meaning) and "ecf" (error carried forward in calculations).
 
 2. LEVELS-BASED QUESTIONS (8-mark Discuss whether or not... — Official Table A):
-- Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, clear logical analysis, and thoughtful evaluation of uncertainties/trade-offs (short run vs long run, elasticity, scale, stakeholders) leading to a reasoned conclusion.
+- Level 3 (6–8 marks): Reasoned discussion accurately examining BOTH sides of the economic argument, clear logical analysis, and thoughtful evaluation leading to a conclusion.
+  * ENTRY LEVEL 3 (6 MARKS): Standard two-sided discussion with good analysis on both sides, but where the conclusion/evaluation is brief, generic, a restatement of points, or lacks explicit evaluative weighing of trade-offs / decisive criteria. In Cambridge 0455, a two-sided essay with a brief or underdeveloped conclusion is awarded 6/8.
+  * TOP LEVEL 3 (7–8 MARKS): Reserved strictly for responses that provide deep multi-link causal chains on both sides AND an explicit evaluative weighing of trade-offs, short-run vs long-run effects, degree of elasticity, or decisive conditions in a reasoned conclusion. If the conclusion is brief or evaluation is underdeveloped, award 6/8.
 - Level 2 (3–5 marks): Reasoned discussion using economic information and clear analysis, but may lack depth or be one-sided (one-sided responses are capped in Level 2, max 5/8).
 - Level 1 (1–2 marks): Simple attempt using economic definitions/terminology with occasional understanding.
 - Level 0 (0 marks): Nothing creditable.

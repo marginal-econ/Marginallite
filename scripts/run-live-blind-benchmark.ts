@@ -379,6 +379,7 @@ async function runLiveBlindBenchmark() {
   }
 
   const results: ResultRow[] = [];
+  const reportPath = path.resolve("scripts/live-blind-mistral-report.json");
 
   for (let i = 0; i < BENCHMARK_CASES.length; i++) {
     const tc = BENCHMARK_CASES[i]!;
@@ -416,6 +417,30 @@ async function runLiveBlindBenchmark() {
         latencyMs: latency,
         examinerSummary: outcome.grading.examiner_summary || "",
       });
+
+      // Save incremental progress after each case
+      const currentExact = results.filter((r) => r.absErr === 0).length;
+      const currentWithin1 = results.filter((r) => r.absErr <= 1).length;
+      const currentMae = results.reduce((s, r) => s + r.absErr, 0) / results.length;
+      fs.writeFileSync(
+        reportPath,
+        JSON.stringify(
+          {
+            summary: {
+              total: results.length,
+              exact: currentExact,
+              within1: currentWithin1,
+              mae: currentMae,
+            },
+            results,
+          },
+          null,
+          2,
+        ),
+      );
+
+      // Brief pause to stay well within Mistral rate limits
+      await new Promise((r) => setTimeout(r, 1200));
     } catch (err: any) {
       console.log(`ERROR: ${err.message}`);
     }
@@ -435,8 +460,7 @@ async function runLiveBlindBenchmark() {
   console.log(`Within ±1 Mark:        ${within1}/${total} (${((within1 / total) * 100).toFixed(1)}%)`);
   console.log(`Mean Absolute Error:   ${mae.toFixed(2)} marks`);
 
-  // Write report to artifact directory
-  const reportPath = path.resolve("scripts/live-blind-mistral-report.json");
+  // Write final report to artifact directory
   fs.writeFileSync(reportPath, JSON.stringify({ summary: { total, exact, within1, mae }, results }, null, 2));
   console.log(`Detailed results saved to: ${reportPath}`);
 }
