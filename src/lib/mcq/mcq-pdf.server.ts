@@ -13,9 +13,13 @@
  *   wrong (or wants to review) — text-only, generated on demand per
  *   question, never used to grade.
  */
-import { chat } from "../ai.server";
+import { chat, visionChat } from "../ai.server";
 import { MODEL_EXAMINER } from "../examiner/config";
 import { extractFirstJsonObject } from "../examiner/json";
+import { classifyMcqQuestion } from "../mcq-domain";
+import { MCQ_MISTAKE_META_MAP, type McqMistakeType } from "../mcq-mistakes";
+import { cleanStars } from "../utils";
+import { formatThreeLineMcqFeedback } from "./mcq-feedback-format";
 import { IGCSE_0455_SECTIONS } from "./mcq.server";
 
 export type PdfMcqEra = "legacy" | "2027";
@@ -352,40 +356,35 @@ export async function explainPdfMcqAnswer(options: {
   const isStudentCorrect = userAnswer !== null && userAnswer === correctAnswer;
 
   const systemPrompt = [
-    "You are a Principal Examiner for Cambridge IGCSE Economics (0455)",
-    `(${"IGCSE Paper 1"}) delivering a strictly accurate, question-specific diagnostic breakdown for a real past paper multiple-choice question.`,
+    "You are a Cambridge International IGCSE Economics (0455) Principal Examiner",
+    `(${"Paper 1 Multiple Choice"}) delivering a strictly accurate, 3-line diagnostic breakdown for a past paper multiple-choice question.`,
+    "",
+    "CRITICAL CONSTRAINT - ULTRA-CONCISE 3 LINES (CANNOT EXCEED 3 LINES):",
+    "High school students will not read long, grueling essays. Your entire explanation MUST NOT EXCEED 3 LINES.",
+    "Keep it ultra-concise, teenage-accessible, razor-sharp, and 100% pitch-accurate to Cambridge 0455 conventions:",
+    `1. correctReasoning: Exactly ONE short, punchy sentence (max 16 words, under 100 chars) stating why Option ${correctAnswer} is correct.`,
+    isStudentCorrect
+      ? `2. distractorTrap: Exactly ONE short sentence (max 15 words, under 95 chars) diagnosing the top tempting distractor trap avoided.`
+      : userAnswer
+        ? `2. distractorTrap: Exactly ONE short sentence (max 15 words, under 95 chars) diagnosing why Option ${userAnswer} fails.`
+        : "2. distractorTrap: Exactly ONE short sentence (max 15 words, under 95 chars) diagnosing the main distractor trap.",
+    "3. keyRule: Exactly ONE punchy Cambridge golden rule or formula takeaway (max 12 words, under 85 chars).",
     "",
     "STRICT ACCURACY & GROUNDING RULES:",
     hasImage
-      ? "1. READ THE ATTACHED OFFICIAL PDF IMAGE FIRST. Inspect EVERY word of the stem, ALL axis labels, curve labels (e.g. D1->D2, S1->S2, AD/AS, MC/MR), shaded areas (e.g. W, X, Y, Z), table numbers, and the EXACT wording of Options A, B, C, and D directly from the image. If the OCR text excerpt below is incomplete or garbled, TRUST THE PDF IMAGE 100%."
+      ? "1. READ THE ATTACHED OFFICIAL PDF IMAGE FIRST. Inspect EVERY word of the stem, ALL axis labels, curve labels (e.g. D1->D2, S1->S2, AD/AS, PPC), shaded areas, table numbers, and the EXACT wording of Options A, B, C, and D directly from the image. If the OCR text excerpt below is incomplete or garbled, TRUST THE PDF IMAGE 100%."
       : "1. Base your explanation strictly on the exact question stem and options provided. Never invent numbers, curve labels, or statements that do not appear in the question.",
-    `2. The official Cambridge IGCSE 0455 mark scheme answer is Option ${correctAnswer}. Never contradict the mark scheme; prove rigorously why Option ${correctAnswer} is uniquely true under Cambridge IGCSE 0455 conventions.`,
-    "3. QUOTE OR REFERENCE THE ACTUAL OPTION CONTENT: In correctReasoning, explicitly state what Option " +
-      correctAnswer +
-      " says (or depicts in the diagram/table) and derive step-by-step why it is true. For any calculation, show exact formula, substituted numbers, sign, and final value.",
-    isStudentCorrect
-      ? `4. THE STUDENT ANSWERED CORRECTLY (Option ${correctAnswer}). In distractorTrap, identify the #1 most tempting WRONG option from this exact question (naming its exact letter A/B/C/D and quoting/describing what it says) and explain precisely why that distractor fails so the student reinforces their mastery.`
-      : userAnswer
-        ? `4. THE STUDENT ANSWERED INCORRECTLY (picked Option ${userAnswer} instead of ${correctAnswer}). In distractorTrap, specifically quote/describe what Option ${userAnswer} says and explain the exact economic flaw in Option ${userAnswer}, then briefly note why the remaining wrong options fail.`
-        : "4. In distractorTrap, identify the #1 most deceptive wrong option letter in this question and explain why candidates fall for it.",
-    "5. In concept, name the EXACT Cambridge IGCSE 0455 syllabus topic actually tested by THIS question (do not blindly repeat the fallback topic hint if the PDF image tests a different topic).",
-    "6. In speedTip, give a concrete, question-specific elimination shortcut referencing an exact keyword, qualifier, axis, or calculation check from THIS question (no vague generic advice).",
-    "7. NO ASTERISKS: Never use asterisks (* or **) anywhere in any JSON string. Do not use markdown bold, italics, or asterisk bullets. Return plain text only with zero asterisks.",
+    `2. The official Cambridge 0455 mark scheme answer is Option ${correctAnswer}. Never contradict the mark scheme; prove rigorously why Option ${correctAnswer} is uniquely true under Cambridge 0455 conventions.`,
+    "3. NO ASTERISKS: Never use asterisks (* or **) anywhere in any JSON string. Do not use markdown bold, italics, or asterisk bullets. Return plain text only.",
+    "4. LENGTH: Keep each of the 3 fields to 1 single concise sentence (under 12-16 words each, max 100 characters).",
     "",
     "Return ONLY a single valid JSON object (no markdown fences, no commentary outside JSON) with these exact keys:",
-    '- "concept": exact Cambridge IGCSE 0455 syllabus unit & specific concept tested in this question',
-    '- "keyRule": the core economic principle, formula, or Cambridge rule governing this exact question',
-    '- "correctReasoning": exact step-by-step worked proof quoting Option ' +
-      correctAnswer +
-      " and showing every diagram/table/calculation step",
-    '- "distractorTrap": specific diagnosis of ' +
-      (isStudentCorrect
-        ? "the top tempting wrong option letter the student successfully avoided"
-        : userAnswer
-          ? `why Option ${userAnswer} is wrong and how Cambridge set that trap`
-          : "the main distractor trap Cambridge set in this question"),
-    '- "speedTip": concrete elimination shortcut specific to this question (< 45 seconds)',
-    '- "summary": a concise 3-4 sentence explanation walking straight through this exact question',
+    '- "concept": exact Cambridge IGCSE 0455 syllabus unit & specific concept tested (short phrase)',
+    `- "correctReasoning": exactly ONE ultra-concise sentence (max 16 words) proving why Option ${correctAnswer} is correct`,
+    '- "distractorTrap": exactly ONE ultra-concise sentence (max 15 words) explaining the trap / why the wrong option fails',
+    '- "keyRule": exactly ONE ultra-concise sentence (max 12 words) with the Cambridge rule or takeaway formula',
+    '- "speedTip": optional short elimination tip (max 12 words)',
+    '- "summary": exactly 3 lines combining the 3 points above separated by newline',
   ].join("\n");
 
   const userMessage = [
@@ -423,7 +422,7 @@ export async function explainPdfMcqAnswer(options: {
         systemPrompt,
         prompt: userMessage,
         imageDataUrls: [questionImageDataUrl],
-        maxCompletionTokens: 1600,
+        maxCompletionTokens: 700,
         userId: userId ?? null,
         feature: "mcq_explain_vision",
       });
@@ -445,7 +444,7 @@ export async function explainPdfMcqAnswer(options: {
       temperature: 0.1,
       json: true,
       reasoningEffort: "low",
-      maxCompletionTokens: 1400,
+      maxCompletionTokens: 600,
       userId: userId ?? null,
       feature: "mcq_explain_text",
       messages: [
@@ -462,28 +461,75 @@ export async function explainPdfMcqAnswer(options: {
     const summary = typeof p.summary === "string" && p.summary.trim() ? p.summary.trim() : "";
     const correctReasoning =
       typeof p.correctReasoning === "string" ? p.correctReasoning.trim() : "";
-    const text = summary || correctReasoning || resultText.trim();
+    const distractorTrap =
+      typeof p.distractorTrap === "string" ? p.distractorTrap.trim() : "";
+    const keyRule =
+      typeof p.keyRule === "string" ? p.keyRule.trim() : "";
+    const speedTip =
+      typeof p.speedTip === "string" ? p.speedTip.trim() : "";
 
-    const diagnostic: McqDiagnostic = {
+    const rawDiagnostic: McqDiagnostic = {
       concept:
         typeof p.concept === "string" && p.concept.trim()
           ? p.concept.trim()
           : `${inferred.unit}: ${inferred.subtopic}`,
-      keyRule: typeof p.keyRule === "string" ? p.keyRule.trim() : "",
-      correctReasoning: correctReasoning || text,
-      distractorTrap: typeof p.distractorTrap === "string" ? p.distractorTrap.trim() : "",
-      speedTip: typeof p.speedTip === "string" ? p.speedTip.trim() : "",
+      keyRule,
+      correctReasoning: correctReasoning || summary,
+      distractorTrap,
+      speedTip,
     };
 
-    const finalResult = cleanStars({ text, diagnostic, visionGrounded });
+    // Guarantee the explanation is strictly at most 3 concise, pitch-accurate lines
+    const formatted = formatThreeLineMcqFeedback({
+      explanation: { diagnostic: rawDiagnostic, text: summary },
+      correctAnswer,
+      userAnswer,
+      isCorrect: isStudentCorrect,
+      topic: inferred.topic,
+      subtopic: inferred.subtopic,
+      unit: inferred.unit,
+      mistakeType,
+    });
+
+    const diagnostic: McqDiagnostic = {
+      concept: formatted.concept ?? rawDiagnostic.concept,
+      keyRule: formatted.line3.text,
+      correctReasoning: formatted.line1.text,
+      distractorTrap: formatted.line2.text,
+      speedTip: speedTip ? cleanStars(speedTip) : formatted.line3.text,
+    };
+
+    const finalResult = cleanStars({
+      text: formatted.plainText,
+      diagnostic,
+      visionGrounded,
+    });
     if (paperId && !mistakeType) {
       await savePaperExplanationServer(paperId, number, finalResult).catch(() => {});
     }
     return finalResult;
   }
 
+  const fallbackFormatted = formatThreeLineMcqFeedback({
+    explanation: resultText.trim(),
+    correctAnswer,
+    userAnswer,
+    isCorrect: isStudentCorrect,
+    topic: inferred.topic,
+    subtopic: inferred.subtopic,
+    unit: inferred.unit,
+    mistakeType,
+  });
+
   const fallbackResult = cleanStars({
-    text: resultText.trim(),
+    text: fallbackFormatted.plainText,
+    diagnostic: {
+      concept: `${inferred.unit}: ${inferred.subtopic}`,
+      correctReasoning: fallbackFormatted.line1.text,
+      distractorTrap: fallbackFormatted.line2.text,
+      keyRule: fallbackFormatted.line3.text,
+      speedTip: fallbackFormatted.line3.text,
+    },
     visionGrounded,
   });
   if (paperId && !mistakeType) {

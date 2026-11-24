@@ -279,7 +279,7 @@ export function questionRequiresDiagram(question?: string | null): boolean {
 
 export function essayHasDiagram(essayText?: string | null): boolean {
   if (!essayText) return false;
-  return /\[DIAGRAM:[^\]]*\]/i.test(essayText);
+  return /\[DIAGRAM:[^\]]*\]|\{DIAGRAM:[^\}]*\}/i.test(essayText);
 }
 
 export function applyRequiredDiagramGuardrail(

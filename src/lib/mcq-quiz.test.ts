@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveCorrectAnswerForQuestion } from "./mcq-quiz.server";
 import {
   buildQuizResultsCsv,
   calculateQuizPoints,
@@ -181,7 +182,6 @@ describe("MCQ Live Quiz Engine (Blooket / Quizizz mode)", () => {
   });
 
   it("resolves correct answers for custom questions cleanly without ReferenceError", async () => {
-    const { resolveCorrectAnswerForQuestion } = await import("./mcq-quiz.server");
     const meta = {
       pin: "123456",
       title: "Custom Quiz",

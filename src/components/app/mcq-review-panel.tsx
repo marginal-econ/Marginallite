@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn, stripStars } from "@/lib/utils";
+import { formatThreeLineMcqFeedback } from "@/lib/mcq/mcq-feedback-format";
 import {
   getSyllabusTopicMeta,
   MCQ_DOMAIN_LABEL,
@@ -820,47 +821,91 @@ export function McqQuestionReviewList({
                           <AlertTriangle className="size-3.5 shrink-0" />
                           <span>{explanation.error}</span>
                         </div>
-                      ) : explanation.diagnostic ? (
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center justify-between gap-1">
-                            <span className="font-semibold text-primary text-[11px]">
-                              {stripStars(explanation.diagnostic.concept)}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 text-[10px] py-0"
-                            >
-                              Ans: {q.correct_answer}
-                            </Badge>
+                      ) : (() => {
+                        const formatted = formatThreeLineMcqFeedback({
+                          explanation,
+                          correctAnswer: q.correct_answer,
+                          userAnswer: q.selected,
+                          isCorrect: q.correct,
+                        });
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-1">
+                              <span className="font-semibold text-primary text-[11px] truncate">
+                                {formatted.concept ?? (explanation.diagnostic ? stripStars(explanation.diagnostic.concept) : `Q${q.number} Breakdown`)}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {explanation.visionGrounded ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="gap-0.5 border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300 text-[9px] py-0 px-1"
+                                  >
+                                    <Eye className="h-2.5 w-2.5" />
+                                    Vision
+                                  </Badge>
+                                ) : null}
+                                <Badge
+                                  variant="outline"
+                                  className="text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 text-[10px] py-0"
+                                >
+                                  Ans: {q.correct_answer}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Strictly 3 Punchy Lines */}
+                            <div className="space-y-1.5 rounded-md border border-border/60 bg-background/60 p-2">
+                              {/* Line 1: Why Correct */}
+                              <div className="flex items-start gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[9px] font-bold py-0 px-1 shrink-0"
+                                >
+                                  {formatted.line1.badge}
+                                </Badge>
+                                <p className="text-[11px] text-foreground/90 font-medium leading-snug">
+                                  {formatted.line1.text}
+                                </p>
+                              </div>
+
+                              {/* Line 2: The Trap */}
+                              {formatted.line2.text ? (
+                                <div className="flex items-start gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[9px] font-bold py-0 px-1 shrink-0",
+                                      q.correct
+                                        ? "bg-muted text-muted-foreground border-border/70"
+                                        : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30",
+                                    )}
+                                  >
+                                    {formatted.line2.badge}
+                                  </Badge>
+                                  <p className="text-[11px] text-foreground/85 leading-snug">
+                                    {formatted.line2.text}
+                                  </p>
+                                </div>
+                              ) : null}
+
+                              {/* Line 3: Cambridge Takeaway */}
+                              {formatted.line3.text ? (
+                                <div className="flex items-start gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[9px] font-bold py-0 px-1 shrink-0"
+                                  >
+                                    {formatted.line3.badge}
+                                  </Badge>
+                                  <p className="text-[11px] text-foreground/85 leading-snug">
+                                    {formatted.line3.text}
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
-
-                          <p className="text-[11px] text-foreground/90 leading-normal">
-                            {stripStars(explanation.diagnostic.correctReasoning)}
-                          </p>
-
-                          {explanation.diagnostic.keyRule ? (
-                            <div className="rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[11px] text-foreground/90">
-                              <span className="font-semibold text-amber-600 dark:text-amber-400">
-                                Rule:{" "}
-                              </span>
-                              {stripStars(explanation.diagnostic.keyRule)}
-                            </div>
-                          ) : null}
-
-                          {explanation.diagnostic.distractorTrap && !q.correct ? (
-                            <div className="rounded border border-rose-500/20 bg-rose-500/5 px-2 py-1.5 text-[11px] text-foreground/90">
-                              <span className="font-semibold text-rose-600 dark:text-rose-400">
-                                Trap:{" "}
-                              </span>
-                              {stripStars(explanation.diagnostic.distractorTrap)}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          {stripStars(explanation.text)}
-                        </p>
-                      )}
+                        );
+                      })()}
                     </div>
                   ) : null}
                 </li>

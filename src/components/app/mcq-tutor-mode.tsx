@@ -48,6 +48,7 @@ import {
   type GradedQuestion,
   type TopicStat,
 } from "./mcq-review-panel";
+import { formatThreeLineMcqFeedback } from "@/lib/mcq/mcq-feedback-format";
 
 type Letter = "A" | "B" | "C" | "D";
 type AnnotateTool = "pen" | "eraser";
@@ -1229,6 +1230,8 @@ export function McqTutorMode({
                     isCorrect={true}
                     mistakeType={null}
                     onRetry={() => onExplainQuestion(currentNumber, null)}
+                    questionStem={stemBlobs.find((s) => s.number === currentNumber)?.text ?? ""}
+                    questionMeta={questionMeta}
                   />
                 )}
 
@@ -1395,6 +1398,8 @@ export function McqTutorMode({
                       isCorrect={false}
                       mistakeType={selectedMistake}
                       onRetry={() => onExplainQuestion(currentNumber, selectedMistake)}
+                      questionStem={stemBlobs.find((s) => s.number === currentNumber)?.text ?? ""}
+                      questionMeta={questionMeta}
                     />
 
                     <TutorNextActionBar
@@ -1442,6 +1447,8 @@ function ExaminerRepairCard({
   isCorrect,
   mistakeType,
   onRetry,
+  questionStem,
+  questionMeta,
 }: {
   explanation: ExplanationState;
   correctAnswer: Letter;
@@ -1449,99 +1456,140 @@ function ExaminerRepairCard({
   isCorrect: boolean;
   mistakeType: McqMistakeType | null;
   onRetry: () => void;
+  questionStem?: string;
+  questionMeta?: ReturnType<typeof classifyMcqQuestion>;
 }) {
-  if (explanation === "loading") {
-    return (
-      <Card className="border-primary/25 bg-primary/[0.03]">
-        <CardContent className="p-3.5 flex items-center gap-2.5 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-          <span>Principal Examiner is analyzing why Option {correctAnswer} is uniquely right…</span>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isLoading = explanation === "loading";
+  const hasError = typeof explanation === "object" && explanation !== null && "error" in explanation;
 
-  if ("error" in explanation) {
-    return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="p-3.5 flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>{explanation.error}</span>
-          </div>
-          <Button type="button" size="sm" variant="outline" onClick={onRetry} className="h-7 px-2 text-xs gap-1">
-            <RefreshCw className="h-3 w-3" />
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const d = explanation.diagnostic;
+  const formatted = useMemo(
+    () =>
+      formatThreeLineMcqFeedback({
+        explanation:
+          typeof explanation === "object" && explanation !== null && !("error" in explanation)
+            ? explanation
+            : null,
+        correctAnswer,
+        userAnswer,
+        isCorrect,
+        questionStem,
+        topic: questionMeta?.topic,
+        subtopic: questionMeta?.subtopic,
+        unit: questionMeta?.unit,
+        mistakeType,
+      }),
+    [explanation, correctAnswer, userAnswer, isCorrect, questionStem, questionMeta, mistakeType],
+  );
 
   return (
-    <Card className="border-border/80 shadow-xs overflow-hidden">
-      <CardHeader className="py-2.5 px-3.5 border-b border-border/60 bg-muted/25">
-        <div className="flex items-center justify-between gap-2">
+    <Card className="border-border/80 shadow-xs overflow-hidden animate-in fade-in duration-150">
+      <CardHeader className="py-2 px-3 border-b border-border/60 bg-muted/25">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
           <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>Examiner Repair Breakdown</span>
+            <span>{isCorrect ? "Examiner Confirmation" : "Examiner Repair Breakdown"}</span>
           </CardTitle>
-          <Badge
-            variant="outline"
-            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] py-0"
-          >
-            Mark Scheme: {correctAnswer}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {isLoading ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] text-muted-foreground">
+                <Loader2 className="h-2.5 w-2.5 animate-spin text-primary" />
+                <span>Verifying</span>
+              </span>
+            ) : explanation &&
+              typeof explanation === "object" &&
+              "visionGrounded" in explanation &&
+              explanation.visionGrounded ? (
+              <Badge
+                variant="outline"
+                className="gap-1 border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300 text-[10px] py-0 px-1.5"
+                title="Verified directly against official Cambridge PDF question diagram & stem"
+              >
+                <Eye className="h-2.5 w-2.5" />
+                <span>PDF Vision</span>
+              </Badge>
+            ) : null}
+            <Badge
+              variant="outline"
+              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] py-0"
+            >
+              Mark Scheme: {correctAnswer}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
 
-      <CardContent className="p-3.5 space-y-2.5 text-xs leading-relaxed">
-        {d ? (
-          <>
-            {d.keyRule ? (
-              <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
-                <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300 text-[11px] mb-0.5">
-                  <Lightbulb className="h-3.5 w-3.5" />
-                  <span>Golden Rule</span>
-                </div>
-                <p className="text-foreground/90">{stripStars(d.keyRule)}</p>
-              </div>
-            ) : null}
+      <CardContent className="p-3 space-y-2 text-xs">
+        {formatted.concept ? (
+          <div className="text-[11px] font-semibold text-primary truncate pb-0.5">
+            {formatted.concept}
+          </div>
+        ) : null}
 
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-                Why Option {correctAnswer} Works
-              </span>
-              <p className="text-foreground/90">{stripStars(d.correctReasoning)}</p>
+        {/* Strictly 3 Punchy Lines: Option Proof, The Trap, Takeaway */}
+        <div className="space-y-2 rounded-lg border border-border/70 bg-background/50 p-2.5">
+          {/* Line 1: Why Correct */}
+          <div className="flex items-start gap-2">
+            <Badge
+              variant="outline"
+              className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] font-bold py-0.5 px-1.5 shrink-0"
+            >
+              {formatted.line1.badge}
+            </Badge>
+            <p className="text-foreground/90 font-medium text-xs leading-relaxed">
+              {formatted.line1.text}
+            </p>
+          </div>
+
+          {/* Line 2: The Trap */}
+          {formatted.line2.text ? (
+            <div className="flex items-start gap-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] font-bold py-0.5 px-1.5 shrink-0",
+                  isCorrect
+                    ? "bg-muted text-muted-foreground border-border/70"
+                    : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30",
+                )}
+              >
+                {formatted.line2.badge}
+              </Badge>
+              <p className="text-foreground/85 text-xs leading-relaxed">
+                {formatted.line2.text}
+              </p>
             </div>
+          ) : null}
 
-            {d.distractorTrap && !isCorrect ? (
-              <div className="rounded-lg border border-rose-500/25 bg-rose-500/[0.06] px-3 py-2">
-                <div className="font-bold text-rose-700 dark:text-rose-300 text-[11px] mb-0.5">
-                  The Trap {userAnswer ? `(Why Option ${userAnswer} Fails)` : ""}
-                </div>
-                <p className="text-foreground/90">{stripStars(d.distractorTrap)}</p>
-              </div>
-            ) : null}
+          {/* Line 3: Cambridge Takeaway */}
+          {formatted.line3.text ? (
+            <div className="flex items-start gap-2">
+              <Badge
+                variant="outline"
+                className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-bold py-0.5 px-1.5 shrink-0"
+              >
+                {formatted.line3.badge}
+              </Badge>
+              <p className="text-foreground/85 text-xs leading-relaxed">
+                {formatted.line3.text}
+              </p>
+            </div>
+          ) : null}
+        </div>
 
-            {d.speedTip ? (
-              <div className="rounded-lg border border-primary/20 bg-primary/[0.04] px-3 py-2">
-                <div className="flex items-center gap-1.5 font-bold text-primary text-[11px] mb-0.5">
-                  <Zap className="h-3.5 w-3.5" />
-                  <span>45-Second Speed Tip</span>
-                </div>
-                <p className="text-foreground/90">{stripStars(d.speedTip)}</p>
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-foreground/90">{stripStars(explanation.text)}</p>
-        )}
-
-        {!isCorrect && mistakeType ? (
-          <div className="flex justify-end pt-1">
+        {hasError ? (
+          <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px] text-muted-foreground">
+            <span>Vision verification delayed. Showing instant syllabus breakdown.</span>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              <RefreshCw className="h-3 w-3" />
+              <span>Retry Vision</span>
+            </button>
+          </div>
+        ) : !isCorrect && mistakeType ? (
+          <div className="flex justify-end pt-0.5">
             <button
               type="button"
               onClick={onRetry}
@@ -1549,7 +1597,7 @@ function ExaminerRepairCard({
               title="Re-run explanation specifically focused on your tagged mistake type"
             >
               <RefreshCw className="h-3 w-3" />
-              <span>Tailor specifically to {MCQ_MISTAKE_META_MAP[mistakeType].shortLabel}</span>
+              <span>Tailor to {MCQ_MISTAKE_META_MAP[mistakeType].shortLabel}</span>
             </button>
           </div>
         ) : null}

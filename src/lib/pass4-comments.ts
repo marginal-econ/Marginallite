@@ -657,6 +657,103 @@ export function findHighlightSpanInText(
 }
 
 /**
+ * Checks whether the manuscript surrounding a diagram thoroughly explains
+ * its economic transmission mechanism, axes, and curve movements.
+ */
+export function isDiagramThoroughlyExplained(
+  diagramTitle: string,
+  targetIndex: number,
+  blocks: ParagraphBlock[],
+  essayText: string,
+): boolean {
+  const lowerTitle = diagramTitle.toLowerCase();
+
+  // Surrounding text: the paragraph immediately before and the paragraph immediately after the diagram
+  const prevBlock = targetIndex > 0 ? blocks[targetIndex - 1] : null;
+  const nextBlock = targetIndex + 1 < blocks.length ? blocks[targetIndex + 1] : null;
+
+  const immediateContext = [
+    prevBlock && !prevBlock.isDiagram ? prevBlock.text : "",
+    nextBlock && !nextBlock.isDiagram ? nextBlock.text : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // 1. Foreign exchange / currency / depreciation / appreciation
+  if (/exchange\s*rate|forex|currency|depreciation|appreciation|devaluation|revaluation/i.test(lowerTitle)) {
+    const hasCurrencyTerm =
+      /depreciat|appreciat|exchange\s*rate|foreign\s*currency|domestic\s*currency|inflow|outflow|currency\s*value|current\s*account|trade\s*balance|exports?|imports?|devalu/i.test(
+        immediateContext,
+      );
+    const hasMechanismTerm =
+      /demand|supply|greater\s+than|less\s+than|increase|decrease|shift|fall|rise|higher|lower|deficit|surplus|equilibrium|flow/i.test(
+        immediateContext,
+      );
+    return Boolean(hasCurrencyTerm && hasMechanismTerm);
+  }
+
+  // 2. J-Curve effect
+  if (/j[\s-_]*curve/i.test(lowerTitle)) {
+    return Boolean(
+      /marshall[\s-_]*lerner|contractual\s+lag|pedx|pedm|elasticity\s+of\s+demand\s+for\s+exports/i.test(
+        immediateContext,
+      ),
+    );
+  }
+
+  // 3. Macroeconomic AD/AS, LRAS, SRAS, Keynesian
+  if (
+    /ad[\s/-]*as|aggregate\s+demand|aggregate\s+supply|\blras\b|\bsras\b|keynesian|monetarist|capacity|output\s+gap|deflationary|inflationary/i.test(
+      lowerTitle,
+    )
+  ) {
+    const hasMacroTerm =
+      /price\s+level|real\s+gdp|national\s+output|aggregate\s+demand|aggregate\s+supply|spare\s+capacity|full\s+employment|bottleneck|inflation/i.test(
+        immediateContext,
+      );
+    const hasShiftTerm = /shift|increase|decrease|rise|fall|equilibrium|gap/i.test(immediateContext);
+    return Boolean(hasMacroTerm && hasShiftTerm);
+  }
+
+  // 4. Phillips curve
+  if (/phillips/i.test(lowerTitle)) {
+    return Boolean(
+      /inflation.*unemployment|unemployment.*inflation|trade[\s-_]*off|srpc|lrpc|nru/i.test(immediateContext),
+    );
+  }
+
+  // 5. Monopoly / Oligopoly / Market structures
+  if (/monopoly|oligopoly|kinked|cartel|pay[\s-_]*off|game\s+theory|monopolistic/i.test(lowerTitle)) {
+    return Boolean(
+      /mc\s*=\s*mr|marginal\s+cost|marginal\s+revenue|supernormal\s+profit|deadweight|abnormal\s+profit|price\s+maker|ar\s+curve/i.test(
+        immediateContext,
+      ),
+    );
+  }
+
+  // 6. PPF / PPC
+  if (/ppf|ppc|production\s*possibility/i.test(lowerTitle)) {
+    return Boolean(
+      /opportunity\s+cost|capital\s+goods|consumer\s+goods|trade[\s-_]*off|productive\s+capacity|outward\s+shift/i.test(
+        immediateContext,
+      ),
+    );
+  }
+
+  // 7. General market models (Supply & Demand, Price Controls, Taxes, Subsidies, Externalities, Minimum Wage)
+  const hasGenericMechanics =
+    /shift|equilibrium|shortage|surplus|price|quantity|tax|subsidy|externality|ceiling|floor|demand|supply|cost|revenue|welfare|minimum\s+wage/i.test(
+      immediateContext,
+    );
+  const hasDirectionalCausal =
+    /increase|decrease|contract|extend|fall|rise|higher|lower|lead\s+to|causes?|results?\s+in/i.test(
+      immediateContext,
+    );
+
+  return hasGenericMechanics && hasDirectionalCausal;
+}
+
+/**
  * Pass 4: In-situ diagnostic alignment pass that compares the dual-examiner
  * candidate report against the candidate script, decoding diagram integration
  * and mapping specific weaknesses directly to paragraphs/sentences.
@@ -716,33 +813,34 @@ export function generatePass4Comments(
 
       const targetIndex = targetBlock ? targetBlock.index : 0;
       const targetLabel = targetBlock ? targetBlock.label : "Diagram";
-      usedBlockIndices.add(targetIndex);
-      const nextBlock = blocks[targetIndex + 1];
+      // Check whether preceding, subsequent, or surrounding analysis thoroughly explains this diagram
+      const hasDetailedExplanation = isDiagramThoroughlyExplained(
+        m.title,
+        targetIndex,
+        blocks,
+        essayText,
+      );
 
-      // Check whether subsequent analysis explains this diagram
-      const hasDetailedExplanation =
-        nextBlock &&
-        !nextBlock.isDiagram &&
-        (nextBlock.text.toLowerCase().includes("shift") ||
-          nextBlock.text.toLowerCase().includes("equilibrium") ||
-          nextBlock.text.toLowerCase().includes("shortage") ||
-          nextBlock.text.toLowerCase().includes("surplus") ||
-          nextBlock.text.toLowerCase().includes("deadweight") ||
-          nextBlock.text.toLowerCase().includes("price") ||
-          nextBlock.text.toLowerCase().includes("quantity") ||
-          nextBlock.text.toLowerCase().includes("marshall") ||
-          nextBlock.text.toLowerCase().includes("deficit") ||
-          nextBlock.text.toLowerCase().includes("current account") ||
-          nextBlock.text.toLowerCase().includes("time") ||
-          nextBlock.text.toLowerCase().includes("as1") ||
-          nextBlock.text.toLowerCase().includes("lras") ||
-          nextBlock.text.toLowerCase().includes("sras") ||
-          nextBlock.text.toLowerCase().includes("gdp") ||
-          nextBlock.text.toLowerCase().includes("inflation"));
+      // Check whether the Cambridge AI examiner flagged an explicit diagram deficiency
+      const missingDiagramNotes = grading.missing_elements?.diagrams || [];
+      const hasExaminerDiagramDefect =
+        missingDiagramNotes.length > 0 ||
+        Boolean(
+          grading.weaknesses?.some((w) =>
+            /\b(?:diagram|figure|curve|axes|axis|unlabelled|unintegrated)\b/i.test(w),
+          ),
+        );
+
+      // If the student placed the diagram AND thoroughly explained it in the accompanying text,
+      // and the examiner has not flagged any diagram defect, DO NOT generate an unsolicited critique comment!
+      if (hasDetailedExplanation && !hasExaminerDiagramDefect) {
+        return;
+      }
+
+      usedBlockIndices.add(targetIndex);
 
       const guidance = getDiagramSyllabusGuidance(m.title, isFullMarks, Boolean(hasDetailedExplanation));
 
-      const missingDiagramNotes = grading.missing_elements?.diagrams || [];
       const critique =
         missingDiagramNotes[0] && !isFullMarks
           ? missingDiagramNotes[0]

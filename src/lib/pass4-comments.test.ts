@@ -389,6 +389,96 @@ Paragraph 5: In the long run, once consumers switch to domestic goods, the trade
     expect(analysisComment).toBeDefined();
     expect(analysisComment?.paragraphLabel).toBe("¶ Paragraph 3");
   });
+
+  it("suppresses diagram critique comment when diagram is placed and thoroughly explained without examiner defect", () => {
+    const userEssay = `The BoP is the total inflow and outflow of transactions between the individuals of the country and the world over a specific period. The current account has four main parts: visible trade, invisible trade, primary income, and secondary income.
+
+A persistent deficit in the current account may lead to depreciation of the domestic currency against the foreign currency. Increased imports of goods and services may cause a deficit in the current account. This is because we require foreign currency to import foreign goods, which means that the demand for the foreign currency in the domestic economy is greater than the demand for the domestic currency. Depreciation can lead to an increase in prices of imported goods and lower living standards in the domestic economy, while the foreign countries may benefit from cheaper imports as their currency value is higher.
+
+{Diagram: Depreciation}
+
+Fixed exchange rate systems cannot benefit from auto stabilisation without active central bank intervention.`;
+
+    const userGrading: Grading = {
+      total_mark: 6,
+      max_mark: 8,
+      band: "Level 3",
+      ao_breakdown: {
+        knowledge: { awarded: 2, out_of: 2, comment: "Accurate BoP definitions." },
+        analysis: { awarded: 3, out_of: 4, comment: "Detailed causal transmission." },
+        evaluation: { awarded: 1, out_of: 2, comment: "Evaluation of fixed systems needs depth." },
+      },
+      examiner_summary: "Good understanding of balance of payments and exchange rates.",
+      strengths: ["Thorough explanation of currency depreciation and import demand."],
+      weaknesses: ["The analysis of fixed exchange rate systems is somewhat compressed."],
+      missing_elements: {
+        definitions: [],
+        analysis: [],
+        evaluation: ["Specific policy trade-offs of maintaining foreign currency reserves."],
+        examples: [],
+        diagrams: [],
+      },
+      actionable_feedback: ["Explore the opportunity cost of central bank reserves."],
+      suggested_resources: [],
+      suggested_practice: [],
+      confidence: 0.94,
+      audited: true,
+      sources: [],
+      anchorsUsed: 2,
+    };
+
+    const comments = generatePass4Comments(
+      userEssay,
+      "Discuss whether a persistent current account deficit leads to currency depreciation [8]",
+      userGrading,
+      [{ title: "Depreciation", matchText: "{Diagram: Depreciation}" }],
+    );
+
+    // Verify diagram comment is NOT generated because the student placed and thoroughly explained the diagram
+    const diagramComment = comments.find((c) => c.category === "diagram");
+    expect(diagramComment).toBeUndefined();
+  });
+
+  it("provides forex axes and coordinates when a Depreciation diagram is completely unexplained", () => {
+    const orphanEssay = `Paragraph 1: An introduction with no mention of exchange rate mechanics.
+
+{Diagram: Depreciation}
+
+Paragraph 2: A conclusion about general economic welfare with no currency discussion.`;
+
+    const orphanGrading: Grading = {
+      total_mark: 3,
+      max_mark: 8,
+      band: "Level 2",
+      ao_breakdown: {
+        knowledge: { awarded: 2, out_of: 2, comment: "" },
+        analysis: { awarded: 1, out_of: 4, comment: "Diagram is isolated." },
+        evaluation: { awarded: 0, out_of: 2, comment: "" },
+      },
+      examiner_summary: "Needs integration.",
+      strengths: [],
+      weaknesses: ["Diagram is unintegrated."],
+      missing_elements: { definitions: [], analysis: [], evaluation: [], examples: [], diagrams: ["Unexplained currency diagram."] },
+      actionable_feedback: [],
+      suggested_resources: [],
+      suggested_practice: [],
+      confidence: 0.9,
+      audited: true,
+      sources: [],
+      anchorsUsed: 2,
+    };
+
+    const comments = generatePass4Comments(
+      orphanEssay,
+      "Discuss exchange rates [8]",
+      orphanGrading,
+      [{ title: "Depreciation", matchText: "{Diagram: Depreciation}" }],
+    );
+
+    const diagramComment = comments.find((c) => c.category === "diagram");
+    expect(diagramComment).toBeDefined();
+    expect(diagramComment?.title).toContain("Diagram Decoding: Depreciation");
+  });
 });
 
 describe("findHighlightSpanInText", () => {

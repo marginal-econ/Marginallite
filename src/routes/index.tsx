@@ -71,6 +71,7 @@ import { Magnetic, TiltCard } from "@/components/marketing/three-d";
 import { AiComparisonSection } from "@/components/marketing/ai-comparison-section";
 import { AccuracyCredibilitySection } from "@/components/marketing/accuracy-credibility-section";
 import { RealEssayShowcase } from "@/components/marketing/real-essay-showcase";
+import { McqShowcaseSection } from "@/components/marketing/mcq-showcase-section";
 import { TeachersSection } from "@/components/marketing/teachers-section";
 import { CosmicAtmosphere } from "@/components/marketing/cosmic-atmosphere";
 import { CommunityPartnerBanner } from "@/components/marketing/community-partner-banner";
@@ -738,6 +739,9 @@ function Index() {
 
       {/* ── Real Graded Essay Showcase (User Scored Exemplar) ────────────── */}
       <RealEssayShowcase />
+
+      {/* ── Cambridge IGCSE 0455 MCQ Past Paper & Live Arena Suite ────────── */}
+      <McqShowcaseSection />
 
       {/* ── Why Marginalite Beats Raw AI (Real 12-Mark Stress Test) ─────────── */}
       <AiComparisonSection />
