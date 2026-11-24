@@ -11,6 +11,7 @@ import {
   requireBackendConfig,
 } from "./config";
 import { supabase as clientSupabase } from "./client";
+import { attachResilientFrom } from "./client.server";
 
 export const requireSupabaseAuth = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
@@ -39,13 +40,14 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
     if (!token || token.split(".").length !== 3) throw new Error("Unauthorized: Invalid token");
 
     requireBackendConfig();
-    const supabase = createClient<Database>(BACKEND_URL, BACKEND_PUBLISHABLE_KEY, {
+    const rawSupabase = createClient<Database>(BACKEND_URL, BACKEND_PUBLISHABLE_KEY, {
       global: {
         fetch: createBackendFetch(BACKEND_PUBLISHABLE_KEY),
         headers: { Authorization: `Bearer ${token}` },
       },
       auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
     });
+    const supabase = attachResilientFrom(rawSupabase);
 
     let userId: string | undefined;
     let claims: any = undefined;

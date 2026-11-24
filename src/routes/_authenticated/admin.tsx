@@ -3980,13 +3980,13 @@ function OverviewPanel({
     if (featureFilter === "live_examiner") {
       if (!row.feature || !row.feature.startsWith("live_examiner")) return false;
     } else if (featureFilter === "essay_grade") {
-      if (row.feature !== "grade_essay" && row.feature !== "essay_grade") return false;
+      if (!row.feature || (!row.feature.startsWith("grade_essay") && !row.feature.startsWith("essay_grade"))) return false;
     } else if (featureFilter === "other") {
       if (
         !row.feature ||
         row.feature.startsWith("live_examiner") ||
-        row.feature === "grade_essay" ||
-        row.feature === "essay_grade"
+        row.feature.startsWith("grade_essay") ||
+        row.feature.startsWith("essay_grade")
       )
         return false;
     }
@@ -4291,7 +4291,7 @@ function OverviewPanel({
                   className="h-7 px-2.5 text-xs"
                   onClick={() => setFeatureFilter("live_examiner")}
                 >
-                  Essay Grader
+                  Live Examiner
                 </Button>
                 <Button
                   type="button"
@@ -4583,7 +4583,7 @@ function OverviewPanel({
               className="h-7 px-2.5 text-xs"
               onClick={() => setFeatureFilter("live_examiner")}
             >
-              Essay Grader
+              Live Examiner
             </Button>
             <Button
               type="button"
