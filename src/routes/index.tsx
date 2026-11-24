@@ -211,6 +211,9 @@ export const Route = createFileRoute("/")({
 
 const RIBBON_ITEMS = [
   "Cambridge IGCSE 0455",
+  "93.9% Senior Examiner Accuracy",
+  "72.7% Exact Matches",
+  "0.33 MAE Benchmark",
   "2m, 4m, 6m & 8m Questions",
   "Papers 1 & 2",
   "Dual-Pass Essay Grader",
@@ -576,6 +579,10 @@ function Index() {
                   <Sparkles className="size-3.5 text-primary animate-pulse" />
                   Cambridge IGCSE 0455 Examiner Calibration
                 </span>
+                <span className="rounded-full bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 shadow-2xs">
+                  <ShieldCheck className="size-3 text-emerald-500" />
+                  93.9% Examiner Accuracy (72.7% Exact · 0.33 MAE)
+                </span>
                 <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-violet-700 dark:text-violet-300 flex items-center gap-1.5 shadow-2xs">
                   <GraduationCap className="size-3 text-violet-500" />
                   Cambridge IGCSE 0455 (Papers 1 &amp; 2)
@@ -629,20 +636,36 @@ function Index() {
               </p>
             </Reveal>
 
-            {/* Live Cambridge Metric Highlights */}
+            {/* Live Cambridge Diagnostic Accuracy & Benchmark Highlights */}
             <Reveal delay={150}>
-              <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl">
-                <div className="rounded-xl border border-primary/25 bg-card/70 p-2 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-primary/50 transition-colors">
-                  <span className="text-base min-[380px]:text-xl sm:text-2xl font-black text-foreground tracking-tight block">2016–2026</span>
-                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">0455 Past Papers</span>
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 max-w-2xl">
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] p-2.5 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-emerald-500/60 transition-colors">
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-xl sm:text-2xl font-black text-foreground tracking-tight">93.9%</span>
+                    <span className="text-[10px] font-bold text-emerald-500 font-mono">±1 Mark</span>
+                  </div>
+                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">Examiner Match</span>
                 </div>
-                <div className="rounded-xl border border-emerald-500/25 bg-card/70 p-2 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-emerald-500/50 transition-colors">
-                  <span className="text-base min-[380px]:text-xl sm:text-2xl font-black text-foreground tracking-tight block">AO1/2/3</span>
-                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">Clause Auditing</span>
+                <div className="rounded-xl border border-primary/30 bg-primary/[0.08] p-2.5 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-primary/60 transition-colors">
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-xl sm:text-2xl font-black text-foreground tracking-tight">72.7%</span>
+                    <span className="text-[10px] font-bold text-primary font-mono">Exact</span>
+                  </div>
+                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">33 Real Scripts</span>
                 </div>
-                <div className="rounded-xl border border-amber-500/25 bg-card/70 p-2 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-amber-500/50 transition-colors">
-                  <span className="text-base min-[380px]:text-xl sm:text-2xl font-black text-foreground tracking-tight block">Unlimited</span>
-                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">Essay Gradings</span>
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.08] p-2.5 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-violet-500/60 transition-colors">
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-xl sm:text-2xl font-black text-foreground tracking-tight">0.33</span>
+                    <span className="text-[10px] font-bold text-violet-400 font-mono">MAE</span>
+                  </div>
+                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">Avg Mark Error</span>
+                </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-2.5 sm:p-3 text-center backdrop-blur-md shadow-xs hover:border-amber-500/60 transition-colors">
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-xl sm:text-2xl font-black text-foreground tracking-tight">100%</span>
+                    <span className="text-[10px] font-bold text-amber-500 font-mono">Pass</span>
+                  </div>
+                  <span className="text-[9.5px] sm:text-[11px] text-muted-foreground font-semibold leading-tight block mt-0.5">10/10 Stress Matrix</span>
                 </div>
               </div>
             </Reveal>
