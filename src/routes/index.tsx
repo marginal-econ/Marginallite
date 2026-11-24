@@ -499,6 +499,20 @@ function Index() {
 
           <div className="flex items-center gap-2">
             <SiteNavMobile />
+
+            {/* Back link to Marginal (A-Level Economics 9708) */}
+            <a
+              href="https://marginal-econ.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-2 sm:px-3 py-1.5 text-xs font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/60 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+              title="Switch to Marginal (Cambridge AS & A Level Economics 9708) (https://marginal-econ.com/)"
+            >
+              <Sparkles className="size-3.5 text-purple-500 fill-purple-500/30 group-hover:scale-110 transition-transform" />
+              <span>Marginal <span className="hidden sm:inline">(A-Level 9708)</span></span>
+              <ExternalLink className="size-2.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+            </a>
+
             <ThemeToggle className="size-8 sm:size-9" />
 
             <Link
@@ -566,6 +580,16 @@ function Index() {
                   <GraduationCap className="size-3 text-violet-500" />
                   Cambridge IGCSE 0455 (Papers 1 &amp; 2)
                 </span>
+                <a
+                  href="https://marginal-econ.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-purple-500/15 border border-purple-500/40 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1.5 shadow-2xs hover:bg-purple-500/25 hover:border-purple-500/60 transition-all cursor-pointer"
+                  title="Visit Marginal for Cambridge AS & A Level Economics 9708 (https://marginal-econ.com/)"
+                >
+                  <Sparkles className="size-3 text-purple-500" />
+                  <span>Looking for A-Level 9708? Visit Marginal ↗</span>
+                </a>
                 <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10.5px] font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 shadow-2xs">
                   <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <BookOpen className="size-3 text-emerald-500" />

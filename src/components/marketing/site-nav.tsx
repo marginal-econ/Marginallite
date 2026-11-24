@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, Menu, School, X } from "lucide-react";
+import { ExternalLink, GraduationCap, Menu, School, Sparkles, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/marketing/theme-toggle";
@@ -251,6 +251,20 @@ export function SiteNavMobile() {
             </div>
 
             <div className="pt-2 border-t border-border/80">
+              <a
+                href="https://marginal-econ.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="flex items-center justify-between rounded-lg px-3 py-2.5 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-all mb-2"
+                title="Switch to Marginal (Cambridge AS & A Level Economics 9708)"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5 text-purple-500 fill-purple-500/30" />
+                  <span>Switch to Marginal (A-Level 9708)</span>
+                </div>
+                <ExternalLink className="size-3 text-purple-500 opacity-70" />
+              </a>
               <ThemeToggle variant="menu-item" />
             </div>
           </div>

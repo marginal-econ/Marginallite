@@ -8,7 +8,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Minimize2 } from "lucide-react";
+import { ExternalLink, Minimize2, Sparkles } from "lucide-react";
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 const PRODUCT_LINKS = [
@@ -180,6 +180,16 @@ export function SiteFooter({ onToggleMinimalist }: { onToggleMinimalist?: () => 
           <nav aria-label="Product">
             <p className="eyebrow text-muted-foreground">Product</p>
             <ul className="mt-4 space-y-2.5 text-sm">
+              <li>
+                <a
+                  href="https://marginal-econ.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-500 transition-colors inline-flex items-center gap-1"
+                >
+                  Marginal (A-Level 9708) ↗
+                </a>
+              </li>
               {PRODUCT_LINKS.map((link) => (
                 <li key={link.href}>
                   <a
@@ -267,6 +277,14 @@ export function SiteFooter({ onToggleMinimalist }: { onToggleMinimalist?: () => 
             <Link to="/privacy" className="transition-colors hover:text-foreground">
               Privacy
             </Link>
+            <a
+              href="https://marginal-econ.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-500 transition-colors inline-flex items-center gap-1"
+            >
+              Marginal (A-Level 9708) ↗
+            </a>
             {onToggleMinimalist ? (
               <button
                 type="button"

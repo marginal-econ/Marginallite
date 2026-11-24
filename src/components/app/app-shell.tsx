@@ -45,6 +45,7 @@ import {
   Search as SearchIcon,
   FileText,
   Info,
+  ExternalLink,
 } from "lucide-react";
 import * as React from "react";
 import type { ReactNode } from "react";
@@ -1526,6 +1527,19 @@ export function AppShell({
               />
             )}
 
+                        {/* Link back to Marginal (A-Level 9708) */}
+            <a
+              href="https://marginal-econ.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/60 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0"
+              title="Switch to Marginal (Cambridge AS and A Level Economics 9708) (https://marginal-econ.com/)"
+            >
+              <Sparkles className="size-3 text-purple-500 fill-purple-500/30 group-hover:scale-110 transition-transform" />
+              <span>Marginal <span className="hidden md:inline">(A-Level)</span></span>
+              <ExternalLink className="size-2.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+            </a>
+
             {/* Night / Day Theme Toggle */}
             <ThemeToggle className="size-8" />
 
@@ -1644,6 +1658,20 @@ export function AppShell({
                 <div className="px-2 py-1 text-[9.5px] font-bold text-muted-foreground uppercase tracking-wider">
                   Platform &amp; Legal
                 </div>
+                <DropdownMenuItem asChild className="p-0 mb-0.5">
+                  <a
+                    href="https://marginal-econ.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-pointer hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-3.5 text-purple-500" />
+                      <span>Switch to Marginal (A-Level 9708)</span>
+                    </div>
+                    <ExternalLink className="size-3 opacity-60" />
+                  </a>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild className="p-0 mb-0.5">
                   <Link
                     to="/about"
