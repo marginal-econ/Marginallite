@@ -103,8 +103,8 @@ const SECTIONS: LegalSection[] = [
           attempts are only visible to you.
         </p>
         <p>
-          <strong>Exemplar Showcase</strong>: Essays achieving distinction marks (8/8 for 8-mark,
-          &gt;10 for 12-mark, or &gt;15 for 20-mark) are automatically made viewable in the Exemplar
+          <strong>Exemplar Showcase</strong>: Essays achieving distinction marks (7–8/8 for 8-mark Discuss,
+          or 6/6 for 6-mark Analyse) are automatically made viewable in the Exemplar
           Showcase for peer revision and academic standards benchmarking. Author identities are
           strictly anonymised (only initials or Anonymous are shown). Only platform administrators
           have the authority to curate, add model responses, or hide/remove essays from the

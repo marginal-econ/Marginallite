@@ -298,6 +298,43 @@ export const adminOverview = createServerFn({ method: "GET" })
     }
 
     try {
+      const { data: defLogs } = await supabaseAdmin
+        .from("definitions")
+        .select("id, term, definition_text, created_at, source_label, extraction_model")
+        .eq("category", "ai_usage_log")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (defLogs && defLogs.length > 0) {
+        const existingIds = new Set(usage.map((u) => u.id));
+        for (const dl of defLogs) {
+          try {
+            const parsed = typeof dl.definition_text === "string" ? JSON.parse(dl.definition_text) : (dl.definition_text || {});
+            const logId = parsed.id || dl.id;
+            if (!existingIds.has(logId)) {
+              existingIds.add(logId);
+              usage.push({
+                id: logId,
+                user_id: parsed.user_id || null,
+                feature: parsed.feature || dl.source_label || "grade_essay",
+                model: parsed.model || dl.extraction_model || "ministral-14b-2512",
+                prompt_tokens: Number(parsed.prompt_tokens) || 2000,
+                completion_tokens: Number(parsed.completion_tokens) || 5000,
+                latency_ms: Number(parsed.latency_ms) || 25000,
+                ok: parsed.ok !== false,
+                error_message: parsed.error_message || null,
+                created_at: parsed.created_at || dl.created_at || new Date().toISOString(),
+              });
+            }
+          } catch {}
+        }
+        usage.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+    } catch (e) {
+      console.warn("Exception merging definitions ai_usage_log into usage:", e);
+    }
+
+    try {
       const { data: subs } = await supabaseAdmin
         .from("essay_submissions")
         .select("id, user_id, awarded_marks, max_marks, question, created_at");
@@ -1716,7 +1753,7 @@ export const adminUserActivity = createServerFn({ method: "GET" })
         Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - istOffsetMs;
       const todayCutoffMs = istMidnightUtcMs;
 
-      const [profilesRes, subsRes, mcqRes, rolesRes, authUsers, aiLogsRes] =
+      const [profilesRes, subsRes, mcqRes, rolesRes, authUsers, aiLogsRes, defLogsRes] =
         await Promise.all([
           supabaseAdmin.from("profiles").select("id, full_name, school, created_at, updated_at").limit(1000),
           supabaseAdmin.from("essay_submissions").select("id, user_id, awarded_marks, created_at").limit(5000),
@@ -1724,6 +1761,7 @@ export const adminUserActivity = createServerFn({ method: "GET" })
           supabaseAdmin.from("user_roles").select("user_id, role"),
           listAcceptedAuthUsers(),
           supabaseAdmin.from("ai_usage_log").select("id, user_id, feature, created_at").limit(5000),
+          supabaseAdmin.from("definitions").select("id, term, definition_text, created_at").eq("category", "ai_usage_log").limit(5000),
         ]);
 
       const authMap = new Map(authUsers.map((u) => [u.id, u.email]));
@@ -1792,6 +1830,30 @@ export const adminUserActivity = createServerFn({ method: "GET" })
           }
           liveCounts.set(log.user_id, live);
         }
+      }
+
+      for (const dl of defLogsRes?.data ?? []) {
+        try {
+          const parsed = typeof dl.definition_text === "string" ? JSON.parse(dl.definition_text) : (dl.definition_text || {});
+          const uId = parsed.user_id;
+          if (!uId) continue;
+          const existing = aiCounts.get(uId) || { count: 0, lastAt: null };
+          existing.count += 1;
+          const createdAt = parsed.created_at || dl.created_at;
+          if (!existing.lastAt || (createdAt && createdAt > existing.lastAt)) {
+            existing.lastAt = createdAt;
+          }
+          aiCounts.set(uId, existing);
+
+          if (parsed.feature && String(parsed.feature).startsWith("live_examiner")) {
+            const live = liveCounts.get(uId) || { count: 0, lastAt: null };
+            live.count += 1;
+            if (!live.lastAt || (createdAt && createdAt > live.lastAt)) {
+              live.lastAt = createdAt;
+            }
+            liveCounts.set(uId, live);
+          }
+        } catch {}
       }
 
       // Ensure every graded candidate essay in essay_submissions also counts toward AI usage

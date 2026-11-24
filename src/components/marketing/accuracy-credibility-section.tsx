@@ -159,7 +159,7 @@ export function AccuracyCredibilitySection({ className }: { className?: string }
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-3 shadow-2xs">
             <ShieldCheck className="size-3.5 text-emerald-500" />
-            <span>Empirical Cambridge 0455 Benchmark · 30 Real Exam Questions &amp; ECR Scripts</span>
+            <span>Empirical Cambridge 0455 Benchmark · 33 Real Exam Questions &amp; ECR Scripts</span>
           </div>
 
           <h2 className="text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-5xl">
@@ -181,16 +181,16 @@ export function AccuracyCredibilitySection({ className }: { className?: string }
                 <Sparkles className="size-4 text-primary" />
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">96.7%</span>
+                <span className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">93.9%</span>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">±1 Mark</span>
               </div>
               <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Audited against 30 authentic Cambridge 0455 questions with a Mean Absolute Error of only 0.27 marks and +0.07 balanced bias.
+                72.7% exact matches and 93.9% within ±1 mark across 33 authentic Cambridge 0455 scripts with an ultra-tight Mean Absolute Error of 0.33 marks.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-border/60 flex items-center gap-1.5 text-[11px] font-semibold text-primary">
               <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
-              <span>30 Cambridge Questions Audited</span>
+              <span>33 Cambridge Scripts Audited</span>
             </div>
           </div>
 

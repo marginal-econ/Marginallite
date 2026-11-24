@@ -767,7 +767,7 @@ function Index() {
       {/* ── Cambridge IGCSE 0455 MCQ Past Paper & Live Arena Suite ────────── */}
       <McqShowcaseSection />
 
-      {/* ── Why Marginalite Beats Raw AI (Real 12-Mark Stress Test) ─────────── */}
+      {/* ── Why Marginalite Beats Raw AI (Real 8-Mark Discuss Stress Test) ─────────── */}
       <AiComparisonSection />
 
       {/* ── Cambridge Teachers & Department Workspace ──────────────────────── */}
@@ -1361,7 +1361,7 @@ function SpecimenCard() {
               <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground">Calibrated against real 0455 candidates</span>
                 <a href="#graded-exemplar" className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1">
-                  View Full 10/12 Script Exemplar ↓
+                  View Full 8/8 Script Exemplar ↓
                 </a>
               </div>
             </div>
@@ -1373,7 +1373,7 @@ function SpecimenCard() {
                 <span>⚠️ Generic Chatbot Output (ChatGPT / Claude default):</span>
               </div>
               <p className="italic text-foreground/80 leading-relaxed">
-                “This is a very good essay! You clearly understand minimum prices and explain how they reduce demand for demerit goods like cigarettes. You also mentioned other policies. Mark: 8 / 12 (Grade B). Keep practicing!”
+                “This is a very good essay! You clearly understand minimum prices and explain how they reduce demand for demerit goods like cigarettes. You also mentioned other policies. Mark: 6 / 8 (Level 2). Keep practicing!”
               </p>
             </div>
 

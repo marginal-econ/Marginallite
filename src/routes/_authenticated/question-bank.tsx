@@ -52,7 +52,7 @@ function QuestionBankPage() {
   const [level, setLevel] = useState<"as" | "a2">("as");
   const [topic, setTopic] = useState<string>("__any__");
   const [search, setSearch] = useState("");
-  const [tariffFilter, setTariffFilter] = useState<"all" | 8 | 12 | 20>("all");
+  const [tariffFilter, setTariffFilter] = useState<"all" | 2 | 4 | 6 | 8>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -82,7 +82,7 @@ function QuestionBankPage() {
     setPage(1);
   };
 
-  const handleTariffChange = (val: "all" | 8 | 12 | 20) => {
+  const handleTariffChange = (val: "all" | 2 | 4 | 6 | 8) => {
     setTariffFilter(val);
     setPage(1);
   };
@@ -216,31 +216,43 @@ function QuestionBankPage() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                8-mark
+                8-mark (Discuss)
               </button>
               <button
                 type="button"
-                onClick={() => handleTariffChange(12)}
+                onClick={() => handleTariffChange(6)}
                 className={cn(
                   "rounded px-2.5 py-1 text-xs transition-colors",
-                  tariffFilter === 12
+                  tariffFilter === 6
                     ? "bg-background font-semibold text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                8-mark
+                6-mark (Analyse)
               </button>
               <button
                 type="button"
-                onClick={() => handleTariffChange(20)}
+                onClick={() => handleTariffChange(4)}
                 className={cn(
                   "rounded px-2.5 py-1 text-xs transition-colors",
-                  tariffFilter === 20
+                  tariffFilter === 4
                     ? "bg-background font-semibold text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                8-mark A2
+                4-mark (Explain)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTariffChange(2)}
+                className={cn(
+                  "rounded px-2.5 py-1 text-xs transition-colors",
+                  tariffFilter === 2
+                    ? "bg-background font-semibold text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                2-mark (Identify)
               </button>
             </div>
           </div>

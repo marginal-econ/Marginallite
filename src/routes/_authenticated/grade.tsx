@@ -100,15 +100,26 @@ const gradeSearchSchema = z
     q: z.string().trim().max(2000).optional().catch(undefined),
     marks: z
       .union([
+        z.literal(2),
+        z.literal(4),
+        z.literal(6),
         z.literal(8),
+        z.literal("2"),
+        z.literal("4"),
+        z.literal("6"),
+        z.literal("8"),
         z.literal(12),
         z.literal(20),
-        z.literal("8"),
         z.literal("12"),
         z.literal("20"),
       ])
       .optional()
-      .transform((val) => (val ? (Number(val) as 8 | 12 | 20) : undefined))
+      .transform((val) => {
+        if (!val) return undefined;
+        const num = Number(val);
+        if (num === 2 || num === 4 || num === 6 || num === 8) return num as 2 | 4 | 6 | 8;
+        return 8 as 2 | 4 | 6 | 8;
+      })
       .catch(undefined),
     essayType: z.string().optional().catch(undefined),
     text: z.string().optional().catch(undefined),
@@ -165,52 +176,52 @@ type AttachedDiagram = {
 
 const TARIFF_OPTIONS = [
   {
-    value: "8_legacy" as const,
+    value: "8" as const,
     marks: "8M",
-    badge: "Legacy",
-    subtitle: "Explain / Analyse",
+    badge: "Part (d)",
+    subtitle: "Discuss / Table A",
     targetWords: "250–400w",
-    paperLevel: "Paper 2",
-    fullTitle: "8 Marks · Legacy Non-Evaluative",
+    paperLevel: "Paper 2 Section B",
+    fullTitle: "8 Marks · Section B Evaluative Essay (Discuss)",
     guidance:
-      "Pure descriptive and causal analysis. Evaluation is not required and candidates are never penalized for having no conclusion.",
-    aoFull: "AO1: 2 · AO2: 6 (No AO3)",
+      "Two-sided balanced evaluative essay governed strictly by Cambridge Table A Level Descriptors (Level 1: 1–2m, Level 2: 3–5m, Level 3: 6–8m).",
+    aoFull: "AO1: 2 · AO2: 3 · AO3: 3",
   },
   {
-    value: "8_eval" as const,
-    marks: "8M",
-    badge: "Evaluative",
-    subtitle: "Discuss / Assess",
-    targetWords: "300–450w",
-    paperLevel: "Paper 2",
-    fullTitle: "8 Marks · Evaluative Section B",
+    value: "6" as const,
+    marks: "6M",
+    badge: "Part (c)",
+    subtitle: "Analyse",
+    targetWords: "150–250w",
+    paperLevel: "Paper 2 Section B",
+    fullTitle: "6 Marks · Section B Causal Analysis (Analyse)",
     guidance:
-      "Requires two-sided balanced analysis with an evaluative concluding judgement ('Discuss', 'Assess', 'Consider').",
-    aoFull: "AO1: 2 · AO2: 4 · AO3: 2",
+      "Point-marked multi-step analytical chains of reasoning (e.g. 3 developed points × 2m). Listing without causal chains is strictly capped at max 3 marks.",
+    aoFull: "AO1: 0 · AO2: 6 (No AO3)",
   },
   {
-    value: "12" as const,
-    marks: "12M",
-    badge: "AS Level",
-    subtitle: "Standard Essay",
-    targetWords: "500–750w",
-    paperLevel: "Paper 2",
-    fullTitle: "12 Marks · AS Evaluative Essay",
+    value: "4" as const,
+    marks: "4M",
+    badge: "Part (b)",
+    subtitle: "Explain",
+    targetWords: "80–150w",
+    paperLevel: "Paper 2 Section B",
+    fullTitle: "4 Marks · Section B Structured Explanation (Explain)",
     guidance:
-      "Standard AS Section B/C essay requiring economic definitions, diagrammatic chains of reasoning, and substantiated evaluation.",
-    aoFull: "AO1: 2 · AO2: 6 · AO3: 4",
+      "2 identified economic reasons/policies (1m each) plus developed explanation for each (1m each). Structure: 2 × (1m identify + 1m develop) = 4m.",
+    aoFull: "AO1: 2 · AO2: 2",
   },
   {
-    value: "20" as const,
-    marks: "20M",
-    badge: "A Level",
-    subtitle: "Extended Essay",
-    targetWords: "800–1200w",
-    paperLevel: "Paper 4",
-    fullTitle: "20 Marks · A Level Extended Essay",
+    value: "2" as const,
+    marks: "2M",
+    badge: "Part (a)",
+    subtitle: "Identify / Define",
+    targetWords: "20–60w",
+    paperLevel: "Paper 2 Section B",
+    fullTitle: "2 Marks · Section B Identification (Identify / Define)",
     guidance:
-      "Comprehensive synoptic essay requiring thorough analysis, counter-perspectives, policy trade-offs, and critical synthesis.",
-    aoFull: "AO1: 2 · AO2: 12 · AO3: 6",
+      "Concise identification of two distinct economic causes, features, or definitions (1m each). Requires directional changes where specified.",
+    aoFull: "AO1: 2",
   },
 ];
 
@@ -315,71 +326,82 @@ function GradePage() {
     return "";
   });
 
-  const [essayCategory, setEssayCategory] = useState<"8_legacy" | "8_eval" | "12" | "20">(() => {
-    if (search.essayType === "8_legacy" || search.essayType === "legacy") return "8_legacy";
-    if (search.essayType === "8_eval") return "8_eval";
-    if (search.marks === 8) {
-      if (search.q && !isEvaluativeQuestion(search.q)) return "8_legacy";
-      return "8_eval";
+  const [essayCategory, setEssayCategory] = useState<"8" | "6" | "4" | "2">(() => {
+    if (search.marks) {
+      const m = String(search.marks);
+      if (m === "8" || m === "6" || m === "4" || m === "2") return m;
     }
-    if (search.marks === 20) return "20";
+    if (search.essayType === "8_eval" || search.essayType === "8_legacy" || search.essayType === "8") return "8";
+    if (search.essayType === "6") return "6";
+    if (search.essayType === "4") return "4";
+    if (search.essayType === "2") return "2";
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed.essayCategory) return parsed.essayCategory;
-          if (parsed.maxMark === "8" || parsed.maxMark === 8) {
-            if (parsed.question && !isEvaluativeQuestion(parsed.question)) return "8_legacy";
-            return "8_eval";
+          if (parsed.essayCategory && ["8", "6", "4", "2"].includes(parsed.essayCategory)) {
+            return parsed.essayCategory;
           }
-          if (parsed.maxMark === "20" || parsed.maxMark === 20) return "20";
+          if (parsed.maxMark && ["8", "6", "4", "2"].includes(String(parsed.maxMark))) {
+            return String(parsed.maxMark) as "8" | "6" | "4" | "2";
+          }
         }
       } catch {}
     }
-    return "12";
+    return "8";
   });
 
   const [maxMark, setMaxMark] = useState(() => {
-    if (search.marks) return String(search.marks);
+    if (search.marks) {
+      const m = String(search.marks);
+      if (["8", "6", "4", "2"].includes(m)) return m;
+    }
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed.maxMark) return String(parsed.maxMark);
+          if (parsed.maxMark && ["8", "6", "4", "2"].includes(String(parsed.maxMark))) {
+            return String(parsed.maxMark);
+          }
         }
       } catch {}
     }
-    return "12";
+    return "8";
   });
 
   // Keep maxMark synchronized with essayCategory
   useEffect(() => {
-    if (essayCategory === "8_legacy" || essayCategory === "8_eval") {
-      setMaxMark("8");
-    } else if (essayCategory === "20") {
-      setMaxMark("20");
-    } else {
-      setMaxMark("12");
-    }
+    setMaxMark(essayCategory);
   }, [essayCategory]);
 
   // Sync state if direct grading search params arrive
   useEffect(() => {
     if (search.q) setQuestion(search.q);
     if (search.text) setEssayText(search.text);
-    if (search.essayType === "8_legacy" || search.essayType === "legacy") {
-      setEssayCategory("8_legacy");
-      setMaxMark("8");
-    } else if (search.marks) {
-      setMaxMark(String(search.marks));
-      if (search.marks === 8) {
-        setEssayCategory(search.q && !isEvaluativeQuestion(search.q) ? "8_legacy" : "8_eval");
-      } else if (search.marks === 20) {
-        setEssayCategory("20");
+    if (search.marks) {
+      const m = String(search.marks);
+      if (m === "8" || m === "6" || m === "4" || m === "2") {
+        setEssayCategory(m);
+        setMaxMark(m);
       } else {
-        setEssayCategory("12");
+        setEssayCategory("8");
+        setMaxMark("8");
+      }
+    } else if (search.essayType) {
+      if (search.essayType === "6") {
+        setEssayCategory("6");
+        setMaxMark("6");
+      } else if (search.essayType === "4") {
+        setEssayCategory("4");
+        setMaxMark("4");
+      } else if (search.essayType === "2") {
+        setEssayCategory("2");
+        setMaxMark("2");
+      } else {
+        setEssayCategory("8");
+        setMaxMark("8");
       }
     }
   }, [search.q, search.text, search.marks, search.essayType]);
@@ -388,7 +410,15 @@ function GradePage() {
     setQuestion(sample.question);
     setEssayText(cleanMathDollarSigns(sample.essayText));
     setMaxMark(sample.maxMark);
-    setEssayCategory(sample.tariff);
+    const tariffMap: Record<string, "8" | "6" | "4" | "2"> = {
+      "8_eval": "8",
+      "8_legacy": "8",
+      "8": "8",
+      "6": "6",
+      "4": "4",
+      "2": "2",
+    };
+    setEssayCategory(tariffMap[sample.tariff] || "8");
     setActiveSampleId(sample.id);
     setDiagrams([]);
     setResult(null);
@@ -476,7 +506,7 @@ function GradePage() {
           data: {
             question,
             essayText,
-            maxMark: Number(maxMark) || 12,
+            maxMark: Number(maxMark) || 8,
             wordCount: essayText.trim() ? essayText.trim().split(/\s+/).length : 0,
           },
         }).catch(() => {});
@@ -1025,8 +1055,8 @@ function GradePage() {
         data: {
           question,
           essayText: essayToGrade,
-          maxMark: essayCategory === "8_legacy" || essayCategory === "8_eval" ? 8 : Number(maxMark),
-          essayType: essayCategory,
+          maxMark: Number(maxMark) || 8,
+          essayType: essayCategory === "8" ? "8_eval" : essayCategory,
           auditPass,
           diagramReference: diagramRef,
           markSchemeImageDataUrls:
@@ -1131,7 +1161,7 @@ function GradePage() {
         targetId: "tour-tariff",
         title: "2. Mark Tariff Level",
         description:
-          "Pick the mark tariff (8m, 12m, or 20m). The examiner adjusts Knowledge (AO1), Analysis (AO2), and Evaluation (AO3) mark distribution accordingly.",
+          "Pick the official 0455 mark tariff (8m Discuss, 6m Analyse, 4m Explain, or 2m Identify). The examiner applies Cambridge Paper 2 rubric guidelines and Table A descriptors accordingly.",
         badge: "Cambridge Tariff",
       },
       {
@@ -1205,7 +1235,7 @@ function GradePage() {
                 className="h-8 px-3 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs gap-1.5 cursor-pointer"
               >
                 <Wand2 className="size-3.5" />
-                <span>Try 12M Sample</span>
+                <span>Try 8M Sample</span>
               </Button>
             )}
           </div>
@@ -1470,11 +1500,11 @@ function GradePage() {
                         Economics Examination · Candidate Response Script
                       </h2>
                       <Badge variant="outline" className="border-primary/40 bg-primary/5 text-primary text-[10px] font-mono">
-                        {(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[4]).fullTitle}
+                        {(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[0]).fullTitle}
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      {(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[4]).guidance} · <strong className="text-foreground">{(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[4]).aoFull}</strong>
+                      {(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[0]).guidance} · <strong className="text-foreground">{(TARIFF_OPTIONS.find((t) => t.value === essayCategory) || TARIFF_OPTIONS[0]).aoFull}</strong>
                     </p>
                   </div>
 

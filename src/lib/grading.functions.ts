@@ -86,12 +86,13 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
         /* best-effort */
       }
       try {
-        await supabaseAdmin.from("ai_usage_log").insert({
-          user_id: userId,
+        const { logAiUsage } = await import("@/lib/ai-logger.server");
+        await logAiUsage({
+          userId,
           feature: "grade_essay",
           model: "ministral-14b-2512",
           ok: false,
-          error_message: error instanceof Error ? error.message : "Unknown error",
+          errorMessage: error instanceof Error ? error.message : "Unknown error",
         });
       } catch {}
       throw error;
@@ -200,13 +201,14 @@ export const gradeEssaySubmission = createServerFn({ method: "POST" })
     }
 
     try {
-      await supabaseAdmin.from("ai_usage_log").insert({
-        user_id: userId,
+      const { logAiUsage } = await import("@/lib/ai-logger.server");
+      await logAiUsage({
+        userId,
         feature: "grade_essay",
         model: outcome.model || "ministral-14b-2512",
-        prompt_tokens: outcome.promptTokens,
-        completion_tokens: outcome.completionTokens,
-        latency_ms: outcome.latencyMs,
+        promptTokens: outcome.promptTokens,
+        completionTokens: outcome.completionTokens,
+        latencyMs: outcome.latencyMs,
         ok: true,
       });
     } catch {}
