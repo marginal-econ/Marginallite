@@ -14,10 +14,12 @@
   "vars": {
     "PUBLIC_SITE_URL": "https://lite.marginal-econ.com",
     "VITE_BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
-    "VITE_BACKEND_PUBLISHABLE_KEY": "sb_publishable_OjodijuvlKGW8FBiuSZU7g_EUggDP77",
+    "VITE_BACKEND_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWhwbm9yanlkZmlqam90dm9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyMDk0MjcsImV4cCI6MjEwNzc4NTQyN30.txvy3nxwmv3G-u1NyG-qJktDVfM86EdG8SraNckMq7Y",
     "BACKEND_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
-    "BACKEND_PUBLISHABLE_KEY": "sb_publishable_OjodijuvlKGW8FBiuSZU7g_EUggDP77",
+    "BACKEND_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWhwbm9yanlkZmlqam90dm9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyMDk0MjcsImV4cCI6MjEwNzc4NTQyN30.txvy3nxwmv3G-u1NyG-qJktDVfM86EdG8SraNckMq7Y",
+    "BACKEND_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWhwbm9yanlkZmlqam90dm9jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjIwOTQyNywiZXhwIjoyMTA3Nzg1NDI3fQ.WXBjD-Z797BZmO5D8i7NFHOm-1LhsRxuZm0wYSBitaw",
     "SUPABASE_URL": "https://tmuhpnorjydfijjotvoc.supabase.co",
+    "SUPABASE_SECRET_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtdWhwbm9yanlkZmlqam90dm9jIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjIwOTQyNywiZXhwIjoyMTA3Nzg1NDI3fQ.WXBjD-Z797BZmO5D8i7NFHOm-1LhsRxuZm0wYSBitaw",
     "MAILJET_SENDER_EMAIL": "marginal.econ.ai@gmail.com",
     "ADMIN_EMAILS": "marginal.econ.ai@gmail.com",
     "VITE_ADMIN_EMAILS": "marginal.econ.ai@gmail.com"
