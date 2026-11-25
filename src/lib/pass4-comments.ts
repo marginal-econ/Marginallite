@@ -26,6 +26,22 @@ function getDiagramSyllabusGuidance(
 ): { critique: string; suggestion: string } {
   const lowerTitle = title.toLowerCase();
 
+  // 0. Quotas, Tariffs & Trade Protectionism
+  if (/quota|tariff|protectionism|trade\s*barrier/i.test(lowerTitle)) {
+    if (isFullMarks) {
+      return {
+        critique: `Diagram (${title}) accurately models trade protection, domestic output extension ($Q_1 \\to Q_2$), and import contraction.`,
+        suggestion: `Full marks secured. For Cambridge Table A distinction: evaluate who captures the surplus rectangle (government tax revenue under a tariff vs quota rents to licence holders/foreign exporters under a quota) and retaliatory risks.`,
+      };
+    }
+    return {
+      critique: hasExplanation
+        ? `Diagram (${title}) is positioned in trade analysis. Ensure the price rise from world price $P_w$ to the protected price, the reduction in imports, and the deadweight loss areas (production inefficiency and consumption loss) are explicitly integrated with the coordinates.`
+        : `Diagram (${title}) is placed here, but accompanying analysis lacks explicit reference to world price ($P_w$), protected price, and the deadweight welfare loss triangles.`,
+      suggestion: `Trace the transmission mechanism: state how the restriction forces domestic price above $P_w$, domestic output extends to $Q_2$, consumption contracts to $Q_3$, leaving quota rents or tariff revenue alongside production and consumption deadweight welfare losses.`,
+    };
+  }
+
   // 1. The J-Curve Effect / Marshall-Lerner
   if (/j[\s-_]*curve/i.test(lowerTitle)) {
     if (isFullMarks) {

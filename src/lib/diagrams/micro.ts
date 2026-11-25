@@ -494,7 +494,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["indirect-tax", "income-elasticity-of-demand", "price-elasticity-of-supply"],
     examQuestions: [
       "Explain why knowledge of PED is useful to a firm setting price. [8]",
-      "Discuss whether an indirect tax on a price inelastic good is an effective way to raise revenue. [12]",
+      "Discuss whether an indirect tax on a price inelastic good is an effective way to raise revenue. [8]",
     ],
   },
   {
@@ -729,7 +729,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     ],
     examQuestions: [
       "Using a diagram, analyse how the burden of an indirect tax is shared between consumers and producers. [8]",
-      "Discuss whether indirect taxation is the best way to reduce consumption of a demerit good. [12]",
+      "Discuss whether indirect taxation is the best way to reduce consumption of a demerit good. [8]",
     ],
   },
   {
@@ -846,7 +846,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     realWorld: ["Rent controls in Berlin and New York; the UK domestic energy price cap."],
     related: ["minimum-price", "market-equilibrium", "consumer-surplus"],
     examQuestions: [
-      "Discuss whether a maximum price is an effective way of making housing affordable. [12]",
+      "Discuss whether a maximum price is an effective way of making housing affordable. [8]",
     ],
   },
   {
@@ -1104,7 +1104,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["positive-externalities", "indirect-tax", "demerit-goods", "deadweight-welfare-loss"],
     examQuestions: [
       "Using a diagram, explain how negative externalities cause market failure. [8]",
-      "Discuss the effectiveness of taxation in correcting negative externalities. [12]",
+      "Discuss the effectiveness of taxation in correcting negative externalities. [8]",
     ],
   },
   {
@@ -1208,7 +1208,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["positive-externalities", "demerit-goods", "public-goods", "subsidy"],
     examQuestions: [
       "Explain why merit goods are under-consumed in a free market. [8]",
-      "Discuss whether governments should provide merit goods free of charge. [12]",
+      "Discuss whether governments should provide merit goods free of charge. [8]",
     ],
   },
   {
@@ -1254,7 +1254,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     realWorld: ["Tobacco duty, the UK soft drinks industry levy, gambling restrictions."],
     related: ["merit-goods", "negative-externalities", "indirect-tax"],
     examQuestions: [
-      "Discuss whether taxation is the most effective policy for reducing consumption of demerit goods. [12]",
+      "Discuss whether taxation is the most effective policy for reducing consumption of demerit goods. [8]",
     ],
   },
   {
@@ -1346,7 +1346,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     realWorld: ["North Atlantic cod collapse; Amazon deforestation; global fish stocks."],
     related: ["public-goods", "negative-externalities"],
     examQuestions: [
-      "Discuss policies to prevent the over-exploitation of common access resources. [12]",
+      "Discuss policies to prevent the over-exploitation of common access resources. [8]",
     ],
   },
 
@@ -1416,7 +1416,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     realWorld: ["Foreign exchange trading and some agricultural commodity markets come close."],
     related: ["monopoly", "contestable-markets", "average-cost", "marginal-revenue"],
     examQuestions: [
-      "Using diagrams, explain how a perfectly competitive firm moves from short-run abnormal profit to long-run equilibrium. [12]",
+      "Using diagrams, explain how a perfectly competitive firm moves from short-run abnormal profit to long-run equilibrium. [8]",
     ],
   },
   {
@@ -1506,7 +1506,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     ],
     examQuestions: [
       "Using a diagram, explain how a monopolist determines price and output. [8]",
-      "Discuss whether monopoly is always against the consumer interest. [12]",
+      "Discuss whether monopoly is always against the consumer interest. [8]",
     ],
   },
   {
@@ -1707,7 +1707,7 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     realWorld: ["Airline routes where aircraft can be redeployed cheaply between city pairs."],
     related: ["monopoly", "perfect-competition"],
     examQuestions: [
-      "Discuss whether the theory of contestable markets weakens the case for regulating monopolies. [12]",
+      "Discuss whether the theory of contestable markets weakens the case for regulating monopolies. [8]",
     ],
   },
 

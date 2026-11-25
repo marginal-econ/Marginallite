@@ -102,7 +102,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-increase-demand-pull", "sras-shift-cost-push", "keynesian-lras"],
     examQuestions: [
       "Using an AD/AS diagram, explain how macroeconomic equilibrium is determined. [8]",
-      "Assess the likely effects of an increase in aggregate demand on an economy. [12]",
+      "Assess the likely effects of an increase in aggregate demand on an economy. [8]",
     ],
   },
   {
@@ -222,7 +222,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-as-equilibrium", "ad-increase-demand-pull", "lras-growth"],
     examQuestions: [
       "Using a diagram, explain how a rise in world oil prices can cause cost-push inflation. [8]",
-      "Assess policies a government could use to respond to stagflation. [12]",
+      "Assess policies a government could use to respond to stagflation. [8]",
     ],
   },
   {
@@ -292,7 +292,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-as-equilibrium", "classical-lras", "output-gaps"],
     examQuestions: [
       "Explain the shape of the Keynesian long-run aggregate supply curve. [8]",
-      "Discuss whether an increase in government spending will always reduce unemployment. [12]",
+      "Discuss whether an increase in government spending will always reduce unemployment. [8]",
     ],
   },
   {
@@ -353,7 +353,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["keynesian-lras", "lras-growth", "long-run-phillips-curve"],
     examQuestions: [
       "Explain why the classical long-run aggregate supply curve is vertical. [8]",
-      "Evaluate the view that demand-side policies cannot raise long-run economic growth. [12]",
+      "Evaluate the view that demand-side policies cannot raise long-run economic growth. [8]",
     ],
   },
   {
@@ -426,7 +426,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["classical-lras", "business-cycle", "output-gaps"],
     examQuestions: [
       "Using a diagram, explain the difference between actual and potential economic growth. [8]",
-      "Assess the effectiveness of supply-side policies in promoting economic growth. [12]",
+      "Assess the effectiveness of supply-side policies in promoting economic growth. [8]",
     ],
   },
   {
@@ -496,7 +496,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["keynesian-lras", "business-cycle", "phillips-curve"],
     examQuestions: [
       "Explain what is meant by a negative output gap and how it may be closed. [8]",
-      "Discuss whether a positive output gap is desirable for an economy. [12]",
+      "Discuss whether a positive output gap is desirable for an economy. [8]",
     ],
   },
   {
@@ -565,7 +565,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-increase-demand-pull", "keynesian-lras", "output-gaps"],
     examQuestions: [
       "Explain how the multiplier magnifies the effect of an increase in government spending. [8]",
-      "Assess the importance of the size of the multiplier for fiscal policy. [12]",
+      "Assess the importance of the size of the multiplier for fiscal policy. [8]",
     ],
   },
   /* ----------------------------- Cycles, unemployment, inflation ----------------------------- */
@@ -627,7 +627,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["output-gaps", "lras-growth", "phillips-curve"],
     examQuestions: [
       "Using a diagram, describe the phases of the business cycle. [8]",
-      "Discuss how a government might reduce fluctuations in the business cycle. [12]",
+      "Discuss how a government might reduce fluctuations in the business cycle. [8]",
     ],
   },
   {
@@ -692,7 +692,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["long-run-phillips-curve", "output-gaps", "sras-shift-cost-push"],
     examQuestions: [
       "Explain, using a Phillips curve, the trade-off between inflation and unemployment. [8]",
-      "Discuss whether governments still face a trade-off between inflation and unemployment. [12]",
+      "Discuss whether governments still face a trade-off between inflation and unemployment. [8]",
     ],
   },
   {
@@ -775,7 +775,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["phillips-curve", "classical-lras", "labour-market-equilibrium"],
     examQuestions: [
       "Explain why the long-run Phillips curve is vertical. [8]",
-      "Evaluate the view that unemployment can only be reduced permanently by supply-side policy. [12]",
+      "Evaluate the view that unemployment can only be reduced permanently by supply-side policy. [8]",
     ],
   },
   /* ----------------------------- Labour market ----------------------------- */
@@ -838,7 +838,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["minimum-wage-labour", "trade-union-wage", "long-run-phillips-curve"],
     examQuestions: [
       "Using a diagram, explain how wages are determined in a competitive labour market. [8]",
-      "Discuss why wage differentials exist between occupations. [12]",
+      "Discuss why wage differentials exist between occupations. [8]",
     ],
   },
   {
@@ -933,7 +933,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["labour-market-equilibrium", "trade-union-wage"],
     examQuestions: [
       "Using a diagram, explain the likely effects of a national minimum wage on employment. [8]",
-      "Assess whether a national minimum wage reduces poverty. [12]",
+      "Assess whether a national minimum wage reduces poverty. [8]",
     ],
   },
   {
@@ -1014,7 +1014,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["labour-market-equilibrium", "minimum-wage-labour"],
     examQuestions: [
       "Using a diagram, explain how a trade union may raise the wages of its members. [8]",
-      "Discuss the effects of trade unions on the labour market. [12]",
+      "Discuss the effects of trade unions on the labour market. [8]",
     ],
   },
   /* ----------------------------- Distribution & development ----------------------------- */
@@ -1085,7 +1085,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["kuznets-curve", "business-cycle"],
     examQuestions: [
       "Explain how a Lorenz curve and Gini coefficient measure income inequality. [8]",
-      "Discuss whether reducing income inequality should be a government priority. [12]",
+      "Discuss whether reducing income inequality should be a government priority. [8]",
     ],
   },
   {
@@ -1149,7 +1149,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["lorenz-curve", "lras-growth"],
     examQuestions: [
       "Explain the Kuznets curve hypothesis. [8]",
-      "Discuss whether economic growth inevitably reduces income inequality. [12]",
+      "Discuss whether economic growth inevitably reduces income inequality. [8]",
     ],
   },
   /* ----------------------------- International ----------------------------- */
@@ -1229,7 +1229,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["j-curve", "tariff-diagram", "sras-shift-cost-push"],
     examQuestions: [
       "Using a diagram, explain how an increase in interest rates may cause a currency to appreciate. [8]",
-      "Assess the effects of a depreciation of the exchange rate on an economy. [12]",
+      "Assess the effects of a depreciation of the exchange rate on an economy. [8]",
     ],
   },
   {
@@ -1303,7 +1303,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["exchange-rate-market", "tariff-diagram"],
     examQuestions: [
       "Using the J-curve, explain why a depreciation may not immediately improve the current account. [8]",
-      "Discuss whether depreciation is an effective way to correct a current account deficit. [12]",
+      "Discuss whether depreciation is an effective way to correct a current account deficit. [8]",
     ],
   },
   {
@@ -1405,7 +1405,7 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["exchange-rate-market", "j-curve"],
     examQuestions: [
       "Using a diagram, explain the effects of imposing a tariff on imports. [8]",
-      "Assess whether protectionism can ever be justified. [12]",
+      "Assess whether protectionism can ever be justified. [8]",
     ],
   },
   {
@@ -1486,7 +1486,262 @@ export const MACRO_DIAGRAMS: DiagramEntry[] = build([
     related: ["ad-increase-demand-pull", "phillips-curve", "exchange-rate-market"],
     examQuestions: [
       "Using a diagram, explain how an increase in the money supply affects the rate of interest. [8]",
-      "Discuss the effectiveness of monetary policy in controlling inflation. [12]",
+      "Discuss whether monetary policy is effective in controlling inflation. [8]",
+    ],
+  },
+  {
+    id: "import-quota",
+    title: "Effect of an Import Quota",
+    topic: "International Trade",
+    level: "Core & Extended",
+    spec: {
+      xLabel: "Quantity",
+      yLabel: "Price",
+      curves: [
+        {
+          points: [
+            [0, 95],
+            [92, 6],
+          ],
+          label: "D (domestic)",
+          tone: "demand",
+          labelAt: [70, 14],
+        },
+        {
+          points: [
+            [0, 3],
+            [92, 92],
+          ],
+          label: "S (domestic)",
+          tone: "supply",
+          labelAt: [93, 88],
+        },
+        {
+          points: [
+            [4, 26],
+            [92, 26],
+          ],
+          label: "Pw",
+          tone: "neutral",
+          labelAt: [93, 26],
+        },
+        {
+          points: [
+            [18, 3],
+            [92, 75],
+          ],
+          label: "S (dom + quota)",
+          tone: "supply",
+          dashed: true,
+          labelAt: [76, 82],
+        },
+        {
+          points: [
+            [4, 42],
+            [92, 42],
+          ],
+          label: "P (quota)",
+          tone: "warn",
+          labelAt: [93, 42],
+        },
+      ],
+      markers: [
+        { at: [24, 26], label: "Q1", guides: "x" },
+        { at: [40, 42], label: "Q2", guides: "x" },
+        { at: [58, 42], label: "Q3", guides: "x" },
+        { at: [72, 26], label: "Q4", guides: "x" },
+      ],
+      shades: [
+        {
+          points: [
+            [40, 26],
+            [58, 26],
+            [58, 42],
+            [40, 42],
+          ],
+          label: "Quota rent",
+          tone: "primary",
+          labelAt: [49, 34],
+        },
+        {
+          points: [
+            [24, 26],
+            [40, 26],
+            [40, 42],
+          ],
+          label: "DWL (prod)",
+          tone: "danger",
+          labelAt: [32, 31],
+        },
+        {
+          points: [
+            [58, 26],
+            [72, 26],
+            [58, 42],
+          ],
+          label: "DWL (cons)",
+          tone: "danger",
+          labelAt: [65, 31],
+        },
+      ],
+      notes: [
+        { at: [49, 92], text: "Imports capped at physical quota Q2→Q3" },
+        { at: [49, 49], text: "Domestic price forced up from Pw to P(quota)" },
+      ],
+    },
+    represents:
+      "A physical quantitative restriction on the volume of imports, which forces domestic price above world price, expands domestic production, reduces domestic consumption, and creates quota rents.",
+    whyUsed:
+      "Cambridge IGCSE 0455 explicitly examines trade protection methods — contrasting price barriers (tariffs) with physical volume barriers (import quotas).",
+    whenToDraw:
+      "In Cambridge 0455 Paper 2 Section B questions on trade protectionism, non-tariff barriers, tariffs vs quotas, or methods to correct a current account deficit.",
+    howToRead: [
+      "At free-trade world price Pw, domestic firms supply Q1 and domestic consumers buy Q4, with imports equal to Q1 to Q4.",
+      "The quota sets a legal maximum on imports equal to the horizontal distance Q2 to Q3.",
+      "Domestic market supply becomes domestic supply plus the quota: S(dom + quota), shifting right by the fixed quota width.",
+      "The intersection with demand establishes the higher domestic price P(quota).",
+      "Domestic production expands from Q1 to Q2 (inefficient reallocation of resources, deadweight loss triangle on the left).",
+      "Domestic consumption contracts from Q4 to Q3 (loss of consumer surplus, deadweight loss triangle on the right).",
+      "The shaded central rectangle is 'quota rent': (P_quota − Pw) × Quota volume, accruing to import licence holders or foreign exporters.",
+    ],
+    labelKeys: ["P", "Q", "D", "S", "DWL", "CS"],
+    labelOverrides: {
+      P: "Price — on the vertical axis, showing free-trade world price Pw and the higher domestic price P(quota).",
+      Q: "Quantity — on the horizontal axis, showing domestic production and consumption coordinates.",
+      DWL: "Deadweight welfare loss — the two red triangles: production inefficiency and consumer surplus loss.",
+    },
+    mistakes: [
+      "Labeling the central rectangle as 'government tax revenue' — under a quota, the government receives no revenue unless it auctions import licences.",
+      "Drawing the quota as a horizontal line instead of a parallel rightward shift of domestic supply by the quota quantity.",
+      "Confusing the domestic production quantity with total quantity consumed.",
+    ],
+    tips: [
+      "In Cambridge Table A Level 3 evaluation, highlight that quotas are more certain in limiting import volume than tariffs, but deprive the government of tariff tax revenue.",
+      "Evaluate retaliatory risks from trading partners.",
+    ],
+    realWorld: [
+      "US sugar import quotas protecting domestic sugarcane farmers by restricting imports from Latin America.",
+      "Historical quotas on textile and agricultural imports.",
+    ],
+    related: ["tariff-diagram", "exchange-rate-market", "j-curve"],
+    examQuestions: [
+      "Discuss whether or not a government should impose an import quota. [8]",
+      "Discuss whether a quota is a more effective method of trade protection than an import tariff. [8]",
+    ],
+  },
+  {
+    id: "domestic-subsidies-trade",
+    title: "Production Subsidy to Domestic Import-Competing Producers",
+    topic: "International Trade",
+    level: "Core & Extended",
+    spec: {
+      xLabel: "Quantity",
+      yLabel: "Price",
+      curves: [
+        {
+          points: [
+            [0, 95],
+            [92, 6],
+          ],
+          label: "D (domestic)",
+          tone: "demand",
+          labelAt: [70, 14],
+        },
+        {
+          points: [
+            [0, 3],
+            [92, 92],
+          ],
+          label: "S (domestic)",
+          tone: "supply",
+          labelAt: [93, 88],
+        },
+        {
+          points: [
+            [12, 3],
+            [92, 81],
+          ],
+          label: "S (dom + subsidy)",
+          tone: "supply",
+          dashed: true,
+          labelAt: [80, 86],
+        },
+        {
+          points: [
+            [4, 26],
+            [92, 26],
+          ],
+          label: "Pw",
+          tone: "neutral",
+          labelAt: [93, 26],
+        },
+      ],
+      markers: [
+        { at: [24, 26], label: "Q1", guides: "x" },
+        { at: [38, 26], label: "Q2", guides: "x" },
+        { at: [72, 26], label: "Q3", guides: "x" },
+      ],
+      shades: [
+        {
+          points: [
+            [24, 26],
+            [38, 26],
+            [38, 38],
+            [24, 26],
+          ],
+          label: "DWL (prod)",
+          tone: "danger",
+          labelAt: [32, 29],
+        },
+        {
+          points: [
+            [4, 26],
+            [38, 26],
+            [38, 38],
+            [4, 38],
+          ],
+          label: "Govt subsidy cost",
+          tone: "primary",
+          labelAt: [20, 32],
+        },
+      ],
+      notes: [
+        { at: [49, 92], text: "Imports fall from Q1→Q3 to Q2→Q3" },
+        { at: [49, 18], text: "Consumer price remains at Pw — NO consumer surplus loss" },
+      ],
+    },
+    represents:
+      "A government subsidy granted to domestic producers competing with imports, lowering their marginal cost and expanding domestic production without raising the price paid by domestic consumers.",
+    whyUsed:
+      "Demonstrates why Cambridge 0455 examiners reward comparisons between subsidies and tariffs: domestic subsidies protect employment and output without raising consumer prices.",
+    whenToDraw:
+      "In questions asking whether a government should protect domestic industries or compare methods of protection (tariffs vs subsidies).",
+    howToRead: [
+      "At world price Pw, domestic producers supply Q1 and consumers buy Q3, with imports equal to Q1 to Q3.",
+      "A production subsidy shifts the domestic supply curve right to S(dom + subsidy).",
+      "Domestic output expands to Q2, cutting imports to Q2 to Q3.",
+      "The market price remains at world price Pw, so consumer surplus is not harmed.",
+      "The deadweight loss is limited to the production inefficiency triangle, funded by government expenditure.",
+    ],
+    labelKeys: ["P", "Q", "D", "S", "DWL"],
+    labelOverrides: {
+      DWL: "Production deadweight loss — caused by domestic resources producing output at higher marginal cost than world price.",
+    },
+    mistakes: [
+      "Showing the domestic consumer price rising — under an open economy price taker, consumer price stays at Pw.",
+      "Adding a consumption deadweight loss triangle — there is no consumption loss because consumers still pay Pw.",
+    ],
+    tips: [
+      "Evaluate the opportunity cost: government funds spent on producer subsidies cannot be spent on healthcare, education, or infrastructure.",
+    ],
+    realWorld: [
+      "Government subsidies to domestic renewable energy equipment manufacturers competing with imports.",
+      "Agricultural subsidies supporting domestic food security.",
+    ],
+    related: ["import-quota", "tariff-diagram"],
+    examQuestions: [
+      "Discuss whether or not a government should subsidise domestic producers competing with imports. [8]",
+      "Discuss whether a subsidy to domestic producers is preferable to an import tariff. [8]",
     ],
   },
 ]);

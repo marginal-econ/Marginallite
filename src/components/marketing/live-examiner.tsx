@@ -63,7 +63,7 @@ const AO_META: Record<Ao, { label: string; code: string; dot: string; badge: str
 
 const TYPE_SPEED = 28;
 const HOLD_TIME = 4000;
-const TOTAL_MARKS = 12;
+const TOTAL_MARKS = 8;
 
 export function LiveExaminer({ className }: { className?: string }) {
   const [typedChars, setTypedChars] = useState(0);
@@ -117,10 +117,7 @@ export function LiveExaminer({ className }: { className?: string }) {
   const activeClause = activeCompleted?.clause;
 
   const completedCount = renderedClauses.filter((row) => row.isCompleted).length;
-  const runningMark = Math.min(
-    11,
-    Math.round((completedCount / CLAUSES.length) * 11),
-  );
+  const runningMark = completedCount === 0 ? 0 : completedCount === 1 ? 2 : completedCount === 2 ? 5 : 8;
 
   const aoProgress = (Object.keys(AO_META) as Ao[]).map((ao) => {
     const total = CLAUSES.filter((c) => c.ao === ao).length;
@@ -157,11 +154,11 @@ export function LiveExaminer({ className }: { className?: string }) {
 
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="rounded-md border border-border/70 bg-card px-2 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
-            Paper 2 · Section B [12 Marks]
+            Paper 2 · Section B [8 Marks]
           </span>
           {runningMark > 0 ? (
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-              Est. {runningMark}/12
+              Est. {runningMark}/8
             </span>
           ) : null}
         </div>
@@ -172,7 +169,7 @@ export function LiveExaminer({ className }: { className?: string }) {
         {!isFinished ? <span className="examiner-scan" aria-hidden="true" /> : null}
 
         <p className="text-xs font-bold text-foreground leading-snug">
-          “Assess whether a minimum price is the most effective way to reduce consumption of a demerit good.”
+          “Discuss whether or not a minimum price is the most effective way to reduce consumption of a demerit good. [8]”
         </p>
 
         <p className="relative mt-3 min-h-[9.5rem] font-serif text-[0.94rem] leading-[1.8] text-foreground sm:min-h-[8.5rem]">

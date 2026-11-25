@@ -160,8 +160,10 @@ export function computeHeuristicScore(params: {
       if (causalLinks >= 10 && contextLinks >= 3) rawAo2 += 2;
     }
 
-    // One-sided essay cap: in an evaluative question (12 or 20 marks), if evaluation is absent (0), analysis cannot achieve top band
-    if (evalLinks === 0 && maxMark >= 12) {
+    // Cambridge IGCSE 0455 Table A Gating: In an 8-mark Discuss question, a one-sided response (evalLinks === 0) is strictly capped at max 5/8 (Level 2)
+    if (evalLinks === 0 && maxMark === 8) {
+      rawAo2 = Math.min(3, rawAo2);
+    } else if (evalLinks === 0 && maxMark >= 12) {
       rawAo2 = Math.min(maxMark === 12 ? 4 : 6, rawAo2);
     }
   }
@@ -179,18 +181,31 @@ export function computeHeuristicScore(params: {
   }
   const ao3 = Math.min(split.ao3_marks, rawAo3);
 
-  // Total clamped
-  const total = Math.min(maxMark, ao1 + ao2 + ao3);
+  // Total clamped (with Table A 5-mark cap for one-sided 8-mark Discuss responses)
+  let total = Math.min(maxMark, ao1 + ao2 + ao3);
+  if (maxMark === 8 && evalLinks === 0) {
+    total = Math.min(5, total);
+  }
 
-  // Band descriptor
-  const ratio = total / maxMark;
-  let band = "Level 1: Basic";
-  if (ratio >= 0.75) {
-    band = "Level 4: Thorough & fully justified";
-  } else if (ratio >= 0.5) {
-    band = "Level 3: Sound analysis & balanced";
-  } else if (ratio >= 0.25) {
-    band = "Level 2: Developing explanation";
+  // Band descriptor calibrated for Cambridge IGCSE 0455
+  let band = "Level 0: No creditable response";
+  if (maxMark === 8) {
+    if (total >= 6) {
+      band = "Level 3: Two-sided discussion with evaluation (6–8m)";
+    } else if (total >= 3) {
+      band = "Level 2: Developed analysis (3–5m)";
+    } else if (total >= 1) {
+      band = "Level 1: Identification & basic reasoning (1–2m)";
+    }
+  } else {
+    const ratio = maxMark > 0 ? total / maxMark : 0;
+    if (ratio >= 0.75) {
+      band = "Level 3: Comprehensive response";
+    } else if (ratio >= 0.4) {
+      band = "Level 2: Developed response";
+    } else if (total >= 1) {
+      band = "Level 1: Basic response";
+    }
   }
 
   // Next Moves (ranked by potential marginal gain)
