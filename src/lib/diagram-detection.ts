@@ -165,7 +165,7 @@ export function extractDiagramReferences(text: string): DiagramRefResult {
       if (d.id === "j-curve" && (cleanContent === "j-curve" || cleanContent === "j-curve effect" || cleanContent === "j curve")) return true;
       if (d.id === "phillips-curve" && (cleanContent === "phillips curve" || cleanContent === "short-run phillips curve")) return true;
       if (d.id === "ad-as-growth" && (cleanContent === "ad/as" || cleanContent === "ad-as" || cleanContent === "aggregate demand and supply")) return true;
-      if (d.id === "ppc-growth" && (cleanContent === "production possibility curve" || cleanContent === "production possibility frontier" || (hasExplicitPrefix && cleanContent === "ppc"))) return true;
+      if ((d.id === "production-possibility-curve" || d.id === "ppc-growth") && (cleanContent === "production possibility curve" || cleanContent === "production possibility frontier" || (hasExplicitPrefix && cleanContent === "ppc") || (hasExplicitPrefix && cleanContent === "ppf"))) return true;
       if (d.id === "negative-externality-production" && (cleanContent === "negative externality of production" || (hasExplicitPrefix && cleanContent === "negative externality"))) return true;
       if (d.id === "positive-externality-consumption" && (cleanContent === "positive externality of consumption" || (hasExplicitPrefix && cleanContent === "positive externality"))) return true;
 

@@ -61,6 +61,7 @@
     "dictionary-en-gb": "^3.0.0",
     "disposable-email-domains": "^1.0.62",
     "embla-carousel-react": "^8.6.0",
+    "heic2any": "^0.0.4",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.13.0",

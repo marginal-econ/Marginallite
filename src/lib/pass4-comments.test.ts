@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { generatePass4Comments, findHighlightSpanInText } from "./pass4-comments";
+import {
+  buildParagraphHighlightSegments,
+  findHighlightSpanInText,
+  generatePass4Comments,
+  parseParagraphBlocks,
+} from "./pass4-comments";
 import type { Grading } from "./examiner/types";
+import { stripStars } from "./utils";
 
 describe("generatePass4Comments", () => {
   const mockGrading: Grading = {
@@ -516,5 +522,91 @@ describe("findHighlightSpanInText", () => {
   it("always preserves 100% of paragraph text even for empty or mismatched query", () => {
     const span = findHighlightSpanInText(paragraph, "completely unrelated string 123456789");
     expect(span.before + span.match + span.after).toBe(paragraph);
+  });
+});
+
+describe("parseParagraphBlocks & buildParagraphHighlightSegments", () => {
+  it("splits single-newline essays cleanly even when a diagram tag is present", () => {
+    const singleNewlineEssay = [
+      "A maximum price is set below equilibrium.",
+      "This causes excess demand and a shortage in the market.",
+      "(Diagram: Maximum Price)",
+      "However, informal black markets can emerge.",
+      "In conclusion, maximum prices carry unintended welfare costs.",
+    ].join("\n");
+
+    const blocks = parseParagraphBlocks(singleNewlineEssay, [
+      { title: "Maximum Price", matchText: "(Diagram: Maximum Price)" },
+    ]);
+
+    expect(blocks).toHaveLength(5);
+    expect(blocks[0].isDiagram).toBe(false);
+    expect(blocks[0].textParagraphNumber).toBe(1);
+    expect(blocks[1].textParagraphNumber).toBe(2);
+    expect(blocks[2].isDiagram).toBe(true);
+    expect(blocks[2].label).toBe("Diagram (after ¶2)");
+    expect(blocks[3].textParagraphNumber).toBe(3);
+    expect(blocks[4].textParagraphNumber).toBe(4);
+  });
+
+  it("rejoins mid-sentence hard line-wraps from PDF/OCR pastes without shredding paragraphs", () => {
+    const hardWrapped =
+      "A depreciation lowers the foreign currency price of exports\nand raises the domestic price of imports.\n\nHowever, the Marshall-Lerner condition states that trade improves only if:\nPEDx + PEDm > 1";
+
+    const blocks = parseParagraphBlocks(hardWrapped, []);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].text).toBe(
+      "A depreciation lowers the foreign currency price of exports and raises the domestic price of imports.",
+    );
+    expect(blocks[1].text).toContain("PEDx + PEDm > 1");
+  });
+
+  it("isolates curly-brace {Diagram: ...} tags cleanly", () => {
+    const essay = "Intro paragraph.\n{Diagram: Depreciation}\nClosing paragraph.";
+    const blocks = parseParagraphBlocks(essay, [
+      { title: "Depreciation", matchText: "{Diagram: Depreciation}" },
+    ]);
+    expect(blocks).toHaveLength(3);
+    expect(blocks[1].isDiagram).toBe(true);
+    expect(blocks[1].label).toBe("Diagram (after ¶1)");
+  });
+
+  it("highlights multiple comments in one paragraph losslessly and prioritizes the active comment", () => {
+    const para =
+      "Demand exceeds supply at the ceiling price. Consequently, a persistent shortage develops. However, black markets may emerge over time.";
+    const c1 = {
+      id: "c1",
+      category: "analysis" as const,
+      title: "Analysis",
+      badge: "Analysis Gap",
+      color: "amber" as const,
+      paragraphIndex: 0,
+      highlightText: "Consequently, a persistent shortage develops.",
+      critique: "Expand transmission.",
+      suggestion: "Explain rationing.",
+    };
+    const c2 = {
+      id: "c2",
+      category: "evaluation" as const,
+      title: "Evaluation",
+      badge: "Evaluation Gap",
+      color: "sky" as const,
+      paragraphIndex: 0,
+      highlightText: "However, black markets may emerge over time.",
+      critique: "Weigh magnitude.",
+      suggestion: "Compare short vs long run.",
+    };
+
+    const segments = buildParagraphHighlightSegments(para, [c1, c2], "c2");
+    expect(segments.map((s) => s.text).join("")).toBe(para);
+    const activeSeg = segments.find((s) => s.isActive);
+    expect(activeSeg?.comment?.id).toBe("c2");
+    expect(segments.some((s) => s.comment?.id === "c1")).toBe(true);
+  });
+
+  it("formats bracketed LaTeX math like $[P - AC] \\times Q$ without leaking raw dollar signs", () => {
+    const cleaned = stripStars("Identify the supernormal profit rectangle ($[P - AC] \\times Q$).");
+    expect(cleaned).not.toContain("$");
+    expect(cleaned).toContain("[P - AC] × Q");
   });
 });

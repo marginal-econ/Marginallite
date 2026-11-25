@@ -91,8 +91,8 @@ export function formatEconomicsMathText(text: unknown): string {
   s = s.replace(/\b([A-Za-z]{1,4})_\{?([A-Za-z0-9]+)\}?\b/g, (_, v, sub) => `${v}${toSubscript(sub)}`);
 
   // 5. Unwrap math expressions inside $...$
-  // Math expressions start with a letter, Greek/operator symbol, or parenthesis (never digits like currency $100)
-  s = s.replace(/\$([A-Za-zΔ×·÷≤≥≠≈→←\\(][^$\n]{0,120}?)\$/g, (match, inner) => {
+  // Math expressions start with a letter, Greek/operator symbol, parenthesis, or bracket (never digits like currency $100)
+  s = s.replace(/\$([A-Za-zΔ×·÷≤≥≠≈→←\\(\[][^$\n]{0,120}?)\$/g, (match, inner) => {
     // If it looks like currency (e.g. "$10 to $20"), don't match
     if (/\$\d/.test(inner)) return match;
     // Format inner subscripts if any remain
@@ -104,6 +104,7 @@ export function formatEconomicsMathText(text: unknown): string {
   // e.g. $(P_x)$ -> (Pₓ), $(AD)$ -> (AD), $(X-M)$ -> (X-M), ($P$) -> (P)
   s = s.replace(/\$\(([^)]+)\)\$/g, "($1)");
   s = s.replace(/\(\$([^$]+)\$\)/g, "($1)");
+  s = s.replace(/\$\[([^\]]+)\]\$/g, "[$1]");
   s = s.replace(/\$([A-Za-z])/g, "$1");
   s = s.replace(/([A-Za-z])\$/g, "$1");
 
@@ -206,9 +207,10 @@ export function autoParagraphText(text: unknown): string {
     return raw;
   }
 
-  // 1. First attempt: Split at Cambridge discourse & transition markers that follow sentence endings (.!?)
-  // Avoid RegExp lookbehinds for broad browser compatibility (older Safari/WebKit & iPads)
-  const transitionPattern = /([.!?])\s+(?=(?:However|In contrast|Conversely|On the other hand|Furthermore|Moreover|In addition|Additionally|Alternatively|Secondly|Thirdly|Finally|In evaluation|To evaluate|In conclusion|Overall|Ultimately|Consequently|Therefore|From an evaluative standpoint|Examining this policy|With regard to|With regards to|Turning to|A government can|Monetary policy|Fiscal policy|Supply-side policy)\b)/gi;
+  // 1. First attempt: Split at major Cambridge discourse & transition markers that follow sentence endings (.!?)
+  // Avoid splitting on mid-paragraph causal connectors ("Consequently", "Therefore") which create 1-sentence fragments.
+  // Avoid RegExp lookbehinds for broad browser compatibility (older Safari/WebKit & iPads).
+  const transitionPattern = /([.!?])\s+(?=(?:However|In contrast|Conversely|On the other hand|Furthermore|Moreover|In addition|Additionally|Alternatively|Secondly|Thirdly|Finally|In evaluation|To evaluate|In conclusion|Overall|Ultimately|From an evaluative standpoint|Examining this policy|With regard to|With regards to|Turning to|A government can|Monetary policy|Fiscal policy|Supply-side policy)\b)/gi;
 
   const splitByTransitions = raw
     .replace(transitionPattern, "$1\n\n")
@@ -217,7 +219,20 @@ export function autoParagraphText(text: unknown): string {
     .filter(Boolean);
 
   if (splitByTransitions.length >= 2) {
-    return splitByTransitions.join("\n\n");
+    // Prevent overly fragmented 1-sentence stub paragraphs (< 18 words) unless it's a conclusion/evaluation opener
+    const merged: string[] = [];
+    for (const para of splitByTransitions) {
+      const wordCount = para.split(/\s+/).length;
+      const isStructuralOpener = /^(?:in conclusion|in evaluation|to evaluate|overall|ultimately|however)\b/i.test(para);
+      if (merged.length > 0 && wordCount < 18 && !isStructuralOpener) {
+        merged[merged.length - 1] = `${merged[merged.length - 1]} ${para}`;
+      } else {
+        merged.push(para);
+      }
+    }
+    if (merged.length >= 2) {
+      return merged.join("\n\n");
+    }
   }
 
   // 2. Second attempt: If no explicit transition words exist, split at natural sentence boundaries

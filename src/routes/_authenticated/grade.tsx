@@ -55,6 +55,7 @@ import { ChainedChamber } from "@/components/app/chained-chamber";
 import { CompactProgressBar, GradingProgress, type ProgressStage } from "@/components/app/grading-progress";
 import { HandwritingUpload } from "@/components/app/handwriting-upload";
 import { MarkBreakdown } from "@/components/app/mark-breakdown";
+import { Pass4ReviewWorkspace } from "@/components/app/pass4-review-workspace";
 import { generatePass4Comments, parseParagraphBlocks, findHighlightSpanInText, type Pass4Comment, type ParagraphBlock } from "@/lib/pass4-comments";
 import { DiagramCheckDialog } from "@/components/app/diagram-check-dialog";
 import { SampleEssayBanner } from "@/components/app/sample-essay-banner";
@@ -556,7 +557,6 @@ function GradePage() {
   const [diagramSearch, setDiagramSearch] = useState("");
   const [diagramFilterSection, setDiagramFilterSection] = useState<"all" | "Microeconomics" | "Macroeconomics" | "custom">("all");
   const [activeViewTab, setActiveViewTab] = useState<"editor" | "report">("editor");
-  const [showDetailedReport, setShowDetailedReport] = useState(false);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [isEditingAfterGrade, setIsEditingAfterGrade] = useState(false);
   const [isDocDragging, setIsDocDragging] = useState(false);
@@ -569,7 +569,21 @@ function GradePage() {
 
   const essayInputRef = useRef<HTMLTextAreaElement>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
-  const reportRef = useRef<HTMLDivElement>(null);
+
+  // Lock background scroll & support Escape key when the Diagnostic Report popup is open
+  useEffect(() => {
+    if (!detailedBreakdownOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDetailedBreakdownOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [detailedBreakdownOpen]);
 
   // Auto-launch guided spotlight tour for first-time visitors
   useEffect(() => {
@@ -1066,7 +1080,7 @@ function GradePage() {
     },
     onSuccess: (data) => {
       setResult({ grading: data.grading as Grading, essayId: data.essayId });
-      setShowDetailedReport(false);
+      setDetailedBreakdownOpen(false);
       setActiveViewTab("report");
       setIsEditingAfterGrade(false);
       setActiveCommentId(null);
@@ -1079,12 +1093,7 @@ function GradePage() {
       } catch {}
       toast.success(`Marked ${data.grading.total_mark}/${data.grading.max_mark}`);
       setTimeout(() => {
-        const target = document.getElementById("candidate-report-header");
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else {
-          reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        document.getElementById("candidate-report-header")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 150);
     },
     onError: (error: Error) => {
@@ -1443,30 +1452,15 @@ function GradePage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <Button
                           size="sm"
-                          onClick={() => {
-                            if (!showDetailedReport) {
-                              setShowDetailedReport(true);
-                              setTimeout(() => {
-                                reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                              }, 100);
-                            } else {
-                              setShowDetailedReport(false);
-                            }
-                          }}
-                          className="text-xs font-semibold rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 cursor-pointer shadow-xs"
+                          variant="outline"
+                          onClick={() => setDetailedBreakdownOpen(true)}
+                          className="text-xs font-semibold rounded-xl gap-1.5 cursor-pointer"
                         >
-                          {showDetailedReport ? (
-                            <>
-                              <ChevronUp className="size-3.5" /> Hide Diagnostic Report
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="size-3.5" /> View Diagnostic Report
-                            </>
-                          )}
+                          <FileText className="size-3.5 text-muted-foreground" />
+                          <span>View Report</span>
                         </Button>
                         <Button
                           size="sm"
@@ -1981,366 +1975,37 @@ function GradePage() {
                           </p>
                         )}
 
-                        {/* Clear Guide to Full Candidate Diagnostic Report Below */}
+                        {/* Clear Guide to Full Candidate Diagnostic Report */}
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-border/50 text-xs">
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Sparkles className="size-3.5 text-primary shrink-0" />
-                            <span>
-                              {showDetailedReport
-                                ? "Full Cambridge criteria report is displayed below."
-                                : "Complete criteria matrix, strengths, weaknesses & model exemplars available on demand."}
-                            </span>
+                            <span>Full Cambridge 0455 diagnostic report and syllabus criteria available on demand.</span>
                           </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => setDetailedBreakdownOpen(true)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-background hover:bg-muted text-foreground font-semibold text-[11px] border border-border/80 transition-all cursor-pointer shadow-xs"
-                            >
-                              <Eye className="size-3 text-muted-foreground" />
-                              <span>Quick Dialog ↗</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!showDetailedReport) {
-                                  setShowDetailedReport(true);
-                                  setTimeout(() => {
-                                    reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                  }, 100);
-                                } else {
-                                  setShowDetailedReport(false);
-                                }
-                              }}
-                              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-primary text-primary-foreground font-bold text-[11px] hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
-                            >
-                              {showDetailedReport ? (
-                                <>
-                                  <ChevronUp className="size-3" />
-                                  <span>Hide Report ↑</span>
-                                </>
-                              ) : (
-                                <>
-                                  <SlidersHorizontal className="size-3" />
-                                  <span>Detailed Report Below ↓</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setDetailedBreakdownOpen(true)}
+                            className="h-7 px-3 rounded-lg text-xs font-semibold gap-1.5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs"
+                          >
+                            <FileText className="size-3" />
+                            <span>Full Diagnostic Report</span>
+                          </Button>
                         </div>
                       </div>
                     )}
 
                     {/* Single Integrated Manuscript Mode: Interactive Pass 4 Review when graded, Pure Writing Surface when drafting */}
                     {result && !isEditingAfterGrade ? (
-                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_370px] gap-6 items-start">
-                        {/* Left Column: Annotated Candidate Manuscript with Google Docs in-situ highlights */}
-                        <div className="rounded-2xl border border-border/70 bg-card/40 dark:bg-card/20 p-5 sm:p-7 shadow-xs space-y-4">
-                          <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider font-sans">
-                              <BookOpenCheck className="size-3.5 text-primary" /> Annotated Candidate Manuscript
-                            </span>
-                            <span className="text-[11px] text-muted-foreground/80 font-mono">
-                              Click any passage or comment to inspect
-                            </span>
-                          </div>
-
-                          <div
-                            className={cn(
-                              "space-y-4 text-base sm:text-[18px] md:text-[19px] leading-[1.95] text-foreground/95 min-h-[460px]",
-                              essayFont === "serif" ? "font-serif" : "font-sans",
-                            )}
-                            style={{
-                              fontFamily:
-                                essayFont === "serif"
-                                  ? '"Newsreader", Georgia, Cambria, "Times New Roman", serif'
-                                  : '"Outfit", "Inter Tight", system-ui, -apple-system, sans-serif',
-                              fontOpticalSizing: "none",
-                              letterSpacing: "0px",
-                              lineHeight: essayFont === "serif" ? "1.9" : "1.75",
-                            }}
-                          >
-                            {paragraphBlocks.length > 0 ? (
-                              paragraphBlocks.map((block) => {
-                                const isDiag = block.isDiagram;
-                                const paraComments = pass4Comments.filter((c) => c.paragraphIndex === block.index);
-                                const isParaActive = paraComments.some((c) => c.id === activeCommentId);
-
-                                if (isDiag) {
-                                  const diagComment = pass4Comments.find(
-                                    (c) => c.category === "diagram" && c.paragraphIndex === block.index,
-                                  );
-                                  const isDiagActive = diagComment && activeCommentId === diagComment.id;
-
-                                  return (
-                                    <div
-                                      key={block.index}
-                                      id={`pass4-para-${block.index}`}
-                                      onClick={() => {
-                                        if (diagComment) {
-                                          setActiveCommentId(diagComment.id);
-                                          document
-                                            .getElementById(`pass4-card-${diagComment.id}`)
-                                            ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                                        }
-                                      }}
-                                      className={cn(
-                                        "my-3 py-3 px-4 rounded-xl border transition-all duration-200 cursor-pointer shadow-xs flex items-center justify-between gap-3 font-sans",
-                                        isDiagActive
-                                          ? "border-emerald-500 bg-emerald-500/20 ring-2 ring-emerald-400/80 shadow-md scale-[1.01]"
-                                          : "border-emerald-500/40 bg-emerald-500/[0.08] dark:bg-emerald-950/30 hover:border-emerald-400 hover:bg-emerald-500/15",
-                                      )}
-                                    >
-                                      <div className="flex items-center gap-2.5">
-                                        <Images
-                                          className={cn(
-                                            "size-4 shrink-0",
-                                            isDiagActive ? "text-emerald-300 animate-pulse" : "text-emerald-400",
-                                          )}
-                                        />
-                                        <span className="font-mono font-bold text-xs sm:text-sm text-emerald-300">
-                                          {block.diagramTitle || block.text.replace(/^\[DIAGRAM:\s*/i, "").replace(/\]$/, "").slice(0, 50)}
-                                        </span>
-                                        <span className="text-[11px] text-emerald-400/80 font-sans hidden sm:inline">
-                                          · Cambridge IGCSE 0455 Integrated Figure · {block.label}
-                                        </span>
-                                      </div>
-                                      {diagComment && (
-                                        <Badge
-                                          variant="outline"
-                                          className={cn(
-                                            "text-[10px] gap-1 cursor-pointer transition-colors",
-                                            isDiagActive
-                                              ? "border-emerald-400 bg-emerald-400/30 text-white font-bold"
-                                              : "border-emerald-500/40 bg-emerald-500/20 text-emerald-300",
-                                          )}
-                                        >
-                                          <MessageSquare className="size-2.5" />
-                                          <span>Decoded by Pass 4</span>
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div
-                                    key={block.index}
-                                    id={`pass4-para-${block.index}`}
-                                    onClick={() => {
-                                      if (paraComments.length > 0) {
-                                        const nextComment = isParaActive
-                                          ? paraComments[0]
-                                          : paraComments.find((c) => c.id !== activeCommentId) || paraComments[0];
-                                        setActiveCommentId(nextComment.id);
-                                        document
-                                          .getElementById(`pass4-card-${nextComment.id}`)
-                                          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                                      }
-                                    }}
-                                    className={cn(
-                                      "relative rounded-xl transition-all duration-200 leading-[1.95] tracking-tight p-3 sm:p-4",
-                                      paraComments.length > 0 ? "cursor-pointer group border-l-2" : "border-l-2 border-transparent",
-                                      isParaActive
-                                        ? "border-primary bg-primary/[0.03] dark:bg-primary/[0.06] shadow-xs"
-                                        : paraComments.length > 0
-                                          ? "border-border/80 hover:border-primary/50 hover:bg-muted/10"
-                                          : "",
-                                    )}
-                                  >
-                                    {paraComments.length > 0 && (
-                                      <div className="flex items-center justify-between gap-2 pb-1.5 text-xs select-none">
-                                        <div className="flex items-center gap-1.5 text-[11px] font-sans text-muted-foreground group-hover:text-foreground transition-colors">
-                                          <span
-                                            className={cn(
-                                              "inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full text-[9px] font-mono font-bold transition-all",
-                                              isParaActive
-                                                ? "bg-primary text-primary-foreground shadow-2xs"
-                                                : "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary",
-                                            )}
-                                          >
-                                            {paraComments.length}
-                                          </span>
-                                          <span className="font-medium text-[11px] text-muted-foreground">
-                                            {block.label}
-                                          </span>
-                                        </div>
-                                        {isParaActive && (
-                                          <span className="text-[10px] font-mono font-semibold text-primary/90 flex items-center gap-1">
-                                            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-                                            Active Passage
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                    {(() => {
-                                      const activeComment = paraComments.find((c) => c.id === activeCommentId);
-
-                                      if (isParaActive && activeComment) {
-                                        const span = findHighlightSpanInText(block.text, activeComment.highlightText);
-                                        const category = activeComment.category;
-                                        return (
-                                          <p className="text-foreground/95">
-                                            <span>{span.before}</span>
-                                            <span
-                                              className={cn(
-                                                "font-bold text-foreground transition-all duration-150 inline rounded-sm px-1 py-0.5",
-                                                category === "diagram"
-                                                  ? "bg-emerald-500/15 dark:bg-emerald-500/25 underline decoration-emerald-500 decoration-2 underline-offset-4 ring-1 ring-emerald-500/30 text-emerald-950 dark:text-emerald-100"
-                                                  : category === "evaluation"
-                                                    ? "bg-sky-500/15 dark:bg-sky-500/25 underline decoration-sky-500 decoration-2 underline-offset-4 ring-1 ring-sky-500/30 text-sky-950 dark:text-sky-100"
-                                                    : category === "knowledge"
-                                                      ? "bg-indigo-500/15 dark:bg-indigo-500/25 underline decoration-indigo-500 decoration-2 underline-offset-4 ring-1 ring-indigo-500/30 text-indigo-950 dark:text-indigo-100"
-                                                      : "bg-amber-500/15 dark:bg-amber-500/25 underline decoration-amber-500 decoration-2 underline-offset-4 ring-1 ring-amber-500/30 text-amber-950 dark:text-amber-100",
-                                              )}
-                                            >
-                                              {span.match}
-                                            </span>
-                                            <span>{span.after}</span>
-                                          </p>
-                                        );
-                                      }
-
-                                      if (paraComments.length > 0) {
-                                        const firstComment = paraComments[0];
-                                        const span = findHighlightSpanInText(block.text, firstComment.highlightText);
-                                        return (
-                                          <p className="text-foreground/95">
-                                            <span>{span.before}</span>
-                                            <span className="font-semibold text-foreground/90 underline decoration-muted-foreground/35 decoration-dashed underline-offset-4 hover:decoration-primary transition-colors cursor-pointer">
-                                              {span.match}
-                                            </span>
-                                            <span>{span.after}</span>
-                                          </p>
-                                        );
-                                      }
-
-                                      return <p className="text-foreground/95">{block.text}</p>;
-                                    })()}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-muted-foreground/40 italic font-sans text-sm">
-                                Candidate script is empty.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Right Column: Pass 4 Google Docs Comment Cards Stream (No inner scrollbar) */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                            <div className="flex items-center gap-1.5 font-bold text-xs text-foreground uppercase tracking-wider">
-                              <MessageSquare className="size-4 text-primary" />
-                              <span>Pass 4 Examiner Comments</span>
-                            </div>
-                            <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
-                              {pass4Comments.length} {pass4Comments.length === 1 ? "Comment" : "Comments"}
-                            </Badge>
-                          </div>
-
-                          {pass4Comments.length === 0 ? (
-                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-4 text-center space-y-1">
-                              <CheckCircle2 className="size-5 text-emerald-400 mx-auto" />
-                              <p className="text-xs font-semibold text-emerald-400">Exemplar Integration</p>
-                              <p className="text-[11px] text-muted-foreground">
-                                All diagrams, causal mechanisms, and evaluation criteria meet Cambridge standards.
-                              </p>
-                            </div>
-                          ) : (
-                            pass4Comments.map((comment) => {
-                              const isActive = activeCommentId === comment.id;
-                              const categoryColor =
-                                comment.category === "diagram"
-                                  ? "border-emerald-500/40 bg-emerald-500/[0.05] hover:border-emerald-500/70"
-                                  : comment.category === "evaluation"
-                                    ? "border-sky-500/40 bg-sky-500/[0.05] hover:border-sky-500/70"
-                                    : comment.category === "knowledge"
-                                      ? "border-indigo-500/40 bg-indigo-500/[0.05] hover:border-indigo-500/70"
-                                      : "border-amber-500/40 bg-amber-500/[0.05] hover:border-amber-500/70";
-
-                              const activeColor =
-                                comment.category === "diagram"
-                                  ? "ring-2 ring-emerald-400 border-emerald-500 bg-emerald-500/15 shadow-md"
-                                  : comment.category === "evaluation"
-                                    ? "ring-2 ring-sky-400 border-sky-500 bg-sky-500/15 shadow-md"
-                                    : comment.category === "knowledge"
-                                      ? "ring-2 ring-indigo-400 border-indigo-500 bg-indigo-500/15 shadow-md"
-                                      : "ring-2 ring-amber-400 border-amber-500 bg-amber-500/15 shadow-md";
-
-                              const badgeColor =
-                                comment.category === "diagram"
-                                  ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-400"
-                                  : comment.category === "evaluation"
-                                    ? "border-sky-500/40 bg-sky-500/20 text-sky-400"
-                                    : comment.category === "knowledge"
-                                      ? "border-indigo-500/40 bg-indigo-500/20 text-indigo-400"
-                                      : "border-amber-500/40 bg-amber-500/20 text-amber-400";
-
-                              return (
-                                <div
-                                  key={comment.id}
-                                  id={`pass4-card-${comment.id}`}
-                                  onClick={() => {
-                                    setActiveCommentId(comment.id);
-                                    document
-                                      .getElementById(`pass4-para-${comment.paragraphIndex}`)
-                                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                  }}
-                                  className={cn(
-                                    "rounded-xl border p-3.5 space-y-2.5 transition-all duration-200 cursor-pointer text-xs",
-                                    categoryColor,
-                                    isActive && activeColor,
-                                  )}
-                                >
-                                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                                    <span className={cn("px-2 py-0.5 rounded-md font-mono text-[10px] font-bold border", badgeColor)}>
-                                      {comment.badge}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-                                      <span>{comment.paragraphLabel || `¶ Paragraph ${comment.paragraphIndex + 1}`}</span>
-                                    </span>
-                                  </div>
-
-                                  <h5 className="font-bold text-xs text-foreground leading-snug">
-                                    {comment.title}
-                                  </h5>
-
-                                  {comment.highlightText && (
-                                    <div className="text-[11px] font-serif italic text-muted-foreground/90 bg-muted/30 border-l-2 border-primary/60 pl-2.5 py-1 rounded-r-md">
-                                      "{comment.highlightText.length > 130 ? `${comment.highlightText.slice(0, 127)}…` : comment.highlightText}"
-                                    </div>
-                                  )}
-
-                                  <div className="space-y-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1">
-                                      <span className="size-1.5 rounded-full bg-amber-400" /> Examiner Diagnostic:
-                                    </span>
-                                    <p className="text-[11.5px] text-foreground/90 leading-relaxed">
-                                      {comment.critique}
-                                    </p>
-                                  </div>
-
-                                  <div className="pt-2 border-t border-border/40 space-y-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
-                                      <Sparkles className="size-3 text-primary" /> Exemplar Fix:
-                                    </span>
-                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                      {comment.suggestion}
-                                    </p>
-                                  </div>
-
-                                  <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground/70">
-                                    <span>Click to highlight in script</span>
-                                    {isActive && <span className="font-semibold text-primary">● Active Pin</span>}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
+                      <Pass4ReviewWorkspace
+                        paragraphBlocks={paragraphBlocks}
+                        comments={pass4Comments}
+                        activeCommentId={activeCommentId}
+                        onSelectComment={setActiveCommentId}
+                        essayFont={essayFont}
+                        isFullMarks={(result.grading.total_mark ?? 0) >= (result.grading.max_mark ?? 8)}
+                        diagramMatches={inTextDiagrams.matches}
+                        onInspectDiagram={(entry) => setPreviewDiagram(entry)}
+                      />
                     ) : (
                       <div
                         id="tour-essay"
@@ -2644,146 +2309,26 @@ function GradePage() {
                   </div>
                 </div>
 
-                {/* Collapsed Candidate Diagnostic Report Teaser (Default View) */}
-                {result && !showDetailedReport && (
-                  <div className="pt-4 border-t border-border/70">
-                    <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-card border border-border/80 shadow-xs">
-                      <div className="flex items-center gap-3">
-                        <div className="size-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
-                          <Award className="size-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-foreground">
-                              Official Cambridge IGCSE 0455 Diagnostic Criteria Breakdown
-                            </h4>
-                            <Badge variant="outline" className="text-[10px] py-0 border-primary/30 text-primary">
-                              Full Matrix Available
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Full criteria matrix, Level boundaries, detailed AO feedback, and missing syllabus elements.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            setShowDetailedReport(true);
-                            setTimeout(() => {
-                              reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }, 100);
-                          }}
-                          className="h-8 px-3 text-xs font-bold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer"
-                        >
-                          <ChevronDown className="size-3.5" />
-                          <span>Show Full Report</span>
-                        </Button>
-                      </div>
-                    </div>
+                {/* Teacher Direct Grading Action (always accessible when graded in classroom mode) */}
+              {result && isDirectGradingMode && (
+                <div className="rounded-2xl border border-purple-500/40 bg-purple-950/40 p-4 sm:p-5 space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-purple-300 text-sm">Teacher Classroom Sync</span>
+                    <Badge className="bg-purple-600 text-white text-[10px]">Ready to Submit</Badge>
                   </div>
-                )}
-
-                {/* Expanded Full Cambridge Candidate Diagnostic Report (Opened On Demand) */}
-                {result && showDetailedReport && (
-                  <div ref={reportRef} id="detailed-report-section" className="space-y-6 pt-6 border-t border-border/70 w-full min-w-0 animate-in fade-in duration-200">
-                    <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-primary/[0.08] via-card to-card border border-primary/25 shadow-xs">
-                      <div className="flex items-center gap-3.5">
-                        <div className="size-11 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary font-black text-base shadow-xs shrink-0">
-                          <Award className="size-6 text-primary" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="font-bold text-base sm:text-lg text-foreground">
-                              Complete Cambridge IGCSE 0455 Candidate Diagnostic Report
-                            </h3>
-                            <Badge className="bg-primary text-primary-foreground font-bold text-xs px-2.5 py-0.5 shadow-xs">
-                              {result.grading.total_mark} / {result.grading.max_mark} Marks
-                            </Badge>
-                            <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary font-semibold text-xs">
-                              {result.grading.band}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Detailed criteria breakdown across Knowledge (AO1), Analysis (AO2), Evaluation (AO3), syllabus missing elements &amp; model exemplars.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDetailedBreakdownOpen(true)}
-                          className="gap-1.5 text-xs font-semibold border-border/80 hover:bg-muted cursor-pointer"
-                        >
-                          <Eye className="size-3.5 text-muted-foreground" />
-                          <span>Popout Dialog ↗</span>
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setShowDetailedReport(false);
-                            document.getElementById("candidate-report-header")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }}
-                          className="gap-1.5 text-xs font-semibold border-border/80 hover:bg-muted cursor-pointer text-muted-foreground hover:text-foreground"
-                        >
-                          <ChevronUp className="size-3.5" />
-                          <span>Hide Report</span>
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Teacher Direct Grading Action */}
-                    {isDirectGradingMode && (
-                      <div className="rounded-2xl border border-purple-500/40 bg-purple-950/40 p-4 sm:p-5 space-y-3 shadow-lg">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-purple-300 text-sm">Teacher Classroom Sync</span>
-                          <Badge className="bg-purple-600 text-white text-[10px]">Ready to Submit</Badge>
-                        </div>
-                        <p className="text-xs text-purple-200">
-                          Sync this official examiner grade ({result.grading.total_mark}/{maxMark}) and diagnostic report directly back to the student.
-                        </p>
-                        <Button
-                          size="sm"
-                          disabled={isReturningGrade}
-                          onClick={handleReturnToClassroom}
-                          className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-2.5 shadow-md cursor-pointer"
-                        >
-                          {isReturningGrade ? "Returning Grade..." : "Save & Return to Student"}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Full Comprehensive Candidate Report */}
-                    <div id="report-section" className="rounded-3xl border border-border/80 bg-card p-5 sm:p-8 shadow-xs">
-                      <MarkBreakdown grading={result.grading} question={question} />
-                    </div>
-
-                    {/* Bottom Hide Report Action Bar */}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground font-mono">Cambridge IGCSE 0455 Diagnostic Report</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setShowDetailedReport(false);
-                          document.getElementById("candidate-report-header")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }}
-                        className="gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        <ChevronUp className="size-3.5" />
-                        <span>Hide Report &amp; Return to Manuscript</span>
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  <p className="text-xs text-purple-200">
+                    Sync this official examiner grade ({result.grading.total_mark}/{maxMark}) and diagnostic report directly back to the student.
+                  </p>
+                  <Button
+                    size="sm"
+                    disabled={isReturningGrade}
+                    onClick={handleReturnToClassroom}
+                    className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-2.5 shadow-md cursor-pointer"
+                  >
+                    {isReturningGrade ? "Returning Grade..." : "Save & Return to Student"}
+                  </Button>
+                </div>
+              )}
               </div>
             )}
           </div>
@@ -3036,14 +2581,21 @@ function GradePage() {
 
           {/* Slide-out Handwriting OCR Drawer */}
           {ocrDrawerOpen && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-background/70 backdrop-blur-xs animate-in fade-in duration-200">
-              <div className="w-full max-w-lg bg-card border-l border-border h-full flex flex-col shadow-2xl p-6 space-y-4 animate-in slide-in-from-right duration-300">
+            <div
+              className="fixed inset-0 z-50 flex justify-end bg-background/70 backdrop-blur-xs animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setOcrDrawerOpen(false);
+              }}
+            >
+              <div className="w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-card border-l border-border h-full flex flex-col shadow-2xl p-4 sm:p-6 space-y-4 animate-in slide-in-from-right duration-300">
                 <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <div className="flex items-center gap-2">
-                    <Camera className="size-5 text-primary" />
+                    <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                      <Camera className="size-4.5" />
+                    </div>
                     <div>
                       <h3 className="font-bold text-sm text-foreground">Import Handwriting Scanner</h3>
-                      <p className="text-xs text-muted-foreground">Transcribe handwritten pages directly into script</p>
+                      <p className="text-xs text-muted-foreground">Transcribe handwritten exam pages directly into candidate script</p>
                     </div>
                   </div>
                   <Button
@@ -3051,12 +2603,12 @@ function GradePage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setOcrDrawerOpen(false)}
-                    className="size-8 rounded-xl"
+                    className="size-8 rounded-xl cursor-pointer"
                   >
                     <X className="size-4" />
                   </Button>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto pr-1">
                   <HandwritingUpload
                     hint={question}
                     onText={(text) => {
@@ -3074,11 +2626,18 @@ function GradePage() {
 
           {/* Slide-out Mark Scheme Vision Drawer */}
           {markSchemeDrawerOpen && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-background/70 backdrop-blur-xs animate-in fade-in duration-200">
-              <div className="w-full max-w-lg bg-card border-l border-border h-full flex flex-col shadow-2xl p-6 space-y-4 animate-in slide-in-from-right duration-300">
+            <div
+              className="fixed inset-0 z-50 flex justify-end bg-background/70 backdrop-blur-xs animate-in fade-in duration-200"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setMarkSchemeDrawerOpen(false);
+              }}
+            >
+              <div className="w-full max-w-full sm:max-w-xl md:max-w-2xl bg-card border-l border-border h-full flex flex-col shadow-2xl p-4 sm:p-6 space-y-4 animate-in slide-in-from-right duration-300">
                 <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <div className="flex items-center gap-2">
-                    <FileText className="size-5 text-primary" />
+                    <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                      <FileText className="size-4.5" />
+                    </div>
                     <div>
                       <h3 className="font-bold text-sm text-foreground">Vision Mark Scheme</h3>
                       <p className="text-xs text-muted-foreground">Attach screenshots of official Cambridge mark scheme</p>
@@ -3089,7 +2648,7 @@ function GradePage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setMarkSchemeDrawerOpen(false)}
-                    className="size-8 rounded-xl"
+                    className="size-8 rounded-xl cursor-pointer"
                   >
                     <X className="size-4" />
                   </Button>
@@ -3239,29 +2798,53 @@ function GradePage() {
             </div>
           )}
 
-          {/* Full Detailed Breakdown Dialog / Modal */}
+          {/* Scrollable Minimalist Diagnostic Report Popup Modal */}
           {detailedBreakdownOpen && result && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
-              <div className="w-full max-w-4xl bg-card border border-border rounded-3xl shadow-2xl p-6 sm:p-8 space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Award className="size-5 text-primary" />
-                    <div>
-                      <h3 className="font-bold text-base text-foreground">Complete Cambridge Diagnostic Report</h3>
-                      <p className="text-xs text-muted-foreground">Score: {result.grading.total_mark} / {result.grading.max_mark} · {result.grading.band}</p>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Cambridge 0455 Diagnostic Report"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setDetailedBreakdownOpen(false);
+              }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-sm p-3 sm:p-6 animate-in fade-in duration-150"
+            >
+              <div className="w-full max-w-4xl max-h-[88vh] flex flex-col bg-card border border-border/80 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+                {/* Sticky Minimalist Header */}
+                <div className="shrink-0 flex items-center justify-between gap-3 px-5 sm:px-7 py-3.5 border-b border-border/60 bg-card">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                    <div className="px-2.5 py-0.5 rounded-lg bg-primary text-primary-foreground font-black text-xs inline-flex items-baseline gap-0.5 shrink-0">
+                      <span>{result.grading.total_mark}</span>
+                      <span className="text-[10px] font-semibold opacity-80">/{result.grading.max_mark}</span>
                     </div>
+                    <h3 className="font-bold text-sm sm:text-base text-foreground truncate">
+                      Cambridge 0455 Diagnostic Report
+                    </h3>
+                    <Badge variant="outline" className="border-primary/35 bg-primary/10 text-primary font-semibold text-[11px] shrink-0">
+                      {result.grading.band}
+                    </Badge>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDetailedBreakdownOpen(false)}
-                    className="size-8 rounded-xl"
-                  >
-                    <X className="size-4" />
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="hidden sm:inline text-[11px] font-mono text-muted-foreground/70">
+                      Esc
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDetailedBreakdownOpen(false)}
+                      className="size-8 rounded-lg hover:bg-muted cursor-pointer"
+                      aria-label="Close diagnostic report"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
                 </div>
-                <MarkBreakdown grading={result.grading} />
+
+                {/* Independently Scrollable Report Body */}
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7 py-5">
+                  <MarkBreakdown grading={result.grading} question={question} />
+                </div>
               </div>
             </div>
           )}

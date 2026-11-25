@@ -1,4 +1,4 @@
-import { resolveLabels, uShape, type DiagramSpec, type Pt } from "./spec";
+import { ppcCurve, resolveLabels, uShape, type DiagramSpec, type Pt } from "./spec";
 import type { DiagramEntry } from "./types";
 
 /* Shared geometry so every market diagram uses identical conventions. */
@@ -2194,6 +2194,75 @@ export const MICRO_DIAGRAMS: DiagramEntry[] = build([
     ],
     realWorld: ["Large conglomerates that later demerged to cut management complexity."],
     related: ["economies-of-scale", "long-run-average-cost"],
-    examQuestions: ["Discuss whether firms always benefit from becoming larger. [12]"],
+    examQuestions: ["Discuss whether firms always benefit from becoming larger. [8]"],
+  },
+  {
+    id: "production-possibility-curve",
+    title: "Production Possibility Curve (PPC)",
+    topic: "The Basic Economic Problem",
+    level: "Core & Extended",
+    spec: {
+      xLabel: "Consumer Goods",
+      yLabel: "Capital Goods",
+      curves: [
+        {
+          points: ppcCurve(1),
+          label: "PPC1",
+          tone: "demand",
+          labelAt: [86, 12],
+        },
+        {
+          points: ppcCurve(1.16),
+          label: "PPC2",
+          tone: "accent",
+          dashed: true,
+          labelAt: [94, 20],
+        },
+      ],
+      markers: [
+        { at: [34, 76], label: "A (efficient)", guides: "both" },
+        { at: [68, 44], label: "B (reallocation)", guides: "both" },
+        { at: [30, 32], label: "U (inefficient)", guides: "none" },
+        { at: [82, 82], label: "X (unattainable)", guides: "none" },
+      ],
+      arrows: [
+        { from: [38, 70], to: [60, 48], label: "Opportunity cost" },
+        { from: [50, 56], to: [64, 68], label: "Economic growth" },
+      ],
+      notes: [
+        { at: [50, 94], text: "Concave shape reflects the law of increasing opportunity cost" },
+      ],
+    },
+    represents:
+      "The maximum potential combinations of two goods or services an economy can produce when all available resources are fully and efficiently employed.",
+    whyUsed:
+      "The fundamental Cambridge 0455 foundational model: illustrates scarcity, choice, opportunity cost, productive efficiency, unemployment of resources, and economic growth on a single diagram.",
+    whenToDraw:
+      "In Section 1 and Section 4 questions on scarcity, resource allocation, opportunity cost, reallocation between capital/consumer goods, supply-side potential, and economic growth.",
+    howToRead: [
+      "Any point ON the curve (like A or B) represents productive efficiency and full employment of all factor inputs.",
+      "A movement along the curve from A to B requires giving up capital goods to gain extra consumer goods: the marginal opportunity cost.",
+      "The concave shape (bowed outward from origin) is caused by the law of increasing opportunity cost: factors of production are not equally adaptable to producing both goods.",
+      "Any point INSIDE the curve (like U) indicates unemployed resources, productive inefficiency, or economic recession.",
+      "Any point OUTSIDE the curve (like X) is currently unattainable given the economy's current state of technology and factor endowment.",
+      "An outward shift from PPC1 to PPC2 shows an increase in the economy's productive potential — long-run economic growth.",
+    ],
+    labelKeys: ["Q"],
+    mistakes: [
+      "Assuming a point inside the PPC is unattainable — inside means resources are unemployed or inefficiently used.",
+      "Confusing a movement along the PPC (reallocation) with an outward shift of the PPC (economic growth).",
+    ],
+    tips: [
+      "Always identify the two axes as two broad categories of goods (e.g. Capital Goods vs Consumer Goods, or Agriculture vs Manufacturing).",
+      "Explain the opportunity cost clearly: to produce more consumer goods, capital goods must be foregone.",
+    ],
+    realWorld: [
+      "An economy investing heavily in education and green technology shifting its PPC outward over a decade.",
+    ],
+    related: ["economic-growth", "unemployment"],
+    examQuestions: [
+      "Explain why the production possibility curve (PPC) is bowed outwards. [4]",
+      "Discuss whether an economy should produce more capital goods than consumer goods. [8]",
+    ],
   },
 ]);

@@ -80,7 +80,45 @@ export async function rotateImageDataUrl(dataUrl: string, degrees = 90): Promise
   });
 }
 
-async function imageToDataUrl(file: File): Promise<string> {
+async function normalizeImageFile(file: File): Promise<File | Blob> {
+  const isHeic =
+    /\.(heic|heif)$/i.test(file.name) ||
+    file.type === "image/heic" ||
+    file.type === "image/heif";
+
+  if (!isHeic) return file;
+
+  // 1. Check if the browser natively decodes HEIC (e.g. Safari on macOS/iOS)
+  if (typeof createImageBitmap === "function") {
+    try {
+      const test = await createImageBitmap(file);
+      test.close();
+      return file;
+    } catch {
+      // Native decoding failed (Chromium, Firefox, Edge on Windows/Android/Linux)
+    }
+  }
+
+  // 2. Decode client-side via heic2any WebAssembly decoder
+  try {
+    const heic2any = (await import("heic2any")).default;
+    const converted = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    });
+    const blob = Array.isArray(converted) ? converted[0] : converted;
+    return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+      type: "image/jpeg",
+    });
+  } catch (error) {
+    console.warn("Client-side HEIC conversion failed, falling back to original file:", error);
+    return file;
+  }
+}
+
+async function imageToDataUrl(rawFile: File): Promise<string> {
+  const file = await normalizeImageFile(rawFile);
   try {
     let bitmap: ImageBitmap;
     try {
@@ -130,7 +168,7 @@ async function imageToDataUrl(file: File): Promise<string> {
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error(`Could not load ${file.name}. Please ensure it is a valid photo.`));
+        reject(new Error(`Could not load ${rawFile.name || "photo"}. Please ensure it is a valid photo.`));
       };
       img.src = url;
     });

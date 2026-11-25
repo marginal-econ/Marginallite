@@ -174,6 +174,8 @@ export function isDiagramBlock(
   if (/^\[\s*(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:[^\]]+\]$/i.test(t)) return true;
   // Standalone parenthesis diagram tag: e.g. (Diagram: Maximum Price), (Figure: J-Curve)
   if (/^\(\s*(?:Diagram|Figure|Fig|Graph)\s*:[^)]+\)$/i.test(t)) return true;
+  // Standalone curly-brace diagram tag: e.g. {Diagram: Depreciation}
+  if (/^\{\s*(?:Diagram|Figure|Fig|Graph)\s*:[^}]+\}$/i.test(t)) return true;
   // Short standalone bracket with explicit diagram words: e.g. (Maximum Price Diagram)
   if (/^\([^)]{3,80}\)$/.test(t) && /\b(?:diagram|curve|equilibrium|shortage|surplus|ppc|ppf)\b/i.test(t)) return true;
 
@@ -200,10 +202,84 @@ export function isDiagramBlock(
 }
 
 /**
+ * Normalizes accidental mid-sentence hard line-wraps (e.g. from PDF or OCR pastes)
+ * inside a single paragraph while preserving intentional line breaks (after colons,
+ * before bullet/list items, or before short formula lines).
+ */
+function normalizeInternalLineBreaks(chunk: string): string {
+  const lines = chunk
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length <= 1) return lines[0] || "";
+
+  let result = lines[0];
+  for (let i = 1; i < lines.length; i++) {
+    const prev = lines[i - 1];
+    const curr = lines[i];
+    const isListOrBullet = /^(?:[-•*–—]\s+|\d+[.)]\s+|(?:First|Second|Third|Fourth|Finally)[,:]\s+)/i.test(curr);
+    const isFormulaLine = curr.length <= 45 && /[=<>+\-×÷→]/.test(curr) && !/[.!?]$/.test(curr);
+    const prevEndsWithColon = /:\s*$/.test(prev);
+    const looksLikeHardWrap =
+      !/[.!?:;)\]}]$/.test(prev) && /^[a-z0-9(]/.test(curr) && !isListOrBullet && !isFormulaLine;
+
+    if (looksLikeHardWrap) {
+      result += ` ${curr}`;
+    } else if (prevEndsWithColon || isListOrBullet || isFormulaLine) {
+      result += `\n${curr}`;
+    } else {
+      result += ` ${curr}`;
+    }
+  }
+  return result;
+}
+
+/**
+ * Splits a single-newline essay (no blank lines between prose paragraphs) into coherent
+ * paragraphs while rejoining mid-sentence hard wraps and keeping colon-introduced
+ * formulas/lists attached to their parent paragraph.
+ */
+function splitSingleNewlineChunk(chunk: string): string[] {
+  const lines = chunk
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length <= 1) return lines;
+
+  const paragraphs: string[] = [];
+  let current = lines[0];
+
+  for (let i = 1; i < lines.length; i++) {
+    const prev = lines[i - 1];
+    const curr = lines[i];
+    const prevEndsSentence = /[.!?]["'”’)\]]*$/.test(prev);
+    const prevEndsColon = /:\s*$/.test(prev);
+    const currIsBullet = /^(?:[-•*–—]\s+|\d+[.)]\s+)/.test(curr);
+    const currIsFormula = curr.length <= 45 && /[=<>+\-×÷→]/.test(curr) && !/[.!?]$/.test(curr);
+    const currStartsLower = /^[a-z]/.test(curr);
+
+    if (prevEndsColon || currIsBullet || currIsFormula) {
+      current += `\n${curr}`;
+    } else if (!prevEndsSentence || currStartsLower) {
+      current += ` ${curr}`;
+    } else {
+      paragraphs.push(current.trim());
+      current = curr;
+    }
+  }
+
+  if (current.trim()) {
+    paragraphs.push(current.trim());
+  }
+
+  return paragraphs;
+}
+
+/**
  * Splits essay text into discrete paragraph blocks with unified indexing and syllabus labels.
  * Handles both double-newline (\n\n) and single-newline paragraph breaks cleanly,
- * and ensures standalone diagram lines are isolated into discrete blocks without corrupting
- * surrounding text paragraph counts.
+ * rejoins accidental PDF/OCR mid-sentence hard wraps, and ensures standalone diagram lines
+ * are isolated into discrete blocks without corrupting surrounding text paragraph counts.
  */
 export function parseParagraphBlocks(
   essayText: string,
@@ -213,23 +289,33 @@ export function parseParagraphBlocks(
 
   const normalized = essayText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 
-  // Ensure diagram tags on their own line are isolated by double-newlines
-  const diagramDelimited = normalized.replace(
-    /(^|\n)\s*(\[(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:[^\]]+\]|\((?:Diagram|Figure|Fig|Graph)\s*:[^)]+\))\s*($|\n)/gi,
-    "\n\n$2\n\n",
-  );
+  // Detect whether the author's original prose used blank lines (\n\n) between paragraphs
+  // (ignoring blank lines that we are about to inject around standalone diagram tags).
+  const standaloneDiagramLineRegex =
+    /(^|\n)\s*(\[(?:DIAGRAM|FIGURE|FIG|GRAPH)\s*:[^\]]+\]|\((?:Diagram|Figure|Fig|Graph)\s*:[^)]+\)|\{(?:Diagram|Figure|Fig|Graph)\s*:[^}]+\})\s*(?=$|\n)/gi;
 
-  let rawChunks = diagramDelimited
+  const proseWithoutDiagrams = normalized.replace(standaloneDiagramLineRegex, "").trim();
+  const hasExplicitBlankLineParagraphs = /\n\s*\n+/.test(proseWithoutDiagrams);
+
+  // Ensure diagram tags on their own line are isolated by double-newlines
+  const diagramDelimited = normalized.replace(standaloneDiagramLineRegex, "\n\n$2\n\n");
+
+  const initialChunks = diagramDelimited
     .split(/\n\s*\n+/)
     .map((chunk) => chunk.trim())
     .filter((chunk) => chunk.length > 0);
 
-  // If user used single newlines without blank lines, split by single newline if chunks <= 1
-  if (rawChunks.length <= 1 && normalized.split(/\n+/).filter((l) => l.trim().length > 0).length > 1) {
-    rawChunks = normalized
-      .split(/\n+/)
-      .map((chunk) => chunk.trim())
-      .filter((chunk) => chunk.length > 0);
+  const rawChunks: string[] = [];
+  for (const chunk of initialChunks) {
+    if (isDiagramBlock(chunk, diagramMatches)) {
+      rawChunks.push(chunk);
+    } else if (!hasExplicitBlankLineParagraphs && chunk.includes("\n")) {
+      rawChunks.push(...splitSingleNewlineChunk(chunk));
+    } else if (chunk.includes("\n")) {
+      rawChunks.push(normalizeInternalLineBreaks(chunk));
+    } else {
+      rawChunks.push(chunk);
+    }
   }
 
   let textCounter = 0;
@@ -654,6 +740,99 @@ export function findHighlightSpanInText(
     match: rawPara,
     after: "",
   };
+}
+
+export interface HighlightSegment {
+  text: string;
+  comment: Pass4Comment | null;
+  isActive: boolean;
+}
+
+/**
+ * Builds non-overlapping, lossless inline highlight segments for a paragraph that may
+ * have one or multiple Pass 4 comments. Concatenating every segment's `text` is
+ * guaranteed to equal `paragraphText` verbatim. When two comments target overlapping
+ * ranges, the currently active comment takes precedence.
+ */
+export function buildParagraphHighlightSegments(
+  paragraphText: string,
+  comments: Pass4Comment[],
+  activeCommentId: string | null,
+): HighlightSegment[] {
+  if (!paragraphText) return [];
+  if (comments.length === 0) {
+    return [{ text: paragraphText, comment: null, isActive: false }];
+  }
+
+  type Range = { start: number; end: number; comment: Pass4Comment; isActive: boolean };
+  const rawRanges: Range[] = [];
+
+  for (const comment of comments) {
+    const span = findHighlightSpanInText(paragraphText, comment.highlightText);
+    if (!span.match) continue;
+    const start = span.before.length;
+    const end = start + span.match.length;
+    if (end > start) {
+      rawRanges.push({
+        start,
+        end,
+        comment,
+        isActive: comment.id === activeCommentId,
+      });
+    }
+  }
+
+  if (rawRanges.length === 0) {
+    return [{ text: paragraphText, comment: null, isActive: false }];
+  }
+
+  // Prioritize active comment first, then earlier start, then shorter specific span
+  const prioritized = [...rawRanges].sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    if (a.start !== b.start) return a.start - b.start;
+    return a.end - a.start - (b.end - b.start);
+  });
+
+  const accepted: Range[] = [];
+  for (const candidate of prioritized) {
+    const overlaps = accepted.some(
+      (existing) => candidate.start < existing.end && candidate.end > existing.start,
+    );
+    if (!overlaps) {
+      accepted.push(candidate);
+    }
+  }
+
+  accepted.sort((a, b) => a.start - b.start);
+
+  const segments: HighlightSegment[] = [];
+  let cursor = 0;
+
+  for (const range of accepted) {
+    if (range.start > cursor) {
+      segments.push({
+        text: paragraphText.slice(cursor, range.start),
+        comment: null,
+        isActive: false,
+      });
+    }
+    segments.push({
+      text: paragraphText.slice(range.start, range.end),
+      comment: range.comment,
+      isActive: range.isActive,
+    });
+    cursor = range.end;
+  }
+
+  if (cursor < paragraphText.length) {
+    segments.push({
+      text: paragraphText.slice(cursor),
+      comment: null,
+      isActive: false,
+    });
+  }
+
+  return segments;
 }
 
 /**

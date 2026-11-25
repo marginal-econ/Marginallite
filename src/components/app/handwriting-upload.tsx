@@ -3,18 +3,24 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   AlertCircle,
   Camera,
+  Check,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  FileText,
   FileType,
   Images,
   Loader2,
+  Maximize2,
   PenLine,
+  Plus,
   RotateCw,
   Sparkles,
   Trash2,
+  UploadCloud,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CompactProgressBar, type ProgressStage } from "@/components/app/grading-progress";
@@ -32,24 +38,15 @@ export type StagedHandwritingPage = {
 };
 
 /**
- * Two separate, explicit upload slots rather than one input that guesses
- * from the file type — a PDF is ambiguous (a typed export vs. a scanned
- * photo of handwriting look identical to a file picker), so the user says
- * which one it is instead of the app trying to detect it:
+ * Modern Handwriting & Document Upload Panel
  *
- *  - "Typed answer": PDF or .txt/.md. Routed through the OCR pipeline
- *    (extract-text.ts / pdf-ocr.ts) — a real text layer (e.g. a PDF
- *    exported from Google Docs) is read directly, and a PDF with no text
- *    layer is OCR'd with Tesseract. This never calls Gemini.
- *
- *  - "Handwritten answer": photos, OR a PDF that is itself a scan of
- *    handwriting. Every page — however it arrived — is rasterised and sent
- *    through Gemini vision (ocr/gemini.server.ts), which is what's actually
- *    needed to read handwriting reliably; Tesseract cannot.
- *
- * Students can stage multiple pages, review thumbnails, see and adjust page
- * numbering (Page 1, Page 2, Page 3), move earlier/later, rotate orientation,
- * and transcribe.
+ * Supports:
+ * - Direct camera snaps (mobile rear-facing camera capture)
+ * - Multi-page photo and scanned PDF batch uploads (up to 12 pages)
+ * - Drag-and-drop dropzone with active hover feedback
+ * - Direct clipboard paste (Ctrl+V / Cmd+V) for screenshots and copied images
+ * - Staged page manager with 90° rotation, re-ordering, and full-screen lightbox inspection
+ * - Dedicated mode for digital typed answers (PDF text layer / Tesseract OCR)
  */
 export function HandwritingUpload({
   hint,
@@ -58,6 +55,10 @@ export function HandwritingUpload({
   hint?: string;
   onText: (text: string) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"handwritten" | "typed">("handwritten");
+  const [isDragging, setIsDragging] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
   const typedInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -72,6 +73,7 @@ export function HandwritingUpload({
   const [readPages, setReadPages] = useState(0);
   const [outstanding, setOutstanding] = useState<OutstandingPage[]>([]);
 
+  // Rotate a page 90 degrees clockwise
   async function handleRotatePage(id: string) {
     const page = stagedPages.find((p) => p.id === id);
     if (!page) return;
@@ -89,6 +91,119 @@ export function HandwritingUpload({
     }
   }
 
+  // Handle newly selected/dropped files
+  const handleFilesSelected = useCallback(
+    async (files: File[]) => {
+      if (!files || files.length === 0) return;
+
+      // If user uploaded a typed file while on typed tab, route to typedMutation
+      if (activeTab === "typed") {
+        typedMutation.mutate(files);
+        return;
+      }
+
+      setIsProcessingUpload(true);
+      setHandwrittenStage("Processing document pages…");
+      try {
+        const pageImages = await filesToPageImages(files);
+        const newItems: StagedHandwritingPage[] = pageImages.map((dataUrl, idx) => ({
+          id: crypto.randomUUID(),
+          dataUrl,
+          name: files[idx]?.name || `Page ${stagedPages.length + idx + 1}`,
+        }));
+
+        setStagedPages((current) => {
+          const combined = [...current, ...newItems];
+          if (combined.length > 12) {
+            toast.warning("Up to 12 pages maximum. Extra pages were trimmed.");
+            return combined.slice(0, 12);
+          }
+          return combined;
+        });
+
+        toast.success(
+          `Added ${newItems.length} page${newItems.length === 1 ? "" : "s"}. Inspect or reorder pages below before transcribing.`,
+        );
+      } catch (err: any) {
+        toast.error(err?.message || "Could not read image files.");
+      } finally {
+        setIsProcessingUpload(false);
+        setHandwrittenStage(null);
+      }
+    },
+    [activeTab, stagedPages.length],
+  );
+
+  // Global paste handler to support Ctrl+V / Cmd+V
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) pastedFiles.push(file);
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        toast.info(`Pasting ${pastedFiles.length} image${pastedFiles.length === 1 ? "" : "s"} from clipboard…`);
+        void handleFilesSelected(pastedFiles);
+      }
+    }
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [handleFilesSelected]);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setLightboxIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setLightboxIndex((curr) => (curr !== null && curr > 0 ? curr - 1 : curr));
+      } else if (e.key === "ArrowRight") {
+        setLightboxIndex((curr) =>
+          curr !== null && curr < stagedPages.length - 1 ? curr + 1 : curr,
+        );
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxIndex, stagedPages.length]);
+
+  // Drag and drop handlers
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) {
+      void handleFilesSelected(files);
+    }
+  }
+
+  // Typed OCR mutation
   const typedMutation = useMutation({
     mutationFn: async (files: File[]) => {
       let text = "";
@@ -112,7 +227,7 @@ export function HandwritingUpload({
         );
         text += (text ? "\n\n" : "") + outcome.text;
         pages += outcome.pages;
-        failedPages += outcome.failedPages?.length ?? 0;
+        failedPages += outcome.failedPages.length;
       }
 
       return { text, pages, failedPages };
@@ -124,36 +239,14 @@ export function HandwritingUpload({
           `${failedPages} page${failedPages === 1 ? "" : "s"} couldn't be OCR'd — check the text before grading.`,
         );
       } else {
-        toast.success(`Read ${pages} page${pages === 1 ? "" : "s"}.`);
+        toast.success(`Extracted text from ${pages} page${pages === 1 ? "" : "s"}.`);
       }
     },
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => setTypedStage(null),
   });
 
-  async function handleFilesSelected(files: File[]) {
-    if (!files || files.length === 0) return;
-    setIsProcessingUpload(true);
-    setHandwrittenStage("Processing document pages…");
-    try {
-      const pageImages = await filesToPageImages(files);
-      const newItems: StagedHandwritingPage[] = pageImages.map((dataUrl, idx) => ({
-        id: crypto.randomUUID(),
-        dataUrl,
-        name: files[idx]?.name || `Page ${stagedPages.length + idx + 1}`,
-      }));
-      setStagedPages((current) => [...current, ...newItems].slice(0, 12));
-      toast.success(
-        `Added ${newItems.length} page${newItems.length === 1 ? "" : "s"}. Review or reorder page numbering below before transcribing.`,
-      );
-    } catch (err: any) {
-      toast.error(err?.message || "Could not read image files.");
-    } finally {
-      setIsProcessingUpload(false);
-      setHandwrittenStage(null);
-    }
-  }
-
+  // Staged pages reordering and removal
   function movePage(index: number, direction: "prev" | "next") {
     setStagedPages((current) => {
       const target = direction === "prev" ? index - 1 : index + 1;
@@ -179,6 +272,7 @@ export function HandwritingUpload({
     handwrittenMutation.mutate(stagedPages.map((p) => p.dataUrl));
   }
 
+  // Vision AI transcription mutation
   const handwrittenMutation = useMutation({
     mutationFn: async (images: string[]) => {
       setHandwrittenStage(
@@ -190,9 +284,9 @@ export function HandwritingUpload({
     onSuccess: ({ images, result }) => {
       onText(result.text);
       setTotalPages(result.pages);
-      setReadPages(result.pages - (result.failedPages?.length ?? 0));
+      setReadPages(result.pages - result.failedPages.length);
 
-      const failed: OutstandingPage[] = (result.failedPages ?? []).map((page) => ({
+      const failed: OutstandingPage[] = result.failedPages.map((page) => ({
         page,
         image: images[page - 1]!,
         error: result.pageErrors?.[page] ?? null,
@@ -201,7 +295,7 @@ export function HandwritingUpload({
 
       if (failed.length === 0) {
         toast.success(
-          `All ${result.pages} page${result.pages === 1 ? "" : "s"} of handwriting read successfully.`,
+          `All ${result.pages} page${result.pages === 1 ? "" : "s"} of handwriting transcribed successfully.`,
         );
         setStagedPages([]);
       } else {
@@ -214,6 +308,7 @@ export function HandwritingUpload({
     onSettled: () => setHandwrittenStage(null),
   });
 
+  // Retry mutation for unreadable pages
   const retryMutation = useMutation({
     mutationFn: async (pages: OutstandingPage[]) => {
       setHandwrittenStage(`Retrying ${pages.length} page${pages.length === 1 ? "" : "s"}…`);
@@ -243,7 +338,7 @@ export function HandwritingUpload({
         onText(recovered.join("\n\n"));
         setReadPages((current) => current + recovered.length);
         toast.success(
-          `Recovered ${recovered.length} page${recovered.length === 1 ? "" : "s"} — added to the end of your answer. Move the text into place if needed.`,
+          `Recovered ${recovered.length} page${recovered.length === 1 ? "" : "s"} — appended to your answer text.`,
         );
       }
       setOutstanding(stillFailed);
@@ -258,114 +353,124 @@ export function HandwritingUpload({
   });
 
   return (
-    <div className="space-y-3">
-      {/* Primary Upload Options */}
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="space-y-1.5 rounded-lg border border-dashed border-border p-3 bg-muted/10">
-          <div className="flex items-center gap-1.5 text-xs font-semibold">
-            <FileType className="size-3.5 text-primary" />
-            Typed answer
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            PDF or text file — read directly / OCR'd.
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full text-xs"
-            disabled={typedMutation.isPending}
-            onClick={() => typedInput.current?.click()}
-          >
-            {typedMutation.isPending ? (
-              <Loader2 className="size-3.5 animate-spin mr-1.5" />
-            ) : (
-              <FileType className="size-3.5 mr-1.5" />
-            )}
-            Upload PDF / text
-          </Button>
-          {typedStage ? <p className="text-[11px] text-muted-foreground">{typedStage}</p> : null}
-          <CompactProgressBar
-            active={typedMutation.isPending}
-            stages={[
-              { label: "Inspecting uploaded file text layer", weight: 2 },
-              { label: "Extracting clean essay paragraphs", weight: 4 },
-            ] satisfies ProgressStage[]}
-            totalMs={14_000}
-            title={typedStage || "Extracting uploaded answer…"}
-          />
-          <input
-            ref={typedInput}
-            type="file"
-            accept=".pdf,.txt,.md,application/pdf,text/plain"
-            multiple
-            className="hidden"
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              if (files.length > 0) typedMutation.mutate(files);
-            }}
-          />
-        </div>
+    <div className="space-y-4">
+      {/* Tab Switcher: Handwritten vs Digital */}
+      <div className="flex items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/60">
+        <button
+          type="button"
+          onClick={() => setActiveTab("handwritten")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === "handwritten"
+              ? "bg-card text-foreground shadow-xs border border-border/80"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <PenLine className="size-3.5 text-primary" />
+          <span>Handwritten Photos</span>
+          <span className="hidden sm:inline-flex px-1.5 py-0.2 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+            Vision AI
+          </span>
+        </button>
 
-        <div className="space-y-1.5 rounded-lg border border-dashed border-border p-3 bg-muted/10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold">
-              <PenLine className="size-3.5 text-primary" />
-              Handwritten answer
-            </div>
-            <span className="text-[10px] text-muted-foreground font-medium">Multi-Page Photos</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            Upload multiple photos from your gallery or snap camera pages (up to 12 pages).
-          </p>
-          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full text-xs font-medium"
-              disabled={isProcessingUpload || handwrittenMutation.isPending}
-              onClick={() => galleryInput.current?.click()}
+        <button
+          type="button"
+          onClick={() => setActiveTab("typed")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === "typed"
+              ? "bg-card text-foreground shadow-xs border border-border/80"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <FileType className="size-3.5 text-primary" />
+          <span>Typed PDF / Text</span>
+          <span className="hidden sm:inline-flex px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground text-[10px] font-medium">
+            Digital
+          </span>
+        </button>
+      </div>
+
+      {/* Main Interactive Dropzone */}
+      {activeTab === "handwritten" ? (
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative group rounded-2xl border-2 border-dashed p-6 transition-all duration-200 text-center ${
+            isDragging
+              ? "border-primary bg-primary/10 scale-[1.01] shadow-lg shadow-primary/10"
+              : "border-border/80 hover:border-primary/50 bg-gradient-to-b from-card to-muted/20 hover:bg-muted/30"
+          }`}
+        >
+          <div className="flex flex-col items-center justify-center space-y-3">
+            {/* Animated Icon Circle */}
+            <div
+              className={`flex size-14 items-center justify-center rounded-2xl transition-transform duration-300 ${
+                isDragging
+                  ? "bg-primary text-primary-foreground scale-110 rotate-3"
+                  : "bg-primary/10 text-primary group-hover:scale-105"
+              }`}
             >
               {isProcessingUpload ? (
-                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                <Loader2 className="size-7 animate-spin text-primary" />
+              ) : isDragging ? (
+                <UploadCloud className="size-7 animate-bounce" />
               ) : (
-                <Images className="size-3.5 mr-1.5 text-primary" />
+                <Images className="size-7" />
               )}
-              Gallery / Photos
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="w-full text-xs font-medium"
-              disabled={isProcessingUpload || handwrittenMutation.isPending}
-              onClick={() => cameraInput.current?.click()}
-            >
-              <Camera className="size-3.5 mr-1.5 text-emerald-500" />
-              Take Photo
-            </Button>
+            </div>
+
+            <div className="space-y-1 max-w-md">
+              <h4 className="text-sm font-bold text-foreground tracking-tight">
+                {isDragging ? "Drop your handwritten pages here" : "Upload Handwritten Exam Pages"}
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Take live photos or upload from gallery. Multi-page scanning automatically stitches
+                your full essay into sequence.
+              </p>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isProcessingUpload || handwrittenMutation.isPending}
+                onClick={() => galleryInput.current?.click()}
+                className="h-9 px-4 rounded-xl text-xs font-semibold gap-2 border-border/80 shadow-2xs hover:border-primary/60 hover:bg-card cursor-pointer"
+              >
+                <Images className="size-4 text-primary" />
+                Browse Photos / PDFs
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isProcessingUpload || handwrittenMutation.isPending}
+                onClick={() => cameraInput.current?.click()}
+                className="h-9 px-4 rounded-xl text-xs font-semibold gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 cursor-pointer"
+              >
+                <Camera className="size-4" />
+                Snap Photo (Camera)
+              </Button>
+            </div>
+
+            {/* Format & Feature Pill Badges */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 border border-border/50">
+                HEIC / JPG / PNG / PDF
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 border border-border/50">
+                Up to 12 pages
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 border border-border/50">
+                Paste with <kbd className="font-mono text-[10px] bg-background px-1 py-0.2 rounded border border-border/60">Ctrl+V</kbd>
+              </span>
+            </div>
           </div>
-          {handwrittenStage ? (
-            <p className="text-[11px] text-muted-foreground">{handwrittenStage}</p>
-          ) : handwrittenMutation.isSuccess && totalPages > 0 ? (
-            <p className="text-[11px] text-muted-foreground">
-              {readPages} of {totalPages} page{totalPages === 1 ? "" : "s"} read.
-            </p>
-          ) : null}
-          <CompactProgressBar
-            active={isProcessingUpload || handwrittenMutation.isPending}
-            stages={[
-              { label: "Preparing & optimizing page images", weight: 2 },
-              { label: "Reading handwriting & economics diagrams", weight: 5 },
-              { label: "Ordering & formatting transcript", weight: 2 },
-            ] satisfies ProgressStage[]}
-            totalMs={22_000}
-            title={handwrittenStage || (isProcessingUpload ? "Preparing page images…" : "Transcribing handwritten pages…")}
-            estimatedTimeLabel="Est: ~10–25s"
-          />
-          {/* Gallery / Photos input: uncaptured, supports multiple image selection */}
+
+          {/* Hidden File Inputs */}
           <input
             ref={galleryInput}
             type="file"
@@ -378,11 +483,10 @@ export function HandwritingUpload({
               if (files.length > 0) void handleFilesSelected(files);
             }}
           />
-          {/* Camera input: capture="environment" for live camera snaps */}
           <input
             ref={cameraInput}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             capture="environment"
             multiple
             className="hidden"
@@ -393,22 +497,104 @@ export function HandwritingUpload({
             }}
           />
         </div>
-      </div>
+      ) : (
+        /* Typed PDF / Document Upload */
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative group rounded-2xl border-2 border-dashed p-6 transition-all duration-200 text-center ${
+            isDragging
+              ? "border-primary bg-primary/10 scale-[1.01]"
+              : "border-border/80 hover:border-primary/50 bg-gradient-to-b from-card to-muted/20 hover:bg-muted/30"
+          }`}
+        >
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              {typedMutation.isPending ? (
+                <Loader2 className="size-7 animate-spin text-primary" />
+              ) : (
+                <FileText className="size-7" />
+              )}
+            </div>
 
-      {/* Visual Staged Document Page Manager & Sequence Viewer */}
+            <div className="space-y-1 max-w-md">
+              <h4 className="text-sm font-bold text-foreground tracking-tight">
+                Upload Digital Essay or Typed PDF
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Directly extracts typed text layers from Word, Google Docs exports, and text files.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={typedMutation.isPending}
+              onClick={() => typedInput.current?.click()}
+              className="h-9 px-5 rounded-xl text-xs font-semibold gap-2 border-border/80 shadow-2xs hover:border-primary/60 hover:bg-card cursor-pointer"
+            >
+              {typedMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin text-primary" />
+              ) : (
+                <FileType className="size-4 text-primary" />
+              )}
+              Select PDF or Text File
+            </Button>
+
+            <div className="text-[11px] text-muted-foreground">
+              Accepts .pdf, .txt, or .md files
+            </div>
+          </div>
+
+          <input
+            ref={typedInput}
+            type="file"
+            accept=".pdf,.txt,.md,application/pdf,text/plain"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = "";
+              if (files.length > 0) typedMutation.mutate(files);
+            }}
+          />
+
+          {typedMutation.isPending && (
+            <div className="mt-4 pt-3 border-t border-border/60">
+              <CompactProgressBar
+                active={typedMutation.isPending}
+                stages={[
+                  { label: "Inspecting document text layer", weight: 2 },
+                  { label: "Extracting essay paragraphs & diagrams", weight: 4 },
+                ] satisfies ProgressStage[]}
+                totalMs={12_000}
+                title={typedStage || "Extracting digital answer…"}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Visual Staged Document Page Manager */}
       {stagedPages.length > 0 && (
-        <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.02] p-3 sm:p-4 shadow-xs">
-          <div className="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <span className="flex size-5 sm:size-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-2xs">
+        <div className="space-y-3.5 rounded-2xl border border-primary/30 bg-card/60 p-3.5 sm:p-5 shadow-xs">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-border/60">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-2xs">
                 {stagedPages.length}
               </span>
               <div>
-                <h4 className="text-xs font-bold text-foreground">
-                  Document Pages ({stagedPages.length} of 12 max)
+                <h4 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5">
+                  Staged Exam Pages
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    ({stagedPages.length} of 12 max)
+                  </span>
                 </h4>
                 <p className="text-[11px] text-muted-foreground">
-                  Confirm page numbers (1, 2, 3…) and ordering before AI handwriting evaluation.
+                  Check page sequence (1, 2, 3…), rotate if needed, or click to zoom before transcribing.
                 </p>
               </div>
             </div>
@@ -418,114 +604,141 @@ export function HandwritingUpload({
               variant="ghost"
               size="sm"
               onClick={clearAllStaged}
-              className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive cursor-pointer"
+              className="h-7 px-2.5 text-[11px] text-muted-foreground hover:text-destructive cursor-pointer rounded-lg"
             >
-              <X className="size-3 mr-1" />
+              <Trash2 className="size-3 mr-1.5" />
               Clear all
             </Button>
           </div>
 
           {/* Staged Pages Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {stagedPages.map((page, idx) => (
               <div
                 key={page.id}
-                className="group relative flex flex-col rounded-lg border border-border/80 bg-card overflow-hidden shadow-2xs hover:border-primary/50 transition-all"
+                className="group relative flex flex-col rounded-xl border border-border/80 bg-card overflow-hidden shadow-2xs hover:border-primary/60 hover:shadow-md transition-all duration-150"
               >
-                {/* Header with Page Number Badge and Controls */}
-                <div className="flex items-center justify-between px-2.5 py-1.5 bg-muted/70 border-b border-border/60">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary">
-                    <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                {/* Header Badge & Quick Actions */}
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-muted/60 border-b border-border/60">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary">
+                    <span className="size-1.5 rounded-full bg-primary" />
                     Page {idx + 1}
                   </span>
-                  <div className="flex items-center gap-1">
+
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
                       disabled={rotatingId === page.id}
                       onClick={() => void handleRotatePage(page.id)}
                       aria-label={`Rotate page ${idx + 1} 90° clockwise`}
-                      className="text-muted-foreground hover:text-primary transition-colors p-1 rounded cursor-pointer disabled:opacity-40"
+                      className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-background/80 transition-colors cursor-pointer disabled:opacity-40"
                       title="Rotate 90° clockwise"
                     >
-                      <RotateCw className={`size-3.5 ${rotatingId === page.id ? "animate-spin text-primary" : ""}`} />
+                      <RotateCw
+                        className={`size-3.5 ${rotatingId === page.id ? "animate-spin text-primary" : ""}`}
+                      />
                     </button>
                     <button
                       type="button"
                       onClick={() => removePage(page.id)}
                       aria-label={`Remove page ${idx + 1}`}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded cursor-pointer"
+                      className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                       title="Remove page"
                     >
-                      <Trash2 className="size-3.5" />
+                      <X className="size-3.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Page Thumbnail */}
-                <div className="relative aspect-[3/4] w-full bg-muted/20 overflow-hidden flex items-center justify-center">
+                {/* Page Thumbnail with Zoom Lightbox Trigger */}
+                <div
+                  onClick={() => setLightboxIndex(idx)}
+                  className="relative aspect-[3/4] w-full bg-muted/20 overflow-hidden flex items-center justify-center cursor-pointer group/thumb"
+                  title="Click to zoom and inspect handwriting"
+                >
                   <img
                     src={page.dataUrl}
-                    alt={`Document Page ${idx + 1}`}
-                    className="h-full w-full object-cover"
+                    alt={`Page ${idx + 1}`}
+                    className="h-full w-full object-contain p-1.5 transition-transform duration-200 group-hover/thumb:scale-[1.02]"
                   />
-                  <div className="absolute bottom-1 left-1.5 rounded bg-background/80 px-1 py-0.5 text-[9px] font-mono text-muted-foreground backdrop-blur-xs">
+
+                  {/* Hover Inspect Overlay */}
+                  <div className="absolute inset-0 bg-background/60 backdrop-blur-2xs opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground">
+                    <Maximize2 className="size-4 text-primary" />
+                    <span>Zoom</span>
+                  </div>
+
+                  <div className="absolute bottom-1.5 left-2 rounded-md bg-background/90 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground backdrop-blur-xs border border-border/40">
                     #{idx + 1}
                   </div>
                 </div>
 
-                {/* Reordering and Rotate Controls */}
-                <div className="flex items-center justify-between p-1 bg-background border-t border-border/60">
+                {/* Bottom Reordering Controls */}
+                <div className="flex items-center justify-between p-1 bg-muted/30 border-t border-border/60">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={idx === 0}
                     onClick={() => movePage(idx, "prev")}
-                    className="h-6 px-1.5 text-[10px] gap-0.5 font-medium disabled:opacity-20 cursor-pointer"
-                    title="Move earlier in sequence (Page - 1)"
+                    className="h-6 px-1.5 text-[10px] gap-0.5 font-medium disabled:opacity-20 cursor-pointer rounded"
+                    title="Move earlier (Page - 1)"
                   >
                     <ChevronLeft className="size-3" />
-                    Earlier
+                    Left
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={rotatingId === page.id}
-                    onClick={() => void handleRotatePage(page.id)}
-                    className="h-6 px-1.5 text-[10px] gap-1 font-medium cursor-pointer text-muted-foreground hover:text-primary"
-                    title="Rotate 90° clockwise"
-                  >
-                    <RotateCw className={`size-3 ${rotatingId === page.id ? "animate-spin" : ""}`} />
-                    Rotate
-                  </Button>
+
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {idx + 1}/{stagedPages.length}
+                  </span>
+
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={idx === stagedPages.length - 1}
                     onClick={() => movePage(idx, "next")}
-                    className="h-6 px-1.5 text-[10px] gap-0.5 font-medium disabled:opacity-20 cursor-pointer"
-                    title="Move later in sequence (Page + 1)"
+                    className="h-6 px-1.5 text-[10px] gap-0.5 font-medium disabled:opacity-20 cursor-pointer rounded"
+                    title="Move later (Page + 1)"
                   >
-                    Later
+                    Right
                     <ChevronRight className="size-3" />
                   </Button>
                 </div>
               </div>
             ))}
+
+            {/* Quick "+ Add Another Page" Slot */}
+            {stagedPages.length < 12 && (
+              <button
+                type="button"
+                onClick={() => galleryInput.current?.click()}
+                disabled={isProcessingUpload || stagedPages.length >= 12}
+                className="flex flex-col items-center justify-center aspect-[3/4] rounded-xl border-2 border-dashed border-border/70 hover:border-primary/60 bg-muted/10 hover:bg-muted/30 transition-all p-3 text-center cursor-pointer group"
+              >
+                <div className="size-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors mb-2">
+                  <Plus className="size-4" />
+                </div>
+                <span className="text-xs font-semibold text-foreground group-hover:text-primary">
+                  Add Page
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Photo or scan
+                </span>
+              </button>
+            )}
           </div>
 
-          {/* Action Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-border/60">
-            <div className="flex items-center gap-1.5">
+          {/* Action Call To Action Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => galleryInput.current?.click()}
                 disabled={stagedPages.length >= 12 || isProcessingUpload}
-                className="h-8 flex-1 sm:flex-initial text-xs gap-1.5 font-medium"
+                className="h-8.5 px-3 rounded-lg text-xs gap-1.5 font-medium cursor-pointer"
               >
                 <Images className="size-3.5 text-primary" />
                 Add Photos
@@ -536,10 +749,10 @@ export function HandwritingUpload({
                 size="sm"
                 onClick={() => cameraInput.current?.click()}
                 disabled={stagedPages.length >= 12 || isProcessingUpload}
-                className="h-8 flex-1 sm:flex-initial text-xs gap-1.5 font-medium"
+                className="h-8.5 px-3 rounded-lg text-xs gap-1.5 font-medium text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
               >
-                <Camera className="size-3.5 text-emerald-500" />
-                Add Camera Snap
+                <Camera className="size-3.5" />
+                Add Snap
               </Button>
             </div>
 
@@ -548,49 +761,76 @@ export function HandwritingUpload({
               size="sm"
               disabled={handwrittenMutation.isPending || isProcessingUpload}
               onClick={handleTranscribeStaged}
-              className="h-8 px-4 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+              className="h-9 px-5 rounded-xl text-xs font-bold gap-2 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md hover:shadow-lg hover:brightness-105 transition-all cursor-pointer"
             >
               {handwrittenMutation.isPending ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   Transcribing {stagedPages.length} Pages…
                 </>
               ) : (
                 <>
-                  <Sparkles className="size-3.5" />
-                  Transcribe {stagedPages.length} Page{stagedPages.length === 1 ? "" : "s"} into Essay
+                  <Sparkles className="size-4" />
+                  Transcribe {stagedPages.length} Page{stagedPages.length === 1 ? "" : "s"} with Vision AI
                 </>
               )}
             </Button>
           </div>
+
+          {/* Progress Bar during Transcription */}
+          {(isProcessingUpload || handwrittenMutation.isPending) && (
+            <div className="pt-2">
+              <CompactProgressBar
+                active={isProcessingUpload || handwrittenMutation.isPending}
+                stages={[
+                  { label: "Preparing & enhancing page images", weight: 2 },
+                  { label: "Transcribing handwriting & economics diagrams", weight: 5 },
+                  { label: "Formatting paragraphs & candidate script", weight: 2 },
+                ] satisfies ProgressStage[]}
+                totalMs={22_000}
+                title={
+                  handwrittenStage ||
+                  (isProcessingUpload
+                    ? "Preparing page images…"
+                    : `Transcribing ${stagedPages.length} handwritten pages…`)
+                }
+                estimatedTimeLabel="Est: ~10–25s"
+              />
+            </div>
+          )}
         </div>
       )}
 
-      {outstanding.length > 0 ? (
-        <div className="space-y-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-            <AlertCircle className="size-3.5 shrink-0" />
-            {outstanding.length} page{outstanding.length === 1 ? "" : "s"} couldn't be read
-            {outstanding.length === 1 ? ` (page ${outstanding[0]!.page})` : ""}
+      {/* Unreadable Pages Recovery Card */}
+      {outstanding.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3.5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>
+                {outstanding.length} page{outstanding.length === 1 ? "" : "s"} need retry
+                {outstanding.length === 1 ? ` (page ${outstanding[0]!.page})` : ""}
+              </span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={retryMutation.isPending}
+              onClick={() => retryMutation.mutate(outstanding)}
+              className="h-7 px-3 rounded-lg text-xs font-semibold border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
+            >
+              {retryMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin mr-1.5" />
+              ) : (
+                <RotateCw className="size-3.5 mr-1.5" />
+              )}
+              Retry Now
+            </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Usually a blurry, dark, or cropped photo — retry, or reshoot that page and upload it on
-            its own.
+            This typically happens if a photo is blurry, dark, or cropped. Click retry or snap a clearer photo.
           </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={retryMutation.isPending}
-            onClick={() => retryMutation.mutate(outstanding)}
-          >
-            {retryMutation.isPending ? (
-              <Loader2 className="size-3.5 animate-spin mr-1.5" />
-            ) : (
-              <RotateCw className="size-3.5 mr-1.5" />
-            )}
-            Retry {outstanding.length} page{outstanding.length === 1 ? "" : "s"}
-          </Button>
           <CompactProgressBar
             active={retryMutation.isPending}
             stages={[
@@ -601,7 +841,93 @@ export function HandwritingUpload({
             title={`Retrying ${outstanding.length} unreadable page${outstanding.length === 1 ? "" : "s"}…`}
           />
         </div>
-      ) : null}
+      )}
+
+      {/* Lightbox / Zoom Preview Modal */}
+      {lightboxIndex !== null && stagedPages[lightboxIndex] && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLightboxIndex(null);
+          }}
+        >
+          {/* Lightbox Topbar */}
+          <div className="flex items-center justify-between px-4 py-3 bg-black/40 border-b border-white/10 text-white">
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-sm">
+                Page {lightboxIndex + 1} of {stagedPages.length}
+              </span>
+              <span className="text-xs text-white/60 font-mono hidden sm:inline">
+                {stagedPages[lightboxIndex]?.name}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleRotatePage(stagedPages[lightboxIndex]!.id)}
+                className="h-8 px-2.5 rounded-lg text-xs text-white hover:bg-white/10 cursor-pointer gap-1.5"
+              >
+                <RotateCw className="size-3.5" />
+                Rotate 90°
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setLightboxIndex(null)}
+                className="size-8 rounded-lg text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Lightbox Image Preview Area */}
+          <div className="relative flex-1 flex items-center justify-center p-4 overflow-hidden">
+            <img
+              src={stagedPages[lightboxIndex]?.dataUrl}
+              alt={`Page ${lightboxIndex + 1}`}
+              className="max-h-[82vh] max-w-[92vw] object-contain rounded-lg shadow-2xl transition-transform"
+            />
+
+            {/* Left Nav Arrow */}
+            {lightboxIndex > 0 && (
+              <button
+                type="button"
+                onClick={() => setLightboxIndex((curr) => (curr !== null ? curr - 1 : 0))}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/90 border border-white/20 transition-all cursor-pointer"
+                title="Previous page (Left Arrow)"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+            )}
+
+            {/* Right Nav Arrow */}
+            {lightboxIndex < stagedPages.length - 1 && (
+              <button
+                type="button"
+                onClick={() => setLightboxIndex((curr) => (curr !== null ? curr + 1 : 0))}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/60 text-white hover:bg-black/90 border border-white/20 transition-all cursor-pointer"
+                title="Next page (Right Arrow)"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            )}
+          </div>
+
+          {/* Lightbox Footer Note */}
+          <div className="py-2 text-center text-xs text-white/50 bg-black/40 border-t border-white/10">
+            Use <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-[10px]">←</kbd> and{" "}
+            <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-[10px]">→</kbd> keys to flip pages •{" "}
+            <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-[10px]">Esc</kbd> to close
+          </div>
+        </div>
+      )}
     </div>
   );
 }
